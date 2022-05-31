@@ -302,6 +302,7 @@ class MLP(nn.Module):
 
 
 def build(args):
+    # 已看過
     # the `num_classes` naming here is somewhat misleading.
     # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
     # is the maximum id for a class in your dataset. For example,
@@ -310,13 +311,21 @@ def build(args):
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
+    # ----------------------------------------------------------------------------
+    # num_classes = 要預測的目標數量再加一，以VOC為例我們就需要把num_classes設定成21
+    # coco_panoptic是全景分析的數據集
+    # ----------------------------------------------------------------------------
     num_classes = 20 if args.dataset_file != 'coco' else 91
     if args.dataset_file == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
+
     device = torch.device(args.device)
 
+    # ----------------------------------------------------------------------------
+    # 構建backbone
+    # ----------------------------------------------------------------------------
     backbone = build_backbone(args)
 
     transformer = build_transformer(args)

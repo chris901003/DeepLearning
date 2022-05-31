@@ -14,8 +14,11 @@ class PositionEmbeddingSine(nn.Module):
     This is a more standard version of the position embedding, very similar to the one
     used by the Attention is all you need paper, generalized to work on images.
     """
+    # 由下面的build_position_encoding構建
     def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
+        # 已看過
         super().__init__()
+        # num_pos_feats = 進入Transformer前的channel的一半，這裡預設會是128
         self.num_pos_feats = num_pos_feats
         self.temperature = temperature
         self.normalize = normalize
@@ -52,13 +55,20 @@ class PositionEmbeddingLearned(nn.Module):
     """
     Absolute pos embedding, learned.
     """
+    # 由下面的build_position_encoding構建
     def __init__(self, num_pos_feats=256):
+        # 已看過
         super().__init__()
+        # 這裡預設傳進來的num_pos_feats = 128
+        # nn.Embedding(x, y) = 會構建出一個大小為x且每個x會給一個向量維度為num_pos_feats的東西
+        # 這裡個給50個是一個給基數一個給偶數
         self.row_embed = nn.Embedding(50, num_pos_feats)
         self.col_embed = nn.Embedding(50, num_pos_feats)
         self.reset_parameters()
 
     def reset_parameters(self):
+        # 已看過
+        # 初始化row_embed以及col_embed，方式為正態分佈且mean=0, std=1
         nn.init.uniform_(self.row_embed.weight)
         nn.init.uniform_(self.col_embed.weight)
 
@@ -77,7 +87,11 @@ class PositionEmbeddingLearned(nn.Module):
 
 
 def build_position_encoding(args):
+    # 已看過
+    # hidden_dim = 256，這裡就是在進入Transformer前會透過一個kernel_size=1的Conv把channel變成256
+    # N_steps = 一半的hidden_dim，估計是會構建出兩個embedding一個是給基數一個給偶數
     N_steps = args.hidden_dim // 2
+    # position_embedding在main中只有sine或是learned兩種選項
     if args.position_embedding in ('v2', 'sine'):
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
@@ -86,4 +100,5 @@ def build_position_encoding(args):
     else:
         raise ValueError(f"not supported {args.position_embedding}")
 
+    # 把實例化後的position_embedding物件回傳回去
     return position_embedding
