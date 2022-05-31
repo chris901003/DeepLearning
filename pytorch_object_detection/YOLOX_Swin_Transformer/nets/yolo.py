@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from swin_transformer import swin_base_patch4_window12_384_in22k
+from .swin_transformer import swin_base_patch4_window12_384_in22k
 
 
 class SiLU(nn.Module):
@@ -42,7 +42,7 @@ class BaseConv(nn.Module):
 class Bottleneck(nn.Module):
     def __init__(self, in_channels, out_channels, shortcut=True, expansion=0.5, depthwise=False, act='silu'):
         super(Bottleneck, self).__init__()
-        hidden_channels = int(in_channels * expansion)
+        hidden_channels = int(out_channels * expansion)
         Conv = BaseConv
         self.conv1 = BaseConv(in_channels, hidden_channels, 1, stride=1, act=act)
         self.conv2 = Conv(hidden_channels, out_channels, 3, stride=1, act=act)
@@ -58,7 +58,7 @@ class Bottleneck(nn.Module):
 class CSPLayer(nn.Module):
     def __init__(self, in_channels, out_channels, n=1, shortcut=True, expansion=0.5, depthwise=False, act='silu'):
         super(CSPLayer, self).__init__()
-        hidden_channel = int(in_channels * expansion)
+        hidden_channel = int(out_channels * expansion)
         self.conv1 = BaseConv(in_channels, hidden_channel, 1, stride=1, act=act)
         self.conv2 = BaseConv(in_channels, hidden_channel, 1, stride=1, act=act)
         self.conv3 = BaseConv(2 * hidden_channel, out_channels, 1, stride=1, act=act)
@@ -127,7 +127,7 @@ class YOLOPAFPN(nn.Module):
         Conv = BaseConv
         self.backbone = swin_base_patch4_window12_384_in22k()
         self.in_features = in_features
-        self.upsample = nn.Upsample(scale_factor=2, mode='nearset')
+        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.lateral_conv0 = BaseConv(int(in_channels[2] * width), int(in_channels[1] * width), 1, 1, act=act)
         self.C3_p4 = CSPLayer(
             int(2 * in_channels[1] * width),
@@ -139,7 +139,7 @@ class YOLOPAFPN(nn.Module):
         )
         self.reduce_conv1 = BaseConv(int(in_channels[1] * width), int(in_channels[0] * width), 1, 1, act=act)
         self.C3_p3 = CSPLayer(
-            int(2 * in_channels[1] * width),
+            int(2 * in_channels[0] * width),
             int(in_channels[0] * width),
             round(3 * depth),
             False,

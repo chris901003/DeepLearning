@@ -98,7 +98,7 @@ def train():
     #   input_shape     输入的shape大小，一定要是32的倍数
     # ------------------------------------------------------#
     # 輸入到網路訓練圖片的大小，不是數據集中圖片的大小
-    input_shape = [640, 640]
+    input_shape = [384, 384]
     # ------------------------------------------------------#
     #   所使用的YoloX的版本。nano、tiny、s、m、l、x
     # ------------------------------------------------------#
@@ -227,7 +227,7 @@ def train():
     #   （二）此处设置评估参数较为保守，目的是加快评估速度。
     # ------------------------------------------------------------------#
     eval_flag = True
-    eval_period = 10
+    eval_period = 1
     # ------------------------------------------------------------------#
     #   num_workers     用于设置是否使用多线程读取数据
     #                   开启后会加快数据读取速度，但是会占用更多内存
@@ -239,8 +239,8 @@ def train():
     #   获得图片路径和标签
     # ----------------------------------------------------#
     # 文檔中包含圖像路徑以及gt_box的座標，這裡給的是絕對座標且是左上右下的點(xmin, ymin, xmax, ymax, class)
-    train_annotation_path = '2007_train.txt'
-    val_annotation_path = '2007_val.txt'
+    train_annotation_path = '2012_train.txt'
+    val_annotation_path = '2012_val.txt'
 
     # ------------------------------------------------------#
     #   设置用到的显卡
@@ -285,7 +285,7 @@ def train():
         # ------------------------------------------------------#
         # 取出預訓練權重
         model_dict = model.state_dict()
-        pretrained_dict = torch.load(model_path, map_location=device)
+        pretrained_dict = torch.load(model_path, map_location=device)['model']
         load_key, no_load_key, temp_dict = [], [], {}
         # 過濾出哪些是我們可以對應上的權重
         for k, v in pretrained_dict.items():
@@ -578,8 +578,8 @@ def train():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--Cuda', type=bool, default=torch.cuda.is_available())
-    parser.add_argument('--model-path', type=str, default='model_data/yolox_m.pth')
-    parser.add_argument('--phi', type=str, default='m')
-    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--model-path', type=str, default='model_data/swin_base_patch4_window12_384.pth')
+    parser.add_argument('--phi', type=str, default='l')
+    parser.add_argument('--batch-size', type=int, default=32)
     opt = parser.parse_args()
     train()

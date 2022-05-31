@@ -275,10 +275,11 @@ class BasicLayer(nn.Module):
                 x = checkpoint.checkpoint(blk, x, attn_mask)
             else:
                 x = blk(x, attn_mask)
+        swin_output = x
         if self.downsample is not None:
             x = self.downsample(x, H, W)
             H, W = (H + 1) // 2, (W + 1) // 2
-        return x, H, W
+        return x, H, W, swin_output
 
 
 class SwinTransformer(nn.Module):
@@ -334,9 +335,14 @@ class SwinTransformer(nn.Module):
         x = self.pos_drop(x)
         output = {}
         for stage, layer in enumerate(self.layers):
-            x, H, W = layer(x, H, W)
-            B, L, C = x.shape()
-            output[f'stage{stage + 1}'] = x.reshape(B, H, W, C).permute(0, 3, 1, 2).contiguous()
+            x, H, W, swin_output = layer(x, H, W)
+            B, L, C = x.shape
+            h, w, c = int(H), int(W), int(C)
+            if stage != 3:
+                h *= 2
+                w *= 2
+                c //= 2
+            output[f'stage{stage + 1}'] = swin_output.reshape(B, h, w, c).permute(0, 3, 1, 2).contiguous()
         return output
 
 
