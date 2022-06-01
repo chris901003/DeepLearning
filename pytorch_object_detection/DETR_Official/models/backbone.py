@@ -116,6 +116,8 @@ class Backbone(BackboneBase):
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
         # 已看過
+        # 繼承nn.Sequential後在forward函數中可以用self[0]來呼叫backbone的forward函數
+        # 也可以用self[1]來呼叫position_embedding的forward函數
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
