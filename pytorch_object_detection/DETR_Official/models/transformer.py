@@ -21,13 +21,19 @@ class Transformer(nn.Module):
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
                  return_intermediate_dec=False):
+        # 已看過
+        # d_model預設為256
+        # return_intermediate_dec預設為True，估計是為了每個decoder出來的都會拿去預測，可以讓每層都學得好
         super().__init__()
 
+        # 構建一個encoder_layer後面由TransformerEncoder來把很多層疊起來
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+        # 構建完整的一個TransformerEncoder
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
 
+        # 構建一個decoder_layer後面由TransformerDecoder來把很多層疊起來
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
         decoder_norm = nn.LayerNorm(d_model)
@@ -40,6 +46,7 @@ class Transformer(nn.Module):
         self.nhead = nhead
 
     def _reset_parameters(self):
+        # 已看過
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -62,7 +69,14 @@ class Transformer(nn.Module):
 class TransformerEncoder(nn.Module):
 
     def __init__(self, encoder_layer, num_layers, norm=None):
+        """
+        :param encoder_layer: 每個基礎的encoder_layer
+        :param num_layers: 要重複幾個encoder_layer
+        :param norm: normalize_before控制，如果是True那就會有LN，否則會是None
+        """
         super().__init__()
+        # 已看過
+        # 傳入一個module class以及需要幾個，就會產生一個module list裡面就會有對應數量的module
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
@@ -87,6 +101,8 @@ class TransformerDecoder(nn.Module):
 
     def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
         super().__init__()
+        # 已看過
+        # return_intermediate預設為True，估計是為了要讓每層的decoder都可以進行預測學習，讓效果更好
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
@@ -128,18 +144,32 @@ class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
+        """
+        :param d_model: 每個特徵點可以被多少維度的向量表示，這裡預設為256
+        :param nhead: 多頭注意力要用幾個頭，這裡預設為8
+        :param dim_feedforward: FFN中間層用到的channel深度
+        :param dropout: dropout
+        :param activation: 激活函數
+        :param normalize_before: 預設為True
+        """
+        # 已看過
         super().__init__()
+        # 實例化pytorch官方給的Multi-head Attention，實例化時需要給一個特徵點用多少維度的向量表示以及要用多少頭，剩下的都使選配
+        # forward時最少需要給q,k,v剩下的mask之類的就是選配，輸出就是跟輸入一樣(shape)
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
+        # FFN，先升維再降維
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
 
+        # 暫時不知道用在哪裡
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
+        # _get_activation_fn = 根據傳入的string會給出對應的激活函數
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
 
@@ -188,14 +218,20 @@ class TransformerDecoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
+        # 已看過
+        # 參數傳入的與EncoderLayer一樣
         super().__init__()
+        # 實例化multi-head attention，這個是用在self attention
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        # 實例化multi-head attention，這個是用在後面與encoder結合時的attention
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
+        # FFN，先升維再降維
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
 
+        # 目前暫時不知道
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.norm3 = nn.LayerNorm(d_model)
@@ -203,6 +239,7 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.dropout3 = nn.Dropout(dropout)
 
+        # _get_activation_fn = 根據傳入的string會給出對應的激活函數
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
 
@@ -270,10 +307,22 @@ class TransformerDecoderLayer(nn.Module):
 
 
 def _get_clones(module, N):
+    # 已看過
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
 def build_transformer(args):
+    # ----------------------------------------------------------------------------
+    # d_model = 輸入的每個點都會有hidden_dim維度向量，對於encoder來說就是每個feature_map上
+    # 的特徵點的channel會變成的大小，這裡預設是256
+    # dropout = 就是dropout，預設是0.1
+    # nhead = 多頭注意力機制的頭數，預設是8
+    # dim_feedforward = FFN的中間channel大小，預設為2048
+    # num_encoder_layers = encoder模塊重複次數，預設為6
+    # num_decoder_layers = decoder模塊重複次數，預設為6
+    # normalize_before = 目前還不知道，預設是False
+    # return_intermediate_dec = 目前不知道是啥，預設是True
+    # ----------------------------------------------------------------------------
     return Transformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
@@ -288,6 +337,7 @@ def build_transformer(args):
 
 def _get_activation_fn(activation):
     """Return an activation function given a string"""
+    # 已看過
     if activation == "relu":
         return F.relu
     if activation == "gelu":

@@ -19,9 +19,11 @@ from .transformer import build_transformer
 
 
 class DETR(nn.Module):
+    # 由下面進行實例化
     """ This is the DETR module that performs object detection """
     def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False):
         """ Initializes the model.
+        # 可以看一下這裡，說明的很清楚了
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
             transformer: torch module of the transformer architecture. See transformer.py
@@ -30,13 +32,22 @@ class DETR(nn.Module):
                          DETR can detect in a single image. For COCO, we recommend 100 queries.
             aux_loss: True if auxiliary decoding losses (loss at each decoder layer) are to be used.
         """
+        # 已看過
         super().__init__()
         self.num_queries = num_queries
         self.transformer = transformer
+        # hidden_dim = 每個特徵圖上的點用多少維度的向量表示
         hidden_dim = transformer.d_model
+        # 估計是拿來預測類別的
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
+        # 透過多層感知機獲得
+        # Mlp(input_dim, hidden_dim, output_dim, num_layers)
+        # 就是FFN
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
+        # 創建embedding大小為num_queries每個queries由hidden_dim維度的向量表示
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
+        # 在把CNN出來的展平特徵圖輸入到transformer前需要先把channel變成hidden_dim的大小
+        # 用kernel_size=1的Conv做降維
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -290,9 +301,11 @@ class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        # 已看過
         super().__init__()
         self.num_layers = num_layers
         h = [hidden_dim] * (num_layers - 1)
+        # 就是FFN
         self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
 
     def forward(self, x):
@@ -327,9 +340,19 @@ def build(args):
     # 構建backbone
     # ----------------------------------------------------------------------------
     backbone = build_backbone(args)
-
+    # ----------------------------------------------------------------------------
+    # 構建transformer
+    # ----------------------------------------------------------------------------
     transformer = build_transformer(args)
 
+    # ----------------------------------------------------------------------------
+    # 構建DETR
+    # backbone = CNN
+    # transformer = 拿到特徵圖後的處理
+    # num_classes = 分類數
+    # num_queries = 一張圖片會有多少個匡
+    # aux_loss = decoder中每層的輸出要不要算入loss
+    # ----------------------------------------------------------------------------
     model = DETR(
         backbone,
         transformer,
