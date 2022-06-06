@@ -140,18 +140,25 @@ def reduce_dict(input_dict, average=True):
     """
     world_size = get_world_size()
     if world_size < 2:
+        # 單gpu裝態
         return input_dict
     with torch.no_grad():
+        # 等到時候看input_dict裡面有什麼再來說
+        # names = dict的key, values = dict的value
         names = []
         values = []
         # sort the keys so that they are consistent across processes
+        # 對輸入的dict的key做sort，為了讓每個gpu出來的dict的key順序是一樣的
         for k in sorted(input_dict.keys()):
             names.append(k)
             values.append(input_dict[k])
+        # list轉換成tensor
         values = torch.stack(values, dim=0)
+        # 官方實現的每個gpu做加總
         dist.all_reduce(values)
         if average:
             values /= world_size
+        # 再放回到dict裡面返回
         reduced_dict = {k: v for k, v in zip(names, values)}
     return reduced_dict
 
@@ -267,14 +274,23 @@ def get_sha():
 
 
 def collate_fn(batch):
+    # 已看過
+    # 一個batch的訓練資料都會到這裡來變成一個可堆疊的batch
+    # 一開始的圖片大小都不一樣沒辦法直接堆一起
+    # 記得要轉成list否則會變成zip格式沒辦法用
     batch = list(zip(*batch))
+    # 取出一個batch的照片進行處理，這裡的image已經是tensor格式了
+    # batch[0]變成NestedTensor的格式了，也就是圖片的tensor以及mask封裝在一個class裡面
     batch[0] = nested_tensor_from_tensor_list(batch[0])
     return tuple(batch)
 
 
 def _max_by_axis(the_list):
     # type: (List[List[int]]) -> List[int]
+    # 已看過
+    # the_list = 每張圖片的shape (List(List))
     maxes = the_list[0]
+    # 這個batch中，每個維度上面的最大
     for sublist in the_list[1:]:
         for index, item in enumerate(sublist):
             maxes[index] = max(maxes[index], item)
@@ -283,11 +299,17 @@ def _max_by_axis(the_list):
 
 class NestedTensor(object):
     def __init__(self, tensors, mask: Optional[Tensor]):
+        # 已看過
+        # 由下面的nested_tensor_from_tensor_list實例化
+        # tensor shape [batch_size, 3, w, h]
+        # mask shape [batch_size, w, h]
         self.tensors = tensors
         self.mask = mask
 
     def to(self, device):
         # type: (Device) -> NestedTensor # noqa
+        # 已看過
+        # 調用to方法，轉換設備
         cast_tensor = self.tensors.to(device)
         mask = self.mask
         if mask is not None:
@@ -298,34 +320,55 @@ class NestedTensor(object):
         return NestedTensor(cast_tensor, cast_mask)
 
     def decompose(self):
+        # 已看過
+        # 分別輸出tensors以及mask
         return self.tensors, self.mask
 
     def __repr__(self):
+        # 已看過
         return str(self.tensors)
 
 
 def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
     # TODO make this more general
+    # 已看過
+    # 傳入的是已經轉成tensor格式的多個image組成的list
+    # 我們知道一張圖片轉成tensor後會shape=[3, w, h]，ndim就是可以看嵌套層數這裡就會是3
+    # 這裡就是在過濾不合法的
     if tensor_list[0].ndim == 3:
         if torchvision._is_tracing():
+            # onnx在用的，有機會再來研究onnx怎麼搞
             # nested_tensor_from_tensor_list() does not export well to ONNX
             # call _onnx_nested_tensor_from_tensor_list() instead
             return _onnx_nested_tensor_from_tensor_list(tensor_list)
 
         # TODO make it support different-sized images
+        # 把每張圖片的shape傳入_max_by_axis
+        # 找到這個batch中每個維度的最大[3, max_w, max_h]
         max_size = _max_by_axis([list(img.shape) for img in tensor_list])
         # min_size = tuple(min(s) for s in zip(*[img.shape for img in tensor_list]))
+        # batch_shape shape = [batch_size, 3, max_w, max_h]
         batch_shape = [len(tensor_list)] + max_size
+        # 最後都會把照片的tensor的高寬維度調整成跟最大一樣
         b, c, h, w = batch_shape
         dtype = tensor_list[0].dtype
         device = tensor_list[0].device
+        # 構建一個與batch_shape一樣shape但初始值為0的tensor
         tensor = torch.zeros(batch_shape, dtype=dtype, device=device)
+        # 一個shape=[b, h, w]且全為1的mask，這個mask不需要channel維度因為他只記錄這個點是不是真得有圖就可以了
         mask = torch.ones((b, h, w), dtype=torch.bool, device=device)
+        # 開始把每個tensor堆疊在一起
         for img, pad_img, m in zip(tensor_list, tensor, mask):
+            # 在新的tensor上從最左上角開始貼上，貼不完的部分就是0
             pad_img[: img.shape[0], : img.shape[1], : img.shape[2]].copy_(img)
+            # 記錄下每張圖那些部分是後來填充的
+            # 不足的部分會是True，真實有圖的地方會是False
             m[: img.shape[1], :img.shape[2]] = False
     else:
         raise ValueError('not supported')
+    # tensor shape [batch_size, 3, w, h]
+    # mask shape [batch_size, w, h]
+    # 轉換成NestedTensor格式
     return NestedTensor(tensor, mask)
 
 
@@ -364,6 +407,7 @@ def setup_for_distributed(is_master):
     """
     This function disables printing when not in master process
     """
+    # 已看過
     import builtins as __builtin__
     builtin_print = __builtin__.print
 
@@ -376,14 +420,20 @@ def setup_for_distributed(is_master):
 
 
 def is_dist_avail_and_initialized():
+    # 已看過
+    # 看是不是在多gpu上運行
     if not dist.is_available():
+        # Returns True if the distributed package is available.
         return False
     if not dist.is_initialized():
+        # Checking if the default process group has been initialized
         return False
     return True
 
 
 def get_world_size():
+    # 已看過
+    # 回傳有多少塊gpu
     if not is_dist_avail_and_initialized():
         return 1
     return dist.get_world_size()
@@ -400,11 +450,22 @@ def is_main_process():
 
 
 def save_on_master(*args, **kwargs):
+    # 已看過
+    # 在多gpu下我們只保存主線程上的
     if is_main_process():
         torch.save(*args, **kwargs)
 
 
 def init_distributed_mode(args):
+    # 已看過
+    # 在這個腳本中使用多gpu訓練時用指令是:torch.distributed.launch
+    # 在調用指令時會有--use_env，這個指令會在os.environ裡面放入RANK, WORLD_SIZE, LOCAL_RANK變數
+    # ---------------------------------------------------------
+    # 多機多卡時，WORD_SIZE對應所有機器中使用的進程數量(一個進程對應一塊gpu)
+    # RANK代表所有進程中的第幾個進程，LOCAL_RANK對應當前機器中第幾個進程
+    # 在單機多卡下
+    # WORD_SIZE就是這台設備上有多少gpu，LOCAL_RANK與RANK表示都是當前是哪塊gpu
+    # ---------------------------------------------------------
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
@@ -417,33 +478,59 @@ def init_distributed_mode(args):
         args.distributed = False
         return
 
+    # 表示使用多gpu，在main中有用到這個變數
     args.distributed = True
 
+    # 指定當前gpu
     torch.cuda.set_device(args.gpu)
+    # 通信後端，nvidia GPU推薦使用nccl
     args.dist_backend = 'nccl'
+    # 打印一些關於多gpu的信息
     print('| distributed init (rank {}): {}'.format(
         args.rank, args.dist_url), flush=True)
+    # 很重要的部分，建立進程組
+    # ---------------------------------------------------------
+    # backend = 剛剛設定的通訊後端
+    # init_method = 初始化方法，這邊都是用默認方法
+    # ---------------------------------------------------------
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
+    # 等待所有gpu都結束上面的操作
     torch.distributed.barrier()
+    # This function disables printing when not in master process
     setup_for_distributed(args.rank == 0)
 
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
+    # 已看過
+    # src_logits[idx] = 有對應上gt_box的query對於每個分類類別的預測值
+    # target_classes_o = 正確分類類別
+    # src_logits shape [total_number_match_gt_box, num_classes]
+    # target_classes_o shape [total_number_match_gt_box]
     if target.numel() == 0:
         return [torch.zeros([], device=output.device)]
     maxk = max(topk)
     batch_size = target.size(0)
 
+    # 對於output找前1大(小)的值且在維度1上尋找，第一個True表示找前k大，第二個True表示返回時需要排序
+    # 返回值為value, index
+    # pred shape [total_number_match_gt_box, 1]
     _, pred = output.topk(maxk, 1, True, True)
+    # 轉置 pred shape [total_number_match_gt_box, 1] -> [1, total_number_match_gt_box, 1]
     pred = pred.t()
+    # 正常來說只需要在前面擴圍就可以了，後面的expand_as基本不起作用
+    # correct shape [1, total_number_match_gt_box]相同的地方會是True，不同的地方是False
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     res = []
+    # 遍歷我們要的topk，這裡我們只要top1就可以了
     for k in topk:
+        # correct[:k] = [total_number_match_gt_box]
+        # 看總共有多少個True
         correct_k = correct[:k].view(-1).float().sum(0)
+        # batch_size表示有多少個gt_box，答對數量除以總數量乘以100可以得到%數
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 

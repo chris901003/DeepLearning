@@ -83,13 +83,25 @@ class BackboneBase(nn.Module):
         self.num_channels = num_channels
 
     def forward(self, tensor_list: NestedTensor):
+        # 已看過
+        # NestedTensor詳細內容到detr.py中找或是到misc.py都可以
+        # tensor_list中的tensors就是圖片轉成的tensor
+        # xs = dict格式，裡面有return_layers指定的輸出layer的特徵圖
         xs = self.body(tensor_list.tensors)
+        # 最後要出書的東西
         out: Dict[str, NestedTensor] = {}
+        # name = key, x = value
         for name, x in xs.items():
+            # 拿到我們的mask
             m = tensor_list.mask
             assert m is not None
+            # 用pytorch的interpolate來將mask的高寬調整到與輸出特徵圖一樣
+            # 原始的mask一定會比特徵圖大，所以這裡一定是對mask做縮小，interpolate再縮小的時候丟棄右邊以及下面的數據
             mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+            # 加入out
             out[name] = NestedTensor(x, mask)
+        # 如果是Object Detection的話out會是 out = {'0': NestedTensor}
+        # 也就是只有最後一個輸出層會輸出
         return out
 
 
@@ -121,14 +133,27 @@ class Joiner(nn.Sequential):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
+        # 已看過
+        # NestedTensor詳細內容到detr.py中找或是到misc.py都可以
+        # ----------------------------------------------------------------------------
+        # self[0]是backbone的forward調用
+        # 如果是Object Detection的話out會是 out = {'0': NestedTensor}
+        # 也就是只有最後一個輸出層會輸出
+        # ----------------------------------------------------------------------------
         xs = self[0](tensor_list)
         out: List[NestedTensor] = []
         pos = []
         for name, x in xs.items():
+            # 將NestedTensor加入out
             out.append(x)
             # position encoding
+            # 做進入transformer前的position encoding
+            # self[1]是position_embedding的forward
             pos.append(self[1](x).to(x.tensors.dtype))
 
+        # out (List[NestedTensor])
+        # 會在detr中把前面的第一個batch_size維度取消掉
+        # pos (List[tensor]) tensor shape [batch_size, batch_size, channel, w, h]
         return out, pos
 
 

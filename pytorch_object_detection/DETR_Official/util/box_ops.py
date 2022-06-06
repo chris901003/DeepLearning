@@ -7,6 +7,8 @@ from torchvision.ops.boxes import box_area
 
 
 def box_cxcywh_to_xyxy(x):
+    # 已看過
+    # (center_x, center_y, w, h) -> (xmin, ymin, xmax, ymax)
     x_c, y_c, w, h = x.unbind(-1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
@@ -14,6 +16,8 @@ def box_cxcywh_to_xyxy(x):
 
 
 def box_xyxy_to_cxcywh(x):
+    # 已看過
+    # (xmin, ymin, xmax, ymax) -> (center_x, center_y, w, h)
     x0, y0, x1, y1 = x.unbind(-1)
     b = [(x0 + x1) / 2, (y0 + y1) / 2,
          (x1 - x0), (y1 - y0)]
@@ -22,9 +26,14 @@ def box_xyxy_to_cxcywh(x):
 
 # modified from torchvision to also return the union
 def box_iou(boxes1, boxes2):
+    # 已看過
+    # 計算iou
+    # 輸入shape [total_box, 4]
+    # area1, area2 shape [total_box]
     area1 = box_area(boxes1)
     area2 = box_area(boxes2)
 
+    # 左上角點以及右下角點
     lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
     rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
 
@@ -33,7 +42,9 @@ def box_iou(boxes1, boxes2):
 
     union = area1[:, None] + area2 - inter
 
+    # 計算出iou
     iou = inter / union
+    # 回傳iou以及相交面積
     return iou, union
 
 
@@ -48,16 +59,22 @@ def generalized_box_iou(boxes1, boxes2):
     """
     # degenerate boxes gives inf / nan results
     # so do an early check
+    # 已看過
+    # giou計算，需把輸入格式轉成(xmin, ymin, xmax, ymax)型態
+    # 檢查是否有符合格式
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
+    # iou以及相交面積
     iou, union = box_iou(boxes1, boxes2)
 
+    # 左上角以及右下角，這裡是外匡
     lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
     rb = torch.max(boxes1[:, None, 2:], boxes2[:, 2:])
 
     wh = (rb - lt).clamp(min=0)  # [N,M,2]
     area = wh[:, :, 0] * wh[:, :, 1]
 
+    # 這裡是giou的公式，如果有問題可以上網查一下
     return iou - (area - union) / area
 
 
