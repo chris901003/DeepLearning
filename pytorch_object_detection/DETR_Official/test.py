@@ -1,4 +1,5 @@
 import torch
+from collections import defaultdict
 from torch import nn
 
 
@@ -28,9 +29,21 @@ class Combine(nn.Sequential):
         return self[1](x)
 
 
-b1 = Backbone()
-b2 = Backbone2()
-c = Combine(b1, b2)
-a = torch.randn((1, 100, 10, 10))
-b = c(a)
-print(b.shape)
+def update(**kwargs):
+    print(kwargs)
+
+
+class SmoothedValue(object):
+    def __init__(self):
+        self.tot = 0
+
+    def update(self, value, n=1):
+        self.tot += value
+
+
+meters = defaultdict(SmoothedValue)
+meters['score'].update(10)
+meters['score'].update(1000)
+meters['total_score'] = 100
+meters['total_score'] = 10000
+print(meters['score'])

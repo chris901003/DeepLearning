@@ -16,6 +16,8 @@ def get_coco_api_from_dataset(dataset):
     if isinstance(dataset, torchvision.datasets.CocoDetection):
         # CocoDetection裡面有這麼一段實例化Coco的Api
         # self.coco = COCO(annFile)
+        # 下面是來自官方的解釋
+        # COCO(annFile) = COCO api classes that loads COCO annotation file and prepare data structures.
         return dataset.coco
 
 

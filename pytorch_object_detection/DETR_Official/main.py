@@ -248,6 +248,7 @@ def main(args):
         # epoch = 當前Epoch
         # clip_max_norm = gradient clipping max norm(上面args寫的，目前不確定是什麼)
         # ---------------------------------------------------------
+        # train_stats = 訓練過程中各種資料的的最終平均值，包含loss、錯誤率、學習率等等
         train_stats = train_one_epoch(
             model, criterion, data_loader_train, optimizer, device, epoch,
             args.clip_max_norm)

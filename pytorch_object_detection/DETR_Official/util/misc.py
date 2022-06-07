@@ -30,14 +30,25 @@ class SmoothedValue(object):
     """
 
     def __init__(self, window_size=20, fmt=None):
+        # 已看過
+        # 用來生成MetricLogger中metric的default value
         if fmt is None:
+            # 我們這裡會用這個格式化字串，這裡會定義輸出的字串要長怎麼樣
+            # Ex:我們給 => fmt.format(median=12.123234123, avg=12.343443, global_avg=54.413213, max=4, value=12.1)
+            # 輸出會是 => '12.1232 (54.4132)'
             fmt = "{median:.4f} ({global_avg:.4f})"
+        # 限定deque的最大長度
         self.deque = deque(maxlen=window_size)
         self.total = 0.0
         self.count = 0
         self.fmt = fmt
 
     def update(self, value, n=1):
+        # 已看過
+        # deque在添加新變數進去時，假設從右邊添加(append)一但大於容量就會將最左側的剔除
+        # 假設從左邊添加(appendleft)一但大於容量就會將最右側的剔除
+
+        # 添加數字到deque中同時更新其他資料
         self.deque.append(value)
         self.count += n
         self.total += value * n
@@ -46,6 +57,8 @@ class SmoothedValue(object):
         """
         Warning: does not synchronize the deque!
         """
+        # 已看過
+        # 多gpu同步一下
         if not is_dist_avail_and_initialized():
             return
         t = torch.tensor([self.count, self.total], dtype=torch.float64, device='cuda')
@@ -57,27 +70,39 @@ class SmoothedValue(object):
 
     @property
     def median(self):
+        # 已看過
+        # 輸出deque中的中位數
         d = torch.tensor(list(self.deque))
         return d.median().item()
 
     @property
     def avg(self):
+        # 已看過
+        # 輸出deque中的均值
         d = torch.tensor(list(self.deque), dtype=torch.float32)
         return d.mean().item()
 
     @property
     def global_avg(self):
+        # 已看過
+        # 這個是在update時會對update的值乘上權重，所以這裡輸出的帶有權重的平均，只是權重預設是1
         return self.total / self.count
 
     @property
     def max(self):
+        # 已看過
+        # 返回deque中的最大值
         return max(self.deque)
 
     @property
     def value(self):
+        # 已看過
+        # 返回deque中最後右邊的值
         return self.deque[-1]
 
     def __str__(self):
+        # 已看過
+        # 在輸出的時候會call到，看fmt裡面需要輸出什麼會有不同的輸出
         return self.fmt.format(
             median=self.median,
             avg=self.avg,
@@ -165,14 +190,25 @@ def reduce_dict(input_dict, average=True):
 
 class MetricLogger(object):
     def __init__(self, delimiter="\t"):
+        # 已看過
+        # delimiter = 分隔符，預設都會改成用一個空格代替
+        # defaultdict = 一種dict可以在當前沒有key時自動生成key並且有一個default的value
+        # 而這個default的value就是後面()中來定義的，()中需要放的是可以呼叫的函數，假使我們放list那麼一但我們給一個新的key時他的value
+        # 就會預設成[]，這樣我們就可以直接使用append
+        # meters型態是Dict
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
 
     def update(self, **kwargs):
+        # 已看過
+        # **kwargs型態為dict
         for k, v in kwargs.items():
+            # 如果是tensor格式我們就把值拿出來就可以了
             if isinstance(v, torch.Tensor):
                 v = v.item()
+            # 這個值的型態必須是int或是float
             assert isinstance(v, (float, int))
+            # 如果key存在就更新，不存在就創建並且調用update函數
             self.meters[k].update(v)
 
     def __getattr__(self, attr):
@@ -184,29 +220,47 @@ class MetricLogger(object):
             type(self).__name__, attr))
 
     def __str__(self):
+        # 已看過
+        # 在下方的輸出會用到，meters = str(self)
+        # loss值由engine.py中會對MetricLogger進行update
         loss_str = []
         for name, meter in self.meters.items():
             loss_str.append(
                 "{}: {}".format(name, str(meter))
             )
+        # 加入到輸出當中
         return self.delimiter.join(loss_str)
 
     def synchronize_between_processes(self):
+        # 已看過
+        # 多gpu同步一下
         for meter in self.meters.values():
             meter.synchronize_between_processes()
 
     def add_meter(self, name, meter):
+        # 已看過
+        # 添加一個新的key且值為給定的meter，這裡meter會是SmoothedValue型態
         self.meters[name] = meter
 
     def log_every(self, iterable, print_freq, header=None):
+        """
+        :param iterable: dataloader
+        :param print_freq: 多久會打印一次狀態
+        :param header: string型態裡面就放Epoch: [當前epoch]
+        """
         i = 0
         if not header:
             header = ''
+        # 計算時間
         start_time = time.time()
         end = time.time()
+        # 構建iter_time以及data_time的SmoothedValue實例
         iter_time = SmoothedValue(fmt='{avg:.4f}')
         data_time = SmoothedValue(fmt='{avg:.4f}')
+        # 計算多少位數，在前面加上:後面加上d可以在輸出數字時決定位數
         space_fmt = ':' + str(len(str(len(iterable)))) + 'd'
+        # 添加一些輸出格式，在輸出的時候會用到，會根據這裡設定的進行輸出，且每個資料間用預設的兩個空格隔開
+        # 這裡在gpu模式下會多輸出max mem
         if torch.cuda.is_available():
             log_msg = self.delimiter.join([
                 header,
@@ -227,13 +281,41 @@ class MetricLogger(object):
                 'data: {data}'
             ])
         MB = 1024.0 * 1024.0
+        # 開始遍歷一個dataloader
         for obj in iterable:
+            # 更新時間，時間的max_len=10，會保留10次的值
             data_time.update(time.time() - end)
+            # ---------------------------------------------------------
+            # yield是節省記憶體的一種方法
+            # 把log_every變成一種生成器，可把yield想成一種return也就是程式執行到這行時就會進行返回，返回的值就是obj
+            # 但下次再呼叫log_every時就會從這行的下行開始執行，直到函數本身結束或是遇到return或是yield
+            # 這種方法每次只會保存上次的狀態，從上次狀態開始執行，利用這種方法可以節省記憶體，可以回想dataloader本身也是這麼做的
+            # 如果要拿出單一一個dataloader中的資料需用到next(iter(dataloader))
+            # ---------------------------------------------------------
             yield obj
+            # 更新一個batch的時間，時間的max_len=10，會保留10次的值
             iter_time.update(time.time() - end)
+            # 每print_freq或是最後一次都會打印狀態，這裡建議可以把print_freq設大一點因為每次印的訊息真的很多
+            # 同時batch_size也不大所以會很長打印
             if i % print_freq == 0 or i == len(iterable) - 1:
+                # eta_seconds = 計算還需要多少時間才可以完成
+                # 透過global_avg可以拿到前10次每個batch消耗的平均時間，之後再乘上剩餘的batch數就可以知道還需要多久
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
+                # 標準化 int(second) -> str(hours:minute:second)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+                # 有無gpu差在memory的輸出
+                # log_msg由上面定義，所以格式上會按照上面設定的
+                # ---------------------------------------------------------
+                # i = 當前是第幾個batch
+                # len(iterable) = 一個Epoch總共有多少個batch
+                # i + len(iterable) = 組成 [i / iterable]，i的長度由space_fmt來固定，i佔據的長度會跟len(iterable)一樣
+                # eta = 還需要多少時間可以完成這次的Epoch，可以發現一開始前幾個batch速度很慢，表示pytorch需要預熱
+                # meters = 各項損失值，在上面的__str__，中可以看到輸出的格式
+                # time = 預測一個batch平均時間
+                # data = load一個batch平均時間
+                # memory = 最大gpu ram使用量
+                # ---------------------------------------------------------
+                # log_msg其實可以算是一個string，後面的format表示{}處要填入什麼
                 if torch.cuda.is_available():
                     print(log_msg.format(
                         i, len(iterable), eta=eta_string,
@@ -245,10 +327,13 @@ class MetricLogger(object):
                         i, len(iterable), eta=eta_string,
                         meters=str(self),
                         time=str(iter_time), data=str(data_time)))
+            # 更新時間以及對i加一
             i += 1
             end = time.time()
+        # 一個Epoch總花費時間
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+        # 輸出總花費時間以及每個batch平均值
         print('{} Total time: {} ({:.4f} s / it)'.format(
             header, total_time_str, total_time / len(iterable)))
 

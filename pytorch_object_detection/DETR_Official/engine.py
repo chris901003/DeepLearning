@@ -33,12 +33,18 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     criterion.train()
     # 就是MetricLogger，主要是可以在多gpu下同步每個gpu的速度
     # 這個基本上可以算是模板了，到處都長這樣
+    # 實例化一個MetricLogger class，並且將分隔符設定為兩個空白
     metric_logger = utils.MetricLogger(delimiter="  ")
+    # 在metric_logger添加一個key且value是SmoothedValue型態且已經指定好裡面的樣子
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    # 與上面相同，只是SmoothedValue裡面的樣子有點不一樣而已
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # 一個string內容為Epoch: [當前epoch]
     header = 'Epoch: [{}]'.format(epoch)
+    # 設定多少個batch打印一次
     print_freq = 10
 
+    # 遍歷一整個Epoch
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         # 可以先去看看dataset怎麼處理__getitem__，在coco.py(CocoDetection)當中可以找到
         # ---------------------------------------------------------
@@ -114,14 +120,25 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         optimizer.step()
 
         # metric_logger的一些東西，更新一下
+        # ---------------------------------------------------------
+        # update吃的參數是**kwargs，這裡簡單說明一下**kwargs傳過去會是什麼
+        # 傳過去的東西都會變成dict格式，所以我們要傳的時候有兩種選擇
+        # 第一種就是傳的本身就是dict，這個時候我們需要在變數前面加上**就可以了
+        # 第二種就是傳一個值，這時候我們需要給他一個key，例如loss_value，我們就需要給一個key叫做loss
+        # 就是下面的loss=loss_value，這樣就會在dict中key為loss且value是loss_value
+        # 傳過去的所有東西都會彙整成一個dict，所以要注意這裡不可以有相同的key不然會報錯
+        # ---------------------------------------------------------
+        # 如果是第一個epoch都會創建新的且max_len都是預設的20
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
     # gather the stats from all processes
     # 同步所有的設備
     metric_logger.synchronize_between_processes()
+    # 最後在印出平均loss
     print("Averaged stats:", metric_logger)
     # 回傳一些訓練狀態，就完成一個Epoch的訓練了
+    # 拿取metric_logger中的meters中所有資料的加權平均值
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
@@ -143,11 +160,13 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
 
     # 建立MetricLogger有空來研究
     metric_logger = utils.MetricLogger(delimiter="  ")
+    # 這裡我們不會再需要紀錄lr所以只有class_error
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
     # 這裡我們只會有bbox的key，segm是在訓練segmentation才會有，iou_types = ('bbox')
     iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    # 實例化CocoEvaluator，bast_ds=COCO(annotation.json)
     coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
@@ -205,6 +224,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         # 'boxes':[batch_size, num_queries,4]
         # }
         # ---------------------------------------------------------
+        # 這裡確實把100個queries都拿進去了，但是理論上要過濾掉背景才對，yolo系列的會在這裡前經過nms
+        # 我覺得至少要把置信度過小的過濾掉吧
         results = postprocessors['bbox'](outputs, orig_target_sizes)
         if 'segm' in postprocessors.keys():
             # 預測segmentation才會用到，這裡我們先不會用到
@@ -214,6 +235,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
         if coco_evaluator is not None:
             # 這裡我們有coco_evaluator，不過這部分晚點再來看
+            # 將image_id對應上預測結果輸入給coco_evaluator
             coco_evaluator.update(res)
 
         if panoptic_evaluator is not None:
@@ -255,4 +277,5 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         stats['PQ_all'] = panoptic_res["All"]
         stats['PQ_th'] = panoptic_res["Things"]
         stats['PQ_st'] = panoptic_res["Stuff"]
+    # 將驗證過程的東西往外傳
     return stats, coco_evaluator

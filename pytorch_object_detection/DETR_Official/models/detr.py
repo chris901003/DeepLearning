@@ -443,6 +443,7 @@ class PostProcess(nn.Module):
                           For evaluation, this must be the original image size (before any data augmentation)
                           For visualization, this should be the image size after data augment, but before padding
         """
+        # 已看過
         # ---------------------------------------------------------
         # outputs (Dict)
         # {
