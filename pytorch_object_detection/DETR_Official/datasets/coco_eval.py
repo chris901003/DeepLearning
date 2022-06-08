@@ -39,6 +39,7 @@ class CocoEvaluator(object):
         # Ex:
         # [{"image_id":42,"category_id":18,"bbox":[258.15,41.29,348.26,243.78],"score":0.236},
         # {"image_id":73,"category_id":11,"bbox":[61,22.75,504,609.67],"score":0.318}]
+        # bbox shape = [center_x, center_y, width, height]
         # 所以官方給的json就是這樣的格式沒有問題
         # 其他檢測需要的格式在網址中查詢：https://zhuanlan.zhihu.com/p/134236324
         # ---------------------------------------------------------

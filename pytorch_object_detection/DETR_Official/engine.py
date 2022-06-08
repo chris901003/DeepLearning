@@ -191,6 +191,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         # {
         #   'pred_logits': shape [batch_size, num_queries, num_classes + 1],
         #   'pred_boxes': shape [batch_size, num_queries, 4]
+        # }
         # ---------------------------------------------------------
         outputs = model(samples)
         # 損失計算
@@ -225,7 +226,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         # }
         # ---------------------------------------------------------
         # 這裡確實把100個queries都拿進去了，但是理論上要過濾掉背景才對，yolo系列的會在這裡前經過nms
-        # 我覺得至少要把置信度過小的過濾掉吧
+        # 我覺得至少要把置信度過小的過濾掉吧，經過測試如果過濾掉的話mAP會下降，但是predict時需要拿掉
         results = postprocessors['bbox'](outputs, orig_target_sizes)
         if 'segm' in postprocessors.keys():
             # 預測segmentation才會用到，這裡我們先不會用到
