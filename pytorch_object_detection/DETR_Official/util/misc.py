@@ -603,7 +603,7 @@ def accuracy(output, target, topk=(1,)):
     # 返回值為value, index
     # pred shape [total_number_match_gt_box, 1]
     _, pred = output.topk(maxk, 1, True, True)
-    # 轉置 pred shape [total_number_match_gt_box, 1] -> [1, total_number_match_gt_box, 1]
+    # 轉置 pred shape [total_number_match_gt_box, 1] -> [1, total_number_match_gt_box]
     pred = pred.t()
     # 正常來說只需要在前面擴圍就可以了，後面的expand_as基本不起作用
     # correct shape [1, total_number_match_gt_box]相同的地方會是True，不同的地方是False

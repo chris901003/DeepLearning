@@ -208,7 +208,7 @@ class SetCriterion(nn.Module):
         This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
         """
         # 已看過
-        # 拿出分類類別預測shape [total_number_match_gt_box, num_classes]
+        # 拿出分類類別預測shape [batch_size, num_queries, num_classes + 1]
         pred_logits = outputs['pred_logits']
         device = pred_logits.device
         # 取出每張圖片的gt_box數量shape [batch_size]
