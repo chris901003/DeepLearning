@@ -5,7 +5,7 @@ from PIL import Image
 
 
 # 改這裡的路徑就可以了，路徑底下要有兩個資料夾，分別為images以及labels
-dataset_path = './my_dataset'
+dataset_path = './my_dataset/train'
 
 # images以及labels的路徑
 images_path = os.path.join(dataset_path, 'images')

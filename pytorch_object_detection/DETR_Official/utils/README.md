@@ -2,7 +2,7 @@
 檔案擺放方式
 需調整程式碼中的dataset_path到train或是val
 ```
-├── my_yolo_dataset 自定义数据集根目录
+├── my_dataset 自定义数据集根目录
 │         ├── train   训练集目录
 │         │     ├── images  训练集图像目录
 │         │     ├── labels  训练集标签目录
