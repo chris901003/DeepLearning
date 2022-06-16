@@ -9,8 +9,11 @@ from train_utils import train_one_epoch, evaluate, create_lr_scheduler
 from my_dataset import VOCSegmentation
 import transforms as T
 
+# train基本上與FCN相同，這裡只會標註不一樣的地方
+
 
 class SegmentationPresetTrain:
+    # 與FCN相同
     def __init__(self, base_size, crop_size, hflip_prob=0.5, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         min_size = int(0.5 * base_size)
         max_size = int(2.0 * base_size)
@@ -30,6 +33,7 @@ class SegmentationPresetTrain:
 
 
 class SegmentationPresetEval:
+    # 與FCN相同
     def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         self.transforms = T.Compose([
             T.RandomResize(base_size, base_size),
@@ -42,6 +46,7 @@ class SegmentationPresetEval:
 
 
 def get_transform(train):
+    # 與FCN相同
     base_size = 520
     crop_size = 480
 
@@ -49,11 +54,15 @@ def get_transform(train):
 
 
 def create_model(aux, num_classes, pretrain=True):
+    # 已看過
+    # 構建模型
     model = deeplabv3_resnet50(aux=aux, num_classes=num_classes)
 
+    # 加載整個模型的權重
     if pretrain:
         weights_dict = torch.load("./deeplabv3_resnet50_coco.pth", map_location='cpu')
 
+        # 將分類頭的權重去除
         if num_classes != 21:
             # 官方提供的预训练权重是21类(包括背景)
             # 如果训练自己的数据集，将和类别相关的权重删除，防止权重shape不一致报错
@@ -61,6 +70,7 @@ def create_model(aux, num_classes, pretrain=True):
                 if "classifier.4" in k:
                     del weights_dict[k]
 
+        # 加載權重
         missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
         if len(missing_keys) != 0 or len(unexpected_keys) != 0:
             print("missing_keys: ", missing_keys)

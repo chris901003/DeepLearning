@@ -35,6 +35,7 @@ class IntermediateLayerGetter(nn.ModuleDict):
     }
 
     def __init__(self, model: nn.Module, return_layers: Dict[str, str]) -> None:
+        # 與FCN相同
         if not set(return_layers).issubset([name for name, _ in model.named_children()]):
             raise ValueError("return_layers are not present in model")
         orig_return_layers = return_layers
@@ -80,6 +81,8 @@ class DeepLabV3(nn.Module):
     __constants__ = ['aux_classifier']
 
     def __init__(self, backbone, classifier, aux_classifier=None):
+        # 已看過
+        # 就是附值而已
         super(DeepLabV3, self).__init__()
         self.backbone = backbone
         self.classifier = classifier
@@ -109,6 +112,10 @@ class DeepLabV3(nn.Module):
 
 class FCNHead(nn.Sequential):
     def __init__(self, in_channels, channels):
+        """
+        :param in_channels: 輸入的channel深度
+        :param channels: 分類類別數
+        """
         inter_channels = in_channels // 4
         super(FCNHead, self).__init__(
             nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
@@ -121,6 +128,8 @@ class FCNHead(nn.Sequential):
 
 class ASPPConv(nn.Sequential):
     def __init__(self, in_channels: int, out_channels: int, dilation: int) -> None:
+        # 已看過
+        # 使用膨脹卷積，卷積核大小都為3*3
         super(ASPPConv, self).__init__(
             nn.Conv2d(in_channels, out_channels, 3, padding=dilation, dilation=dilation, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -130,6 +139,8 @@ class ASPPConv(nn.Sequential):
 
 class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels: int, out_channels: int) -> None:
+        # 已看過
+        # 使用全局平均池化，會在forward中將高寬使用雙線性插值方式縮放回去
         super(ASPPPooling, self).__init__(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
@@ -146,7 +157,15 @@ class ASPPPooling(nn.Sequential):
 
 class ASPP(nn.Module):
     def __init__(self, in_channels: int, atrous_rates: List[int], out_channels: int = 256) -> None:
+        """
+        :param in_channels: 輸入channel
+        :param atrous_rates: 三個卷積層使用的膨脹卷積係數
+        :param out_channels: 輸出channel，這裡不會是分類類別數量
+        """
+        # 已看過
+        # ASPP中會有5個分支，每個分支會放到modules裏面
         super(ASPP, self).__init__()
+        # 第一個分支只會使用普通1*1卷積層
         modules = [
             nn.Sequential(nn.Conv2d(in_channels, out_channels, 1, bias=False),
                           nn.BatchNorm2d(out_channels),
@@ -154,13 +173,18 @@ class ASPP(nn.Module):
         ]
 
         rates = tuple(atrous_rates)
+        # 遍歷3個需要使用膨脹卷積的卷積層
         for rate in rates:
+            # 輸入膨脹係數，所使用的卷積核大小都為3*3
             modules.append(ASPPConv(in_channels, out_channels, rate))
 
+        # 最後一層使用平均池化下採樣
         modules.append(ASPPPooling(in_channels, out_channels))
 
+        # 將ModuleList給convs
         self.convs = nn.ModuleList(modules)
 
+        # 在forward中會將5個分支的輸出concat在一起，所以下面的conv的輸入channel是5個分支的輸出channel總和
         self.project = nn.Sequential(
             nn.Conv2d(len(self.convs) * out_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -169,6 +193,7 @@ class ASPP(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # 簡單的forward
         _res = []
         for conv in self.convs:
             _res.append(conv(x))
@@ -178,6 +203,14 @@ class ASPP(nn.Module):
 
 class DeepLabHead(nn.Sequential):
     def __init__(self, in_channels: int, num_classes: int) -> None:
+        """
+        :param in_channels: 輸入channel
+        :param num_classes: 輸出channel=分類類別數
+        """
+        # 已看過
+        # ASPP傳入的有，輸入的channel以及膨脹係數
+        # 之後再將ASPP的輸出透過一個3*3的conv採集資料
+        # 最後透過一個1*1的conv將channel調整成分類類別數量
         super(DeepLabHead, self).__init__(
             ASPP(in_channels, [12, 24, 36]),
             nn.Conv2d(256, 256, 3, padding=1, bias=False),
@@ -188,29 +221,37 @@ class DeepLabHead(nn.Sequential):
 
 
 def deeplabv3_resnet50(aux, num_classes=21, pretrain_backbone=False):
-    # 'resnet50_imagenet': 'https://download.pytorch.org/models/resnet50-0676ba61.pth'
+    # 已看過
+    # 'resnet50_imagenet': 'https://download.pytorch.org/models/resnet50-0676ba61.pth' (backbone預訓練權重)
     # 'deeplabv3_resnet50_coco': 'https://download.pytorch.org/models/deeplabv3_resnet50_coco-cd0a2569.pth'
+    # 構建backbone，這裡跟FCN一樣都是最後兩個layer使用膨脹卷積
     backbone = resnet50(replace_stride_with_dilation=[False, True, True])
 
+    # 如果有加載整個模型的權重就不會加載backbone權重，相反就會加載backbone權重
     if pretrain_backbone:
         # 载入resnet50 backbone预训练权重
         backbone.load_state_dict(torch.load("resnet50.pth", map_location='cpu'))
 
+    # backbone最後輸出以及輔助輸出的channel深度
     out_inplanes = 2048
     aux_inplanes = 1024
 
     return_layers = {'layer4': 'out'}
     if aux:
         return_layers['layer3'] = 'aux'
+    # 提取出backbone需要的輸出
     backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     aux_classifier = None
     # why using aux: https://github.com/pytorch/vision/issues/4292
     if aux:
+        # 構建輔助輸出頭，Conv -> BN -> Relu -> Dropout -> Conv(out_channel=num_classes)
         aux_classifier = FCNHead(aux_inplanes, num_classes)
 
+    # 最終輸出頭
     classifier = DeepLabHead(out_inplanes, num_classes)
 
+    # 構建完整模型
     model = DeepLabV3(backbone, classifier, aux_classifier)
 
     return model

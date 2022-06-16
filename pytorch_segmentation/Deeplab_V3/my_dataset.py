@@ -5,6 +5,7 @@ from PIL import Image
 
 
 class VOCSegmentation(data.Dataset):
+    # 與FCN相同
     def __init__(self, voc_root, year="2012", transforms=None, txt_name: str = "train.txt"):
         super(VOCSegmentation, self).__init__()
         assert year in ["2007", "2012"], "year must be in ['2007', '2012']"
@@ -44,6 +45,7 @@ class VOCSegmentation(data.Dataset):
 
     @staticmethod
     def collate_fn(batch):
+        # 與FCN相同
         images, targets = list(zip(*batch))
         batched_imgs = cat_list(images, fill_value=0)
         batched_targets = cat_list(targets, fill_value=255)
@@ -51,6 +53,7 @@ class VOCSegmentation(data.Dataset):
 
 
 def cat_list(images, fill_value=0):
+    # 與FCN相同
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
     batch_shape = (len(images),) + max_size
     batched_imgs = images[0].new(*batch_shape).fill_(fill_value)
