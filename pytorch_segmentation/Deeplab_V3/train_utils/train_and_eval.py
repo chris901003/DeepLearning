@@ -4,6 +4,7 @@ import train_utils.distributed_utils as utils
 
 
 def criterion(inputs, target):
+    # 與FCN相同
     losses = {}
     for name, x in inputs.items():
         # 忽略target中值为255的像素，255的像素是目标边缘或者padding填充

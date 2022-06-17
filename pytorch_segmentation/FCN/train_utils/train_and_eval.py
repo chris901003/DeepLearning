@@ -9,7 +9,7 @@ def criterion(inputs, target):
                        'out': [batch_size, num_classes, 480, 480]
                        'aux': [batch_size, num_classes, 480, 480]
                    }
-    :param target: [batch_size, 3, 480, 480]
+    :param target: [batch_size, 480, 480]
     :return:
     """
     # 已看過
@@ -17,6 +17,10 @@ def criterion(inputs, target):
     for name, x in inputs.items():
         # 進行交叉熵計算
         # 忽略target中值为255的像素，255的像素是目标边缘或者padding填充
+        # torch.nn.functional.cross_entropy輸入的方式
+        # input = x shape [batch_size, num_classes, w, h]
+        # target = target shape [batch_size, w, h]
+        # 這裡輸入的target只需要輸入該位置應該是哪個分類就可以了，裡面會自動轉成ont-hot形式進行損失計算
         losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
 
     if len(losses) == 1:

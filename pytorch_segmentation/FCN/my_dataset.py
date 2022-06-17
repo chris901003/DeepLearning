@@ -50,7 +50,8 @@ class VOCSegmentation(data.Dataset):
         # 讀取一張照片
         # images存放圖片的路徑，將圖片讀出後轉成RGB的Image格式
         img = Image.open(self.images[index]).convert('RGB')
-        # masks存放分割圖片的路徑，將圖片讀出並且格式為Image，本身就是RGB
+        # masks存放分割圖片的路徑，將圖片讀出並且格式為Image，本身就是L模式
+        # target shape [480, 480]
         target = Image.open(self.masks[index])
 
         # 如果有需要進行transform就會進行，可以到transforms中的__call__看有進行什麼操作
@@ -70,7 +71,8 @@ class VOCSegmentation(data.Dataset):
         # list型態的images以及targets後面需要轉換成一個batch的tensor
         images, targets = list(zip(*batch))
         # 建立一個batch的tensor
-        # batched_imgs, batched_targets shape [batch_size, channel, w, h]
+        # batched_imgs shape [batch_size, channel, w, h]
+        # batched_targets shape [batch_size, w, h]
         batched_imgs = cat_list(images, fill_value=0)
         batched_targets = cat_list(targets, fill_value=255)
         return batched_imgs, batched_targets
