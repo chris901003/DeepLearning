@@ -49,11 +49,14 @@ def get_transform(train):
 
 
 def create_model(num_classes, pretrain=True):
+    # 與FCN有差別的地方只有在模型構建
     model = lraspp_mobilenetv3_large(num_classes=num_classes)
 
+    # 加載模型
     if pretrain:
         weights_dict = torch.load("./lraspp_mobilenet_v3_large.pth", map_location='cpu')
 
+        # 去除最後分類的卷積層的訓練權重加載
         if num_classes != 21:
             # 官方提供的预训练权重是21类(包括背景)
             # 如果训练自己的数据集，将和类别相关的权重删除，防止权重shape不一致报错
@@ -61,6 +64,7 @@ def create_model(num_classes, pretrain=True):
                 if "low_classifier" in k or "high_classifier" in k:
                     del weights_dict[k]
 
+        # 加載訓練權重
         missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
         if len(missing_keys) != 0 or len(unexpected_keys) != 0:
             print("missing_keys: ", missing_keys)

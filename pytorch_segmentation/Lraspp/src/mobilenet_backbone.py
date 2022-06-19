@@ -32,6 +32,16 @@ class ConvBNActivation(nn.Sequential):
                  norm_layer: Optional[Callable[..., nn.Module]] = None,
                  activation_layer: Optional[Callable[..., nn.Module]] = None,
                  dilation: int = 1):
+        """
+        :param in_planes: 輸入channel深度
+        :param out_planes: 輸出channel深度
+        :param kernel_size: 卷積核大小
+        :param stride: 步距
+        :param groups: 如果設定大小與輸入channel深度相同就會使用dw卷積
+        :param norm_layer: 標準化層
+        :param activation_layer: 激活函數
+        :param dilation: 1=不使用膨脹卷積，2=使用膨脹卷積且係數為2
+        """
         padding = (kernel_size - 1) // 2 * dilation
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -54,15 +64,18 @@ class SqueezeExcitation(nn.Module):
     def __init__(self, input_c: int, squeeze_factor: int = 4):
         super(SqueezeExcitation, self).__init__()
         squeeze_c = _make_divisible(input_c // squeeze_factor, 8)
+        # 使用conv來實踐fc的工用
         self.fc1 = nn.Conv2d(input_c, squeeze_c, 1)
         self.fc2 = nn.Conv2d(squeeze_c, input_c, 1)
 
     def forward(self, x: Tensor) -> Tensor:
+        # shape [batch_size, channel, w, h] -> [batch_size, channel, 1, 1]
         scale = F.adaptive_avg_pool2d(x, output_size=(1, 1))
         scale = self.fc1(scale)
         scale = F.relu(scale, inplace=True)
         scale = self.fc2(scale)
         scale = F.hardsigmoid(scale, inplace=True)
+        # 直接相乘就可以完成注意力機制
         return scale * x
 
 
@@ -77,6 +90,18 @@ class InvertedResidualConfig:
                  stride: int,
                  dilation: int,
                  width_multi: float):
+        """
+        :param input_c: 輸入channel深度
+        :param kernel: 卷積核大小
+        :param expanded_c: 中間層channel深度
+        :param out_c: 輸出channel深度
+        :param use_se: 是否使用注意力機制
+        :param activation: 激活函數選擇
+        :param stride: 步距
+        :param dilation: 是否使用膨脹卷積，1=不使用，2=使用
+        :param width_multi: channel係數
+        """
+        # 每一層的設定檔
         self.input_c = self.adjust_channels(input_c, width_multi)
         self.kernel = kernel
         self.expanded_c = self.adjust_channels(expanded_c, width_multi)
@@ -88,6 +113,7 @@ class InvertedResidualConfig:
 
     @staticmethod
     def adjust_channels(channels: int, width_multi: float):
+        # 調整至離8的倍數最接近的數
         return _make_divisible(channels * width_multi, 8)
 
 
@@ -95,17 +121,25 @@ class InvertedResidual(nn.Module):
     def __init__(self,
                  cnf: InvertedResidualConfig,
                  norm_layer: Callable[..., nn.Module]):
+        """
+        :param cnf: 構建配置方法
+        :param norm_layer: 標準化層
+        """
         super(InvertedResidual, self).__init__()
 
+        # 在mobilenet中步距不是1就是2
         if cnf.stride not in [1, 2]:
             raise ValueError("illegal stride value.")
 
+        # 只有在步距為1且輸入channel深度與輸出channel深度相同時才會有殘差結構
         self.use_res_connect = (cnf.stride == 1 and cnf.input_c == cnf.out_c)
 
         layers: List[nn.Module] = []
+        # 看要用哪種激活函數，在mobilenet中會用到兩種不同的激活函數
         activation_layer = nn.Hardswish if cnf.use_hs else nn.ReLU
 
         # expand
+        # 透過1*1卷積將channel加深，注意一下第一層層結構時不會有這個，因為輸入與輸出channel深度相同所以就乾脆不用
         if cnf.expanded_c != cnf.input_c:
             layers.append(ConvBNActivation(cnf.input_c,
                                            cnf.expanded_c,
@@ -114,6 +148,7 @@ class InvertedResidual(nn.Module):
                                            activation_layer=activation_layer))
 
         # depthwise
+        # 進行dw卷積同時也判斷是否使用膨脹卷積
         stride = 1 if cnf.dilation > 1 else cnf.stride
         layers.append(ConvBNActivation(cnf.expanded_c,
                                        cnf.expanded_c,
@@ -124,9 +159,11 @@ class InvertedResidual(nn.Module):
                                        norm_layer=norm_layer,
                                        activation_layer=activation_layer))
 
+        # 看是否使用注意力機制
         if cnf.use_se:
             layers.append(SqueezeExcitation(cnf.expanded_c))
 
+        # 最後再降維
         # project
         layers.append(ConvBNActivation(cnf.expanded_c,
                                        cnf.out_c,
@@ -135,7 +172,9 @@ class InvertedResidual(nn.Module):
                                        activation_layer=nn.Identity))
 
         self.block = nn.Sequential(*layers)
+        # 最後一層的channel保留下來
         self.out_channels = cnf.out_c
+        # 這個是之後會用到的，再決定要哪個層結構輸出時
         self.is_strided = cnf.stride > 1
 
     def forward(self, x: Tensor) -> Tensor:
@@ -153,24 +192,37 @@ class MobileNetV3(nn.Module):
                  num_classes: int = 1000,
                  block: Optional[Callable[..., nn.Module]] = None,
                  norm_layer: Optional[Callable[..., nn.Module]] = None):
+        """
+        :param inverted_residual_setting: 每一層的config
+        :param last_channel: 最後輸出的channel深度
+        :param num_classes: 分類類別數
+        :param block: 每層要用哪個module
+        :param norm_layer: 要用哪種標準化層方法
+        """
         super(MobileNetV3, self).__init__()
 
+        # 結構配置檢查
         if not inverted_residual_setting:
             raise ValueError("The inverted_residual_setting should not be empty.")
         elif not (isinstance(inverted_residual_setting, List) and
                   all([isinstance(s, InvertedResidualConfig) for s in inverted_residual_setting])):
             raise TypeError("The inverted_residual_setting should be List[InvertedResidualConfig]")
 
+        # 設定每一層用什麼module
         if block is None:
             block = InvertedResidual
 
+        # 設定標準化層並且將參數設定好
         if norm_layer is None:
             norm_layer = partial(nn.BatchNorm2d, eps=0.001, momentum=0.01)
 
+        # 紀錄多層層結構實例化對象
         layers: List[nn.Module] = []
 
         # building first layer
+        # 第一層channel輸入深度等於最一開始的卷積層輸出channel深度
         firstconv_output_c = inverted_residual_setting[0].input_c
+        # ConvBNActivation可以構建出卷積加上標準化加上激活函數
         layers.append(ConvBNActivation(3,
                                        firstconv_output_c,
                                        kernel_size=3,
@@ -178,10 +230,12 @@ class MobileNetV3(nn.Module):
                                        norm_layer=norm_layer,
                                        activation_layer=nn.Hardswish))
         # building inverted residual blocks
+        # 遍歷每個層結構的config來構建全部層結構
         for cnf in inverted_residual_setting:
             layers.append(block(cnf, norm_layer))
 
         # building last several layers
+        # 最後一層的channel深度
         lastconv_input_c = inverted_residual_setting[-1].out_c
         lastconv_output_c = 6 * lastconv_input_c
         layers.append(ConvBNActivation(lastconv_input_c,
@@ -189,6 +243,7 @@ class MobileNetV3(nn.Module):
                                        kernel_size=1,
                                        norm_layer=norm_layer,
                                        activation_layer=nn.Hardswish))
+        # 在segmentation中只會用到這裡以前的層結構，後面的不會用到
         self.features = nn.Sequential(*layers)
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Sequential(nn.Linear(lastconv_output_c, last_channel),
@@ -238,13 +293,20 @@ def mobilenet_v3_large(num_classes: int = 1000,
             backbone for Detection and Segmentation.
         dilated: whether using dilated conv
     """
+    # 構建large版本
+    # width_multi = 卷積層channel深度係數，預設深度會再乘上width_multi才是最後深度
     width_multi = 1.0
+    # 每個層結構的config，使用partial可以讓每個bneck_conf的width_multi都直接先設定好了
     bneck_conf = partial(InvertedResidualConfig, width_multi=width_multi)
+    # 把width_multi先設定好，這樣比較方便
     adjust_channels = partial(InvertedResidualConfig.adjust_channels, width_multi=width_multi)
 
+    # 如果要減少訓練參數可以將reduced_divider設定成2，但是相對的正確率會下降，預設是不會減少參數
     reduce_divider = 2 if reduced_tail else 1
+    # 是否使用膨脹卷積，預設為True
     dilation = 2 if dilated else 1
 
+    # 設定每一層的config檔
     inverted_residual_setting = [
         # input_c, kernel, expanded_c, out_c, use_se, activation, stride, dilation
         bneck_conf(16, 3, 16, 16, False, "RE", 1, 1),
