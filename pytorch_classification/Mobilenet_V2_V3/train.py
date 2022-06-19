@@ -12,12 +12,15 @@ from model_v2 import MobileNetV2
 
 
 def main():
+    # 已看過
+    # 指定設備
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
     batch_size = 16
     epochs = 5
 
+    # 資料轉換方式
     data_transform = {
         "train": transforms.Compose([transforms.RandomResizedCrop(224),
                                      transforms.RandomHorizontalFlip(),
