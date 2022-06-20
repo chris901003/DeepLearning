@@ -64,7 +64,7 @@ class BackboneBase(nn.Module):
         :param backbone: resnet50
         :param train_backbone: 是否要進行訓練
         :param num_channels: 最後一層輸出的channel
-        :param return_interm_layers: segmentation會是True
+        :param return_interm_layers: 訓練第二階段segmentation會是True
         """
         # 已看過
         super().__init__()
@@ -72,7 +72,7 @@ class BackboneBase(nn.Module):
         for name, parameter in backbone.named_parameters():
             if not train_backbone or 'layer2' not in name and 'layer3' not in name and 'layer4' not in name:
                 parameter.requires_grad_(False)
-        # 看要不要把中間的layer也輸出出去
+        # 看要不要把中間的layer也輸出出去，訓練第二階段segmentation時會是True
         if return_interm_layers:
             return_layers = {"layer1": "0", "layer2": "1", "layer3": "2", "layer4": "3"}
         else:
@@ -85,14 +85,14 @@ class BackboneBase(nn.Module):
     def forward(self, tensor_list: NestedTensor):
         # 已看過
         # NestedTensor詳細內容到detr.py中找或是到misc.py都可以
-        # tensor_list中的tensors就是圖片轉成的tensor
+        # tensor_list中的tensors就是圖片轉成的tensor shape [batch_size, 3, height, width]
         # xs = dict格式，裡面有return_layers指定的輸出layer的特徵圖
         xs = self.body(tensor_list.tensors)
         # 最後要出書的東西
         out: Dict[str, NestedTensor] = {}
         # name = key, x = value
         for name, x in xs.items():
-            # 拿到我們的mask
+            # 拿到我們的mask shape [batch_size, height, width]
             m = tensor_list.mask
             assert m is not None
             # 用pytorch的interpolate來將mask的高寬調整到與輸出特徵圖一樣
@@ -102,6 +102,9 @@ class BackboneBase(nn.Module):
             out[name] = NestedTensor(x, mask)
         # 如果是Object Detection的話out會是 out = {'0': NestedTensor}
         # 也就是只有最後一個輸出層會輸出
+
+        # 如果是Segmentation的話out會是 out = {'0': NestedTensor, '1': NestedTensor, '2': NestedTensor, '3': NestedTensor}
+        # 也就是會有多層輸出
         return out
 
 
@@ -112,6 +115,8 @@ class Backbone(BackboneBase):
                  return_interm_layers: bool,
                  dilation: bool):
         # 已看過
+        # return_interm_layers在第二階段訓練segmentation時會是True
+        # dilation一直都會是False，在官方文檔中沒有看到會是True的時候
         # ----------------------------------------------------------------------------
         # replace_stride_with_dilation = 可以決定在resnet中哪個layer要不要用膨脹卷積
         # pretrained = 可以決定要不要載入預訓練權重
@@ -137,9 +142,12 @@ class Joiner(nn.Sequential):
         # NestedTensor詳細內容到detr.py中找或是到misc.py都可以
         # ----------------------------------------------------------------------------
         # self[0]是backbone的forward調用
-        # 如果是Object Detection的話out會是 out = {'0': NestedTensor}
+        # 如果是Object Detection的話xs會是 xs = {'0': NestedTensor}
         # 也就是只有最後一個輸出層會輸出
+        # 如果是Segmentation的話xs會是 xs = {'0': NestedTensor, '1': NestedTensor, '2': NestedTensor, '3': NestedTensor}
+        # 也就是會有多層輸出
         # ----------------------------------------------------------------------------
+        # 首先先傳入backbone的forward
         xs = self[0](tensor_list)
         out: List[NestedTensor] = []
         pos = []
@@ -149,11 +157,12 @@ class Joiner(nn.Sequential):
             # position encoding
             # 做進入transformer前的position encoding
             # self[1]是position_embedding的forward
+            # 根據x中的mask會製造出一個位置編碼，高寬會跟特徵圖一樣
+            # pos shape [batch_size, channel, height, weight]
             pos.append(self[1](x).to(x.tensors.dtype))
 
-        # out (List[NestedTensor])
-        # 會在detr中把前面的第一個batch_size維度取消掉
-        # pos (List[tensor]) tensor shape [batch_size, batch_size, channel, w, h]
+        # out (List[NestedTensor])，list長度就是從backbone拿出多少層的輸出
+        # pos (List[tensor]) tensor shape [batch_size, channel, height, width]，list長度就是從backbone拿出多少層的輸出
         return out, pos
 
 
@@ -162,12 +171,12 @@ def build_backbone(args):
     position_embedding = build_position_encoding(args)
     # lr_backbone應該是backbone的學習率
     train_backbone = args.lr_backbone > 0
-    # 這邊看到main裡面是寫masks是給segmentation用的
+    # 在訓練第二階段segmentation時會是True
     return_interm_layers = args.masks
     # ----------------------------------------------------------------------------
     # backbone = 選擇要用哪個backbone預設為resnet50
     # train_backbone = backbone的學習率是否大於0，估計是表示backbone要不要學習
-    # return_interm_layers = 如果要做segmentation會設定成True
+    # return_interm_layers = 如果要做segmentation會設定成True，會將resnet的中間layer都輸出出來
     # dilation = 在resnet的最後一層不會進行下採樣，會使用空洞卷積做替代，也就是不會減少高和寬但是可以增加感受野
     # dilation估計會配合return_interm_layers一起使用
     # ----------------------------------------------------------------------------

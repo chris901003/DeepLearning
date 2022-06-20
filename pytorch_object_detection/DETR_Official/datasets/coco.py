@@ -33,6 +33,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         # 轉換方式，包含圖像以及gt_box
         self._transforms = transforms
+        # 在segmentation中return_masks會是True
         self.prepare = ConvertCocoPolysToMask(return_masks)
 
     def __getitem__(self, idx):
@@ -55,21 +56,42 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
-    # 這個是做segmentation才會用到，目前暫時不會用到
-    # 未讀
+    """
+    :param segmentations: [[[x1, y1, x2, y2, ..., xn, yn]], [[]], ..., [[]]]，長度就是一張圖片中有多少個gt_box
+    :param height: 圖像高度
+    :param width: 圖像寬度
+    :return: return shape [num_gt_box, height, width]
+    """
+    # 已看過
+    # 在二階段訓練segmentation中會用到
     masks = []
+    # 遍歷每個gt_box
     for polygons in segmentations:
+        # 透過pycocotools中的mask工具可以解析polygons內容，這個還不會是我們看得懂的
         rles = coco_mask.frPyObjects(polygons, height, width)
+        # 透過pycocotools中的mask工具再來解析獲得我們需要的資料
+        # mask shape [height, weight, 1]，不是我們要的分割訊息的地方會是0，是我們的目標會是1
         mask = coco_mask.decode(rles)
+        # 如果mask的shape維度不是3維，就在最後一個維度擴維，但是我們都會是3維的
         if len(mask.shape) < 3:
             mask = mask[..., None]
+        # 轉成tensor且type為unit8
         mask = torch.as_tensor(mask, dtype=torch.uint8)
+        # 將最後一個維度去除，值不改變
+        # mask shape [height, width]
         mask = mask.any(dim=2)
+        # 添加進masks列表中
         masks.append(mask)
+    # 看這張圖片是否有一個或是一個以上的gt_box
     if masks:
+        # 全部在第0維度上堆疊
+        # masks shape [num_gt_box, height, width]
         masks = torch.stack(masks, dim=0)
     else:
+        # 構建出一個空的，表示這張圖片沒有任何gt_box
+        # masks shape [0, height, width]
         masks = torch.zeros((0, height, width), dtype=torch.uint8)
+    # return shape [num_gt_box, height, width]
     return masks
 
 
@@ -77,6 +99,7 @@ class ConvertCocoPolysToMask(object):
     def __init__(self, return_masks=False):
         # 已看過
         # return_maks預設為False
+        # 在訓練segmentation時會是True
         self.return_masks = return_masks
 
     def __call__(self, image, target):
@@ -93,6 +116,15 @@ class ConvertCocoPolysToMask(object):
         image_id = torch.tensor([image_id])
 
         # 拿出annotation(List[Dict])
+        # ---------------------------------------------------------
+        # segmentation = [[x1, y1, x2, y2, ..., xn, yn]]，長度為偶數因為一個x就會有一個y
+        # area = double型態，存放這個目標的面積大小
+        # iscrowd = 當數值為0表示是好檢測的目標，1表示目標不好檢測到
+        # image_id = 圖片id
+        # bbox = gt_box在圖像中的位置(xmin, ymin, w, h)絕對位置
+        # category_id = 分類類別id
+        # id = 每個標註都會有不一樣的id，這個沒有很重要
+        # ---------------------------------------------------------
         anno = target["annotations"]
 
         # 過濾出被標記為iscrowd的gt_box，通常有被標記的都是有遮擋的
@@ -115,8 +147,13 @@ class ConvertCocoPolysToMask(object):
         classes = torch.tensor(classes, dtype=torch.int64)
 
         # 如果要做segmentation的訓練的話才會用到，這裡我們不會用到
+        # 在二階段訓練segmentation時會用到
         if self.return_masks:
+            # 先將segmentations拿出來
             segmentations = [obj["segmentation"] for obj in anno]
+            # 傳入標註點以及圖片大小
+            # [height, width]就是傳入的[h, w]
+            # masks shape [num_gt_box, height, width]
             masks = convert_coco_poly_to_mask(segmentations, h, w)
 
         # 如果需要訓練人物關節點的話就會用到，這裡我們不會用到
@@ -134,7 +171,9 @@ class ConvertCocoPolysToMask(object):
         # 記得classes也要同步過濾掉
         classes = classes[keep]
         # 這裡我們return_masks預設為False
+        # 在第二階段訓練segmentation時會是True
         if self.return_masks:
+            # masks也會需要過濾掉
             masks = masks[keep]
         if keypoints is not None:
             keypoints = keypoints[keep]
@@ -142,9 +181,11 @@ class ConvertCocoPolysToMask(object):
         # 最後整理出我們真正的target
         # 這裡target的每個value都是List格式，除了image_id
         target = {"boxes": boxes, "labels": classes}
+        # 在訓練segmentation時會多出一個masks在target中
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
+        # 這裡都不會用到關節點
         if keypoints is not None:
             target["keypoints"] = keypoints
 
@@ -164,13 +205,14 @@ class ConvertCocoPolysToMask(object):
 
         # ---------------------------------------------------------
         # target中到底有什麼
-        # boxes: 就是gt_box格式為 [xmin, ymin, xmax, ymax] (List(List))
-        # labels: 每個gt_box的分類類別 (List(int))
-        # image_id: 這張圖片的id (int)
-        # area: 每個gt_box的大小 (List(int))
-        # iscrowd: 每個gt_box的iscrowd標籤 (List(int))
-        # orig_size: 圖片原始大小 ([int, int])
-        # size: 目前是原始圖片大小，之後可能會做更動 ([int, int])
+        # boxes: 就是gt_box格式為 [xmin, ymin, xmax, ymax] shape [num_gt_box, 4]
+        # labels: 每個gt_box的分類類別 shape [num_gt_box]
+        # masks: 在訓練segmentation才會有，1表示需要匡出的目標，0表示背景 shape [num_gt_box, height, weight]
+        # image_id: 這張圖片的id shape [1]
+        # area: 每個gt_box的大小 shape [num_gt_box] (float格式)
+        # iscrowd: 每個gt_box的iscrowd標籤 shape [num_gt_box]，正常來說裡面都會是0因為剛剛過濾過了
+        # orig_size: 圖片原始大小 ([int, int]) shape [2]
+        # size: 目前是原始圖片大小，之後可能會做更動 ([int, int]) shape [2]
         # ---------------------------------------------------------
         return image, target
 
@@ -225,6 +267,6 @@ def build(image_set, args):
     # 拿到圖片的檔案以及標註檔案
     img_folder, ann_file = PATHS[image_set]
     # image_set = 'train' or 'val'
-    # args.masks預設為False
+    # args.masks預設為False，在訓練segmentation中會是True
     dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set), return_masks=args.masks)
     return dataset

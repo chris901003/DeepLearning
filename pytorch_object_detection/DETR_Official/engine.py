@@ -66,7 +66,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         #   'aux_outputs': List[{
         #                           'pred_logits': shape [batch_size, num_queries, num_classes + 1],
         #                           'pred_boxes': shape [batch_size, num_queries, 4]
-        #                      }]
+        #                      }],
+        #   'pred_masks': shape [batch_size, num_queries, height, width] (只有在訓練segmentation中才會有)
         # }
         # ---------------------------------------------------------
         outputs = model(samples)
@@ -79,6 +80,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         #   loss_bbox:l1損失,
         #   loss_giou:giou損失,
         #   cardinality_error:正負樣本匹配損失,
+        #   loss_mask: segmentation損失,
+        #   loss_dice: 在segmentation中可視化用的,
         #   ...
         # }
         # ---------------------------------------------------------
@@ -190,7 +193,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         # outputs (Dict)
         # {
         #   'pred_logits': shape [batch_size, num_queries, num_classes + 1],
-        #   'pred_boxes': shape [batch_size, num_queries, 4]
+        #   'pred_boxes': shape [batch_size, num_queries, 4],
+        #   'pred_masks': shape[batch_size, num_queries, height, width](只有在訓練segmentation中才會有)
         # }
         # ---------------------------------------------------------
         outputs = model(samples)
@@ -220,16 +224,20 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         # 將預測結果以及原始圖片大小輸入到postprocessors中
         # ---------------------------------------------------------
         # results = {
-        # 'scores':[batch_size, num_queries],
-        # 'labels':[batch_size, num_queries],
-        # 'boxes':[batch_size, num_queries,4]
+        #   'scores':[batch_size, num_queries],
+        #   'labels':[batch_size, num_queries],
+        #   'boxes':[batch_size, num_queries,4]
         # }
         # ---------------------------------------------------------
         # 這裡確實把100個queries都拿進去了，但是理論上要過濾掉背景才對，yolo系列的會在這裡前經過nms
         # 我覺得至少要把置信度過小的過濾掉吧，經過測試如果過濾掉的話mAP會下降，但是predict時需要拿掉
         results = postprocessors['bbox'](outputs, orig_target_sizes)
+        # 在使用segmentation時會啟用
+        # results會多上masks的key同時value shape [num_queries, 1, orig_height, orig_width]
         if 'segm' in postprocessors.keys():
-            # 預測segmentation才會用到，這裡我們先不會用到
+            # 預測segmentation才會用到，這裡我們先不會用到，現在會用到了
+            # targets中的size是原始圖像經過隨機縮放後的大小，一個batch當中的圖片不一定全部一樣
+            # targets_sizes shape [batch_size, 2]
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
         # res(Dict) = 拿圖片的id對上那張圖片預測出來的結果
@@ -239,6 +247,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             # 將image_id對應上預測結果輸入給coco_evaluator
             coco_evaluator.update(res)
 
+        # 在做全景分割時才會用到，這裡還不會用到
         if panoptic_evaluator is not None:
             # 這裡預測segmentation才會有，我們不會用到
             res_pano = postprocessors["panoptic"](outputs, target_sizes, orig_target_sizes)

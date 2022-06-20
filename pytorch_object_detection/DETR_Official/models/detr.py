@@ -149,7 +149,7 @@ class SetCriterion(nn.Module):
         self.eos_coef = eos_coef
         # losses = ['labels', 'boxes', 'cardinality']
         self.losses = losses
-        # empty_weight暫時不知道要做什麼用
+        # empty_weight可以根據不同類別給出不同損失權重，這裡只有對於背景的損失權重會進行改變其他都是1
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
@@ -269,27 +269,54 @@ class SetCriterion(nn.Module):
         """Compute the losses related to the masks: the focal loss and the dice loss.
            targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
         """
-        # 未讀
+        # 已看過
         # 如果要訓練segmentation才會用到
+        # 檢查outputs中是否有pred_masks
         assert "pred_masks" in outputs
 
+        # src_idx = (batch_idx, src_idx)
+        # batch_idx = 把一個batch的gt_box concat起來所以長度是所有的gt_box，只是batch中第一張圖片的會是0，第二張會是1，後面以此類推
+        # src_idx = 把一個batch有對應到gt_box的query concat起來
         src_idx = self._get_src_permutation_idx(indices)
+        # tgt_idx = (batch_idx, src_idx)
+        # batch_idx = 把一個batch的gt_box concat起來所以長度是所有的gt_box，只是batch中第一張圖片的會是0，第二張會是1，後面以此類推
+        # src_idx = 把一個batch有對應到gt_box的query concat起來，並且存放的是gt_box的index
         tgt_idx = self._get_tgt_permutation_idx(indices)
+        # src_masks shape [batch_size, num_queries, height, width]
         src_masks = outputs["pred_masks"]
+        # 獲取到有配對上的src_masks shape [total_number_match_gt_box, height, width]
         src_masks = src_masks[src_idx]
+        # masks是list型態裡面會是tensor且shape [num_gt_box, height, width]
+        # 這裡的height跟width是原始圖片的高寬，也就是同一個batch當中每個masks的高寬不一定一樣
         masks = [t["masks"] for t in targets]
         # TODO use valid to mask invalid areas due to padding in loss
+        # 將一個batch的masks變成NestTensor格式後在做解壓，變成tensor以及mask
+        # 這樣就可以讓一個batch的masks的高寬變成一致就可以堆疊了
+        # 這邊要注意一個地方就是原先是channel的地方在這裡是num_gt_box，所以透過NestTensor後每張圖片的num_gt_box維度會是一樣的
+        # 如果是被擴充的就會全為1
+        # target_masks shape [batch_size, num_gt_box, height, width]
+        # valid shape [batch_size, height, width]
         target_masks, valid = nested_tensor_from_tensor_list(masks).decompose()
+        # 轉換到設備上
         target_masks = target_masks.to(src_masks)
+        # 取出我們需要的
+        # target_masks shape [total_number_match_gt_box, height, width]
         target_masks = target_masks[tgt_idx]
 
         # upsample predictions to the target size
+        # interpolate與官方實現的雙線性差值是一樣的，只是支援batch_size等於0的情況
+        # 將預測出來的高寬透過雙線性差值調整到跟target一樣
+        # src_masks shape [total_number_match_gt_box, 1, height, width]
         src_masks = interpolate(src_masks[:, None], size=target_masks.shape[-2:],
                                 mode="bilinear", align_corners=False)
+        # src_masks shape [total_number_match_gt_box, height * width]
         src_masks = src_masks[:, 0].flatten(1)
 
+        # target_masks shape [total_number_match_gt_box, height * width]
         target_masks = target_masks.flatten(1)
+        # 原來兩個的shape就會一樣了
         target_masks = target_masks.view(src_masks.shape)
+        # 計算相關損失，num_boxes = 一個batch總共有多少個gt_box
         losses = {
             "loss_mask": sigmoid_focal_loss(src_masks, target_masks, num_boxes),
             "loss_dice": dice_loss(src_masks, target_masks, num_boxes),
@@ -315,10 +342,14 @@ class SetCriterion(nn.Module):
         return batch_idx, src_idx
 
     def _get_tgt_permutation_idx(self, indices):
-        # 未讀
+        # 已看過
         # 如果要訓練segmentation才會用到
         # permute targets following indices
+        # Ex: batch_size = 3，第一張有3個gt_box，第二張有2個gt_box，第三張有4個gt_box
+        # 那麼batch_idx = [0, 0, 0, 1, 1, 2, 2, 2, 2]
+        # 與上方拿src是相同的
         batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
+        # 將query有對應上的gt_box的gt_box index做拼接
         tgt_idx = torch.cat([tgt for (_, tgt) in indices])
         return batch_idx, tgt_idx
 
@@ -350,12 +381,24 @@ class SetCriterion(nn.Module):
         #   'aux_outputs': List[{
         #                           'pred_logits': shape [batch_size, num_queries, num_classes + 1],
         #                           'pred_boxes': shape [batch_size, num_queries, 4]
-        #                      }]
+        #                      }],
+        #   'pred_masks': shape [batch_size, num_queries, height, width] (只有在訓練segmentation中才會有)
         # }
-        # targets = [batch_size, annotations_per_image] = [tuple[list[dict]]] = [幾張照片[每張照片的標籤信息[每個標籤的內容]]]
+        # ---------------------------------------------------------
+        # target中到底有什麼
+        # boxes: 就是gt_box格式為 [xmin, ymin, xmax, ymax] shape [num_gt_box, 4]
+        # labels: 每個gt_box的分類類別 shape [num_gt_box]
+        # masks: 在訓練segmentation才會有，1表示需要匡出的目標，0表示背景 shape [num_gt_box, height, weight]
+        # image_id: 這張圖片的id shape [1]
+        # area: 每個gt_box的大小 shape [num_gt_box] (float格式)
+        # iscrowd: 每個gt_box的iscrowd標籤 shape [num_gt_box]，正常來說裡面都會是0因為剛剛過濾過了
+        # orig_size: 圖片原始大小 ([int, int]) shape [2]
+        # size: 目前是原始圖片大小，之後可能會做更動 ([int, int]) shape [2]
+        # ---------------------------------------------------------
         # 已看過
 
         # 將最後輸出拿出來，也就是不要輔助輸出
+        # 如果在訓練segmentation那就會把segmentation的預測拿出來
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         # Retrieve the matching between the outputs of the last layer and the targets
@@ -380,6 +423,7 @@ class SetCriterion(nn.Module):
         # Compute all the requested losses
         # 計算損失
         # self.losses = ['labels', 'boxes', 'cardinality']
+        # 在訓練segmentation第二階段時會有segm這個損失要進行計算
         losses = {}
         # ---------------------------------------------------------
         # 'labels':
@@ -390,6 +434,9 @@ class SetCriterion(nn.Module):
         # loss_giou = giou損失
         # 'cardinality':
         # cardinality_error = 正負樣本匹配損失
+        # 'segm':
+        # 'loss_mask': segmentation損失
+        # 'loss_dice': 在segmentation中可視化用的
         # ---------------------------------------------------------
         for loss in self.losses:
             # 根據要計算的loss放入get_loss中
@@ -426,6 +473,8 @@ class SetCriterion(nn.Module):
         #   loss_bbox:l1損失,
         #   loss_giou:giou損失,
         #   cardinality_error:正負樣本匹配損失,
+        #   loss_mask: segmentation損失,
+        #   loss_dice: 在segmentation中可視化用的
         #   ...
         # }
         # ---------------------------------------------------------
@@ -522,6 +571,9 @@ def build(args):
     # coco_panoptic是全景分析的數據集
     # ----------------------------------------------------------------------------
     num_classes = 20 if args.dataset_file != 'coco' else 91
+
+    # 全景分割，我們將分類類別數進行擴充，不在意到底要是多少只要夠用就可以了
+    # 這裡我們先看實例分割
     if args.dataset_file == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
@@ -553,7 +605,7 @@ def build(args):
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
     )
-    # 預設為False除非要訓練segmentation
+    # 預設為False除非要訓練segmentation，在續練segmentation第二輪時會是True
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     # 實例化匈牙利匹配的東西
@@ -575,6 +627,7 @@ def build(args):
 
     # 紀錄有哪幾種的loss
     losses = ['labels', 'boxes', 'cardinality']
+    # 訓練segmentation時會多出一個masks的損失
     if args.masks:
         losses += ["masks"]
     # 設定標準
@@ -588,6 +641,7 @@ def build(args):
     # 訓練Segmentation才會用到
     if args.masks:
         postprocessors['segm'] = PostProcessSegm()
+        # 我們先只做實例分割，不去看全景分割的東西，所以不會設定dataset_file
         if args.dataset_file == "coco_panoptic":
             is_thing_map = {i: i <= 90 for i in range(201)}
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)

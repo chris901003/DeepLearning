@@ -82,6 +82,7 @@ class HungarianMatcher(nn.Module):
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
         # 抓出out_prob中對應idx地方的概率，這邊先都不考慮到底是哪張照片因為batch_size都已經混合了
         # cost_class shape [batch_size * num_queries, total_gt_box]
+        # 取負號是因為在計算cost時，值越小越好
         cost_class = -out_prob[:, tgt_ids]
 
         # Compute the L1 cost between boxes
@@ -98,6 +99,7 @@ class HungarianMatcher(nn.Module):
         # Compute the giou cost betwen boxes
         # 先轉成左上右下後再去計算giou
         # cost_giou shape [batch_size * num_queries, total_gt_box]
+        # 取負號是因為在計算cost時，值越小越好
         cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # Final cost matrix

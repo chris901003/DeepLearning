@@ -29,6 +29,7 @@ def build_dataset(image_set, args):
         # 預設是coco，原則上我們會用這個
         return build_coco(image_set, args)
     # coco_panoptic是做segmentation的
+    # 這裡我們先不去處理全景分割，所以還是用上面的
     if args.dataset_file == 'coco_panoptic':
         # to avoid making panopticapi required for coco
         from .coco_panoptic import build as build_coco_panoptic

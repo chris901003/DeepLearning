@@ -53,6 +53,8 @@ def crop(image, target, region):
     if "masks" in target:
         # FIXME should we update the area here if there are no boxes?
         # 直接把要的放入新的array
+        # target['masks'] shape [batch_size, height, width]
+        # 直接進行剪裁
         target['masks'] = target['masks'][:, i:i + h, j:j + w]
         fields.append("masks")
 
@@ -187,7 +189,7 @@ def pad(image, target, padding):
     # 更新target中圖片的大小，變成加上pad後的圖像大小
     # gt_box是不用動的，因為是加在右邊以及下面所以不會影響原始gt_box位置
     target["size"] = torch.tensor(padded_image.size[::-1])
-    # 如果有masks也要增加pad
+    # 如果有masks也要增加pad，在訓練segmentation時會有
     if "masks" in target:
         target['masks'] = torch.nn.functional.pad(target['masks'], (0, padding[0], 0, padding[1]))
     return padded_image, target

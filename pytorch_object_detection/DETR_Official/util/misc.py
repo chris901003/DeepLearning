@@ -364,6 +364,8 @@ def collate_fn(batch):
     # 一開始的圖片大小都不一樣沒辦法直接堆一起
     # 記得要轉成list否則會變成zip格式沒辦法用
     batch = list(zip(*batch))
+    # batch[0] = 一個batch圖片的list
+    # batch[1] = 一個batch的target訊息的list
     # 取出一個batch的照片進行處理，這裡的image已經是tensor格式了
     # batch[0]變成NestedTensor的格式了，也就是圖片的tensor以及mask封裝在一個class裡面
     batch[0] = nested_tensor_from_tensor_list(batch[0])
@@ -429,10 +431,10 @@ def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
 
         # TODO make it support different-sized images
         # 把每張圖片的shape傳入_max_by_axis
-        # 找到這個batch中每個維度的最大[3, max_w, max_h]
+        # 找到這個batch中每個維度的最大 list[3, max_w, max_h]
         max_size = _max_by_axis([list(img.shape) for img in tensor_list])
         # min_size = tuple(min(s) for s in zip(*[img.shape for img in tensor_list]))
-        # batch_shape shape = [batch_size, 3, max_w, max_h]
+        # batch_shape shape = list[batch_size, 3, max_w, max_h]
         batch_shape = [len(tensor_list)] + max_size
         # 最後都會把照片的tensor的高寬維度調整成跟最大一樣
         b, c, h, w = batch_shape

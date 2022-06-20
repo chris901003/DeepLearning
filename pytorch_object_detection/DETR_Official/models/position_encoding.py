@@ -33,6 +33,7 @@ class PositionEmbeddingSine(nn.Module):
         # 已看過
         # NestedTensor詳細內容到detr.py中找或是到misc.py都可以
         # 將NestedTensor中的tensor以及mask分別拿出來
+        # x shape [batch_size, 3, height, width], mask shape [batch_size, height, width]
         x = tensor_list.tensors
         mask = tensor_list.mask
         assert mask is not None
@@ -46,6 +47,7 @@ class PositionEmbeddingSine(nn.Module):
         if self.normalize:
             # 會進來
             eps = 1e-6
+            # 先將所有值控制在[0, 1]之後再乘上scale
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
 

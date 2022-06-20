@@ -23,7 +23,7 @@ class Transformer(nn.Module):
                  return_intermediate_dec=False):
         # 已看過
         # d_model預設為256
-        # return_intermediate_dec預設為True，估計是為了每個decoder出來的都會拿去預測，可以讓每層都學得好
+        # return_intermediate_dec預設為True，為了每個decoder出來的都會拿去預測，可以讓每層都學得好
         super().__init__()
 
         # 構建一個encoder_layer後面由TransformerEncoder來把很多層疊起來
@@ -40,6 +40,7 @@ class Transformer(nn.Module):
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
+        # 初始化權重
         self._reset_parameters()
 
         self.d_model = d_model
@@ -148,7 +149,7 @@ class TransformerDecoder(nn.Module):
     def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
         super().__init__()
         # 已看過
-        # return_intermediate預設為True，估計是為了要讓每層的decoder都可以進行預測學習，讓效果更好
+        # return_intermediate預設為True，為了要讓每層的decoder都可以進行預測學習，讓效果更好
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
@@ -221,7 +222,7 @@ class TransformerEncoderLayer(nn.Module):
         :param dim_feedforward: FFN中間層用到的channel深度
         :param dropout: dropout
         :param activation: 激活函數
-        :param normalize_before: 預設為True
+        :param normalize_before: 預設為True，所以會先進行標準化後才會進入自注意力機制
         """
         # 已看過
         super().__init__()
@@ -486,8 +487,8 @@ def build_transformer(args):
     # dim_feedforward = FFN的中間channel大小，預設為2048
     # num_encoder_layers = encoder模塊重複次數，預設為6
     # num_decoder_layers = decoder模塊重複次數，預設為6
-    # normalize_before = 目前還不知道，預設是False
-    # return_intermediate_dec = 目前不知道是啥，預設是True
+    # normalize_before = 在進行自注意力機制前是否先進行標準化
+    # return_intermediate_dec = 將每層decoder的輸出都拿去計算損失，達到更佳學習效果
     # ----------------------------------------------------------------------------
     # 已看過
     return Transformer(
