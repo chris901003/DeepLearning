@@ -130,6 +130,9 @@ def get_args_parser():
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
+
+    # 使用amp可以讓使用記憶體減半，達到更快訓練，在訓練segmentation一定要開啟除非ram大於16G
+    parser.add_argument('--amp', default=False, help='Using AMP')
     return parser
 
 
@@ -152,6 +155,8 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+    # 如果有使用amp就要有一個scaler
+    scaler = torch.cuda.amp.GradScaler() if args.amp else None
 
     # ---------------------------------------------------------
     # model = 我們需要用到的預測模型
@@ -286,7 +291,7 @@ def main(args):
         # train_stats = 訓練過程中各種資料的的最終平均值，包含loss、錯誤率、學習率等等
         train_stats = train_one_epoch(
             model, criterion, data_loader_train, optimizer, device, epoch,
-            args.clip_max_norm)
+            args.clip_max_norm, scaler)
         # 一個epoch後對學習率調整
         lr_scheduler.step()
         # 保存訓練結果

@@ -8,7 +8,7 @@ import sys
 from typing import Iterable
 
 import torch
-
+from torch.cuda import amp
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
 from datasets.panoptic_eval import PanopticEvaluator
@@ -16,7 +16,7 @@ from datasets.panoptic_eval import PanopticEvaluator
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0):
+                    device: torch.device, epoch: int, max_norm: float = 0, scaler=None):
     # 已看過
     # 由main.py呼叫，用來train一個epoch
     # ---------------------------------------------------------
@@ -70,27 +70,29 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         #   'pred_masks': shape [batch_size, num_queries, height, width] (只有在訓練segmentation中才會有)
         # }
         # ---------------------------------------------------------
-        outputs = model(samples)
-        # ---------------------------------------------------------
-        # 將模型預測結果outputs與真實標記targets放入計算損失
-        # loss_dict =
-        # {
-        #   loss_ce:用交叉商計算出來的損失值,
-        #   class_error:錯誤率，以100%格式,
-        #   loss_bbox:l1損失,
-        #   loss_giou:giou損失,
-        #   cardinality_error:正負樣本匹配損失,
-        #   loss_mask: segmentation損失,
-        #   loss_dice: 在segmentation中可視化用的,
-        #   ...
-        # }
-        # ---------------------------------------------------------
-        loss_dict = criterion(outputs, targets)
-        # weight_dict = criterion在構建的時候有一個變數就是weight_dict裡面存放了loss_dict的key要對應上的loss權重
-        # 可以到detr.py中的build函數篇下面的地方可以看到
-        weight_dict = criterion.weight_dict
-        # 遍歷全部的loss，計算出來的loss乘上相對應的權重後加總起來獲得最後的loss值
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+        # 看是否有使用amp
+        with amp.autocast(enabled=scaler is not None):
+            outputs = model(samples)
+            # ---------------------------------------------------------
+            # 將模型預測結果outputs與真實標記targets放入計算損失
+            # loss_dict =
+            # {
+            #   loss_ce:用交叉商計算出來的損失值,
+            #   class_error:錯誤率，以100%格式,
+            #   loss_bbox:l1損失,
+            #   loss_giou:giou損失,
+            #   cardinality_error:正負樣本匹配損失,
+            #   loss_mask: segmentation損失,
+            #   loss_dice: 在segmentation中可視化用的,
+            #   ...
+            # }
+            # ---------------------------------------------------------
+            loss_dict = criterion(outputs, targets)
+            # weight_dict = criterion在構建的時候有一個變數就是weight_dict裡面存放了loss_dict的key要對應上的loss權重
+            # 可以到detr.py中的build函數篇下面的地方可以看到
+            weight_dict = criterion.weight_dict
+            # 遍歷全部的loss，計算出來的loss乘上相對應的權重後加總起來獲得最後的loss值
+            losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
         # reduce losses over all GPUs for logging purposes
         # 對於多gpu我們loss會需要進行一些調整
@@ -116,11 +118,18 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # 歸零優化器
         optimizer.zero_grad()
         # 反向傳遞
-        losses.backward()
+        if scaler is not None:
+            scaler.scale(losses).backward()
+        else:
+            losses.backward()
         if max_norm > 0:
             # clip_grad_norm = 可以設定梯度閾值，當梯度大於設定值時就會被限制，不會超過避免梯度爆炸
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-        optimizer.step()
+        if scaler is not None:
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
 
         # metric_logger的一些東西，更新一下
         # ---------------------------------------------------------
