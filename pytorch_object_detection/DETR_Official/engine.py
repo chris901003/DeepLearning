@@ -223,11 +223,21 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         # 將預測結果以及原始圖片大小輸入到postprocessors中
         # ---------------------------------------------------------
-        # results = {
-        #   'scores':[batch_size, num_queries],
-        #   'labels':[batch_size, num_queries],
-        #   'boxes':[batch_size, num_queries,4]
-        # }
+        # results = [
+        #   {
+        #       'scores': shape [num_queries],
+        #       'labels': shape [num_queries],
+        #       'boxes': shape [num_queries,4],
+        #       'masks': shape [num_queries, 1, height, width]
+        #   },
+        #   {
+        #       'scores': shape [num_queries],
+        #       'labels': shape [num_queries],
+        #       'boxes': shape [num_queries,4],
+        #       'masks': shape [num_queries, 1, height, width]],
+        #   },
+        # ]
+        # results的長度就會是batch_size
         # ---------------------------------------------------------
         # 這裡確實把100個queries都拿進去了，但是理論上要過濾掉背景才對，yolo系列的會在這裡前經過nms
         # 我覺得至少要把置信度過小的過濾掉吧，經過測試如果過濾掉的話mAP會下降，但是predict時需要拿掉
