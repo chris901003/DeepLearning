@@ -146,11 +146,14 @@ class DETR(object):
             top_conf = top_scores.cpu().numpy()
             top_label = top_labels.cpu().numpy()
             top_boxes = top_boxes.cpu().numpy()
+            # top_masks shape [num_queries, height, width]
+            top_masks = top_masks.squeeze(1)
             if 'masks' in results[0].keys():
                 top_masks = top_masks.cpu().numpy().astype(np.uint8)
 
-        # top_masks shape [num_queries, 1, height, width]
-        segmentation_masks = []
+        # top_masks shape [num_queries, height, width]
+        h, w = top_masks.shape[-2], top_masks.shape[-1]
+        segmentation_masks = np.zeros([h, w])
         if 'masks' in results[0].keys():
             with open(self.palette_path, 'rb') as f:
                 palette_dict = json.load(f)
@@ -160,10 +163,12 @@ class DETR(object):
             for idx, mask in enumerate(top_masks):
                 label = top_label[idx]
                 mask[mask == 1] = label
-                segmentation_mask = Image.fromarray(mask)
-                segmentation_mask.putpalette(palette)
-                segmentation_mask.convert('RGB')
-                segmentation_masks.append(segmentation_mask)
+                mask_filter = np.where(segmentation_masks == 0)
+                segmentation_masks[mask_filter] = mask[mask_filter]
+            segmentation_masks = segmentation_masks.astype(np.uint8)
+            segmentation_masks = Image.fromarray(segmentation_masks)
+            segmentation_masks.putpalette(palette)
+            segmentation_masks = segmentation_masks.convert('RGB')
 
         # font = 字體選擇，這裡指定字體的檔案位置
         # size = 字體大小，會根據輸入圖片做調整
@@ -219,7 +224,5 @@ class DETR(object):
             del draw
 
         # 回傳畫好框框的圖片
-        segmentation_image = image
-        for mask in segmentation_masks:
-            segmentation_image = Image.blend(segmentation_image, mask, 0.5)
+        segmentation_image = Image.blend(segmentation_masks, image, 0.5)
         return segmentation_image
