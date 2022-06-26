@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 import numpy as np
 
-from model import HighResolutionNet
+from models import HighResolutionNet
 from train_utils import EvalCOCOMetric
 from my_dataset_coco import CocoKeypoint
 import transforms
@@ -132,14 +132,14 @@ def main(args):
                                                      num_workers=nw,
                                                      collate_fn=val_dataset.collate_fn)
 
-    # create model
+    # create models
     model = HighResolutionNet()
 
     # 载入你自己训练好的模型权重
     weights_path = args.weights_path
     assert os.path.exists(weights_path), "not found {} file.".format(weights_path)
     model.load_state_dict(torch.load(weights_path, map_location='cpu'))
-    # print(model)
+    # print(models)
     model.to(device)
 
     # evaluate on the val dataset

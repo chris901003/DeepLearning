@@ -26,7 +26,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
-                        help="Path to the pretrained model. If set, only the mask head will be trained")
+                        help="Path to the pretrained models. If set, only the mask head will be trained")
     # * Backbone
     # 選擇使用哪種backbone
     parser.add_argument('--backbone', default='resnet50', type=str,

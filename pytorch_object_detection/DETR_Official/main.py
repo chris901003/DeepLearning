@@ -36,7 +36,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
-                        help="Path to the pretrained model. If set, only the mask head will be trained")
+                        help="Path to the pretrained models. If set, only the mask head will be trained")
     # * Backbone
     # 選擇使用哪種backbone
     parser.add_argument('--backbone', default='resnet50', type=str,
@@ -159,7 +159,7 @@ def main(args):
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
 
     # ---------------------------------------------------------
-    # model = 我們需要用到的預測模型
+    # models = 我們需要用到的預測模型
     # criterion = 預測後處理
     # postprocessors = 將輸出變成coco api想要的格式
     # ---------------------------------------------------------
@@ -236,7 +236,7 @@ def main(args):
     # 訓練第二階段segmentation會有檔案位置傳入
     if args.frozen_weights is not None:
         checkpoint = torch.load(args.frozen_weights, map_location='cpu')
-        model_without_ddp.detr.load_state_dict(checkpoint['model'])
+        model_without_ddp.detr.load_state_dict(checkpoint['models'])
 
     # 紀錄訓練的檔案位置，如果沒有要記錄會是空
     output_dir = Path(args.output_dir)
@@ -249,8 +249,8 @@ def main(args):
         else:
             # 從本地的權重檔案加載
             checkpoint = torch.load(args.resume, map_location='cpu')
-        # 權重key['model']加載到模型裡面
-        model_without_ddp.load_state_dict(checkpoint['model'])
+        # 權重key['models']加載到模型裡面
+        model_without_ddp.load_state_dict(checkpoint['models'])
         # 如果是自己訓練到一半的那種會有保存
         # optimizer之前得狀態，lr_scheduler的數值可以拿回當時的學習率，epoch知道那時候是到第幾個epoch
         # 當然要在訓練模式下才有意義所以先檢查是不是在訓練模式下
@@ -280,7 +280,7 @@ def main(args):
             sampler_train.set_epoch(epoch)
         # 交給train_one_epoch進行一個epoch的訓練
         # ---------------------------------------------------------
-        # model = 就是model，在多gpu下就是有經過DistributedDataParallel的model
+        # models = 就是model，在多gpu下就是有經過DistributedDataParallel的model
         # criterion = 預測後處理
         # data_loader_train = 訓練集的資料
         # optimizer = 優化器
@@ -306,7 +306,7 @@ def main(args):
                 # 這個回圈我們也只會跑一或兩次，看當前epoch到哪裡
                 # 總共保存了，模型當前的權重，優化器權重，學習率，epoch，超參數
                 utils.save_on_master({
-                    'model': model_without_ddp.state_dict(),
+                    'models': model_without_ddp.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'epoch': epoch,
@@ -315,7 +315,7 @@ def main(args):
 
         # 測試一下，這裡等我看完train_one_epoch再回來看
         # ---------------------------------------------------------
-        # model = 預測模型
+        # models = 預測模型
         # criterion = 預測後處理
         # postprocessors = 將輸出變成coco api想要的格式
         # data_loader_val = 驗證集的dataloader

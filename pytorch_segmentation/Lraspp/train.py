@@ -128,7 +128,7 @@ def main(args):
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint['models'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         args.start_epoch = checkpoint['epoch'] + 1
@@ -151,7 +151,7 @@ def main(args):
                          f"lr: {lr:.6f}\n"
             f.write(train_info + val_info + "\n\n")
 
-        save_file = {"model": model.state_dict(),
+        save_file = {"models": model.state_dict(),
                      "optimizer": optimizer.state_dict(),
                      "lr_scheduler": lr_scheduler.state_dict(),
                      "epoch": epoch,

@@ -71,7 +71,7 @@ class Trainer(DefaultTrainer):
             params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
 
         def maybe_add_full_model_gradient_clipping(optim):  # optim: the optimizer class
-            # detectron2 doesn't have full model gradient clipping now
+            # detectron2 doesn't have full models gradient clipping now
             clip_norm_val = cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE
             enable = (
                 cfg.SOLVER.CLIP_GRADIENTS.ENABLED

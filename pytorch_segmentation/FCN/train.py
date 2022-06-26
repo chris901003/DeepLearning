@@ -179,7 +179,7 @@ def main(args):
         # 加載之前訓練的紀錄
         checkpoint = torch.load(args.resume, map_location='cpu')
         # 加載模型權重
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint['models'])
         # 加載優化器狀態
         optimizer.load_state_dict(checkpoint['optimizer'])
         # 加載學習率
@@ -213,7 +213,7 @@ def main(args):
             f.write(train_info + val_info + "\n\n")
 
         # 保存pth檔
-        save_file = {"model": model.state_dict(),
+        save_file = {"models": model.state_dict(),
                      "optimizer": optimizer.state_dict(),
                      "lr_scheduler": lr_scheduler.state_dict(),
                      "epoch": epoch,

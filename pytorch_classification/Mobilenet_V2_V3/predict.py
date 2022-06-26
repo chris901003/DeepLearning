@@ -35,9 +35,9 @@ def main():
     with open(json_path, "r") as f:
         class_indict = json.load(f)
 
-    # create model
+    # create models
     model = MobileNetV2(num_classes=5).to(device)
-    # load model weights
+    # load models weights
     model_weight_path = "./MobileNetV2.pth"
     model.load_state_dict(torch.load(model_weight_path, map_location=device))
     model.eval()

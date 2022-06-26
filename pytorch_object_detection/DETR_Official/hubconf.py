@@ -34,7 +34,7 @@ def detr_resnet50(pretrained=False, num_classes=91, return_postprocessor=False):
         checkpoint = torch.hub.load_state_dict_from_url(
             url="https://dl.fbaipublicfiles.com/detr/detr-r50-e632da11.pth", map_location="cpu", check_hash=True
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcess()
     return model
@@ -53,7 +53,7 @@ def detr_resnet50_dc5(pretrained=False, num_classes=91, return_postprocessor=Fal
         checkpoint = torch.hub.load_state_dict_from_url(
             url="https://dl.fbaipublicfiles.com/detr/detr-r50-dc5-f0fb7ef5.pth", map_location="cpu", check_hash=True
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcess()
     return model
@@ -70,7 +70,7 @@ def detr_resnet101(pretrained=False, num_classes=91, return_postprocessor=False)
         checkpoint = torch.hub.load_state_dict_from_url(
             url="https://dl.fbaipublicfiles.com/detr/detr-r101-2c7b67e5.pth", map_location="cpu", check_hash=True
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcess()
     return model
@@ -89,7 +89,7 @@ def detr_resnet101_dc5(pretrained=False, num_classes=91, return_postprocessor=Fa
         checkpoint = torch.hub.load_state_dict_from_url(
             url="https://dl.fbaipublicfiles.com/detr/detr-r101-dc5-a2e86def.pth", map_location="cpu", check_hash=True
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcess()
     return model
@@ -112,7 +112,7 @@ def detr_resnet50_panoptic(
             map_location="cpu",
             check_hash=True,
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcessPanoptic(is_thing_map, threshold=threshold)
     return model
@@ -138,7 +138,7 @@ def detr_resnet50_dc5_panoptic(
             map_location="cpu",
             check_hash=True,
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcessPanoptic(is_thing_map, threshold=threshold)
     return model
@@ -162,7 +162,7 @@ def detr_resnet101_panoptic(
             map_location="cpu",
             check_hash=True,
         )
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint["models"])
     if return_postprocessor:
         return model, PostProcessPanoptic(is_thing_map, threshold=threshold)
     return model

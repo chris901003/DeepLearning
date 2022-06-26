@@ -217,7 +217,7 @@ def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#iss
     return 1.0 - 0.5 * eps, 0.5 * eps
 
 
-def compute_loss(p, targets, model):  # predictions, targets, model
+def compute_loss(p, targets, model):  # predictions, targets, models
     # 已看過
     device = p[0].device
     # 分類損失

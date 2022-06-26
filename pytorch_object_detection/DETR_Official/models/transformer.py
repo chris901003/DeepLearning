@@ -229,7 +229,7 @@ class TransformerEncoderLayer(nn.Module):
         # 實例化pytorch官方給的Multi-head Attention，實例化時需要給一個特徵點用多少維度的向量表示以及要用多少頭，剩下的都使選配
         # forward時最少需要給q,k,v剩下的mask之類的就是選配，輸出就是跟輸入一樣(shape)
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        # Implementation of Feedforward model
+        # Implementation of Feedforward models
         # FFN，先升維再降維
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -342,7 +342,7 @@ class TransformerDecoderLayer(nn.Module):
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # 實例化multi-head attention，這個是用在後面與encoder結合時的attention
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        # Implementation of Feedforward model
+        # Implementation of Feedforward models
         # FFN，先升維再降維
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)

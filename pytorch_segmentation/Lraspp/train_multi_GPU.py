@@ -114,8 +114,8 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=train_dataset.collate_fn)
 
-    print("Creating model")
-    # create model num_classes equal background + 20 classes
+    print("Creating models")
+    # create models num_classes equal background + 20 classes
     model = create_model(num_classes=num_classes)
     model.to(device)
 
@@ -147,7 +147,7 @@ def main(args):
         # and then copy each parameter to where it was saved,
         # which would result in all processes on the same machine using the same set of devices.
         checkpoint = torch.load(args.resume, map_location='cpu')  # 读取之前保存的权重文件(包括优化器以及学习率策略)
-        model_without_ddp.load_state_dict(checkpoint['model'])
+        model_without_ddp.load_state_dict(checkpoint['models'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         args.start_epoch = checkpoint['epoch'] + 1
@@ -184,7 +184,7 @@ def main(args):
 
         if args.output_dir:
             # 只在主节点上执行保存权重操作
-            save_file = {'model': model_without_ddp.state_dict(),
+            save_file = {'models': model_without_ddp.state_dict(),
                          'optimizer': optimizer.state_dict(),
                          'lr_scheduler': lr_scheduler.state_dict(),
                          'args': args,
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--test-only",
         dest="test_only",
-        help="Only test the model",
+        help="Only test the models",
         action="store_true",
     )
 

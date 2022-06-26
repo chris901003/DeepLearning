@@ -44,12 +44,12 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
-    # create model
+    # create models
     model = fcn_resnet50(aux=aux, num_classes=classes+1)
 
     # delete weights about aux_classifier
     # 加載權重，這裡會把輔助分類的權重捨棄
-    weights_dict = torch.load(weights_path, map_location='cpu')['model']
+    weights_dict = torch.load(weights_path, map_location='cpu')['models']
     for k in list(weights_dict.keys()):
         if "aux" in k:
             del weights_dict[k]
@@ -72,7 +72,7 @@ def main():
 
     model.eval()  # 进入验证模式
     with torch.no_grad():
-        # init model
+        # init models
         img_height, img_width = img.shape[-2:]
         # 構建一個全為零且shape與圖像一樣的tensor
         init_img = torch.zeros((1, 3, img_height, img_width), device=device)

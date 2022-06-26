@@ -25,13 +25,13 @@ def main():
 
     input_size = (img_size, img_size)  # [h, w]
 
-    # create model
+    # create models
     model = models.Darknet(cfg, input_size)
-    # load model weights
-    model.load_state_dict(torch.load(weights, map_location=device)["model"])
+    # load models weights
+    model.load_state_dict(torch.load(weights, map_location=device)["models"])
     model.to(device)
     model.eval()
-    # input to the model
+    # input to the models
     # [batch, channel, height, width]
     # x = torch.rand(1, 3, *input_size, requires_grad=True)
     img_path = "test.jpg"
@@ -50,15 +50,15 @@ def main():
     torch_out = model(x)
 
     save_path = "yolov3spp.onnx"
-    # export the model
-    torch.onnx.export(model,                       # model being run
-                      x,                           # model input (or a tuple for multiple inputs)
-                      save_path,                   # where to save the model (can be a file or file-like object)
-                      export_params=True,          # store the trained parameter weights inside the model file
-                      opset_version=12,            # the ONNX version to export the model to
+    # export the models
+    torch.onnx.export(model,                       # models being run
+                      x,                           # models input (or a tuple for multiple inputs)
+                      save_path,                   # where to save the models (can be a file or file-like object)
+                      export_params=True,          # store the trained parameter weights inside the models file
+                      opset_version=12,            # the ONNX version to export the models to
                       do_constant_folding=True,    # whether to execute constant folding for optimization
-                      input_names=["images"],       # the model's input names
-                      # output_names=["classes", "boxes"],     # the model's output names
+                      input_names=["images"],       # the models's input names
+                      # output_names=["classes", "boxes"],     # the models's output names
                       output_names=["prediction"],
                       dynamic_axes={"images": {0: "batch_size"},  # variable length axes
                                     "prediction": {0: "batch_size"}})
@@ -66,7 +66,7 @@ def main():
                                     # "confidence": {0: "batch_size"},
                                     # "boxes": {0: "batch_size"}})
 
-    # check onnx model
+    # check onnx models
     onnx_model = onnx.load(save_path)
     onnx.checker.check_model(onnx_model)
     # print(onnx.helper.printable_graph(onnx_model.graph))
@@ -82,7 +82,7 @@ def main():
     np.testing.assert_allclose(to_numpy(torch_out), ort_outs[0], rtol=1e-03, atol=1e-05)
     # np.testing.assert_allclose(to_numpy(torch_out[1]), ort_outs[1], rtol=1e-03, atol=1e-05)
     # np.testing.assert_allclose(to_numpy(torch_out[2]), ort_outs[2], rtol=1e-03, atol=1e-05)
-    print("Exported model has been tested with ONNXRuntime, and the result looks good!")
+    print("Exported models has been tested with ONNXRuntime, and the result looks good!")
 
 
 if __name__ == '__main__':

@@ -63,7 +63,7 @@ def main():
     print("using {} images for training, {} images for validation.".format(train_num,
                                                                            val_num))
 
-    # create model
+    # create models
     net = MobileNetV2(num_classes=5)
 
     # load pretrain weights

@@ -35,7 +35,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = Darknet(cfg, img_size)
-    model.load_state_dict(torch.load(weights, map_location='cpu')["model"])
+    model.load_state_dict(torch.load(weights, map_location='cpu')["models"])
     model.to(device)
 
     model.eval()
@@ -52,7 +52,7 @@ def main():
 
             # init
             # img = torch.zeros((1, 3, img_size, img_size), device=device)
-            # model(img)
+            # models(img)
 
             img_o = img  # BGR
             # assert img_o is not None, "Image Not Found " + img_path

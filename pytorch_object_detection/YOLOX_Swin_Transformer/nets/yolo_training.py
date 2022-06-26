@@ -526,12 +526,12 @@ class YOLOLoss(nn.Module):
 
 
 def is_parallel(model):
-    # Returns True if model is of type DP or DDP
+    # Returns True if models is of type DP or DDP
     return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
 
 
 def de_parallel(model):
-    # De-parallelize a model: returns single-GPU model if model is of type DP or DDP
+    # De-parallelize a models: returns single-GPU models if models is of type DP or DDP
     return model.module if is_parallel(model) else model
 
 
@@ -550,7 +550,7 @@ class ModelEMA:
     # q 可能是0.1，C就是變化量
     # W(t) = (1 - q) * C(t-1) + q * C(t)
     """ Updated Exponential Moving Average (EMA) from https://github.com/rwightman/pytorch-image-models
-    Keeps a moving average of everything in the model state_dict (parameters and buffers)
+    Keeps a moving average of everything in the models state_dict (parameters and buffers)
     For EMA details see https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
     """
 
@@ -558,7 +558,7 @@ class ModelEMA:
         # 裡面的東西我就不詳細看了，反正就是反向傳遞的時候的小trick
         # Create EMA
         self.ema = deepcopy(de_parallel(model)).eval()  # FP32 EMA
-        # if next(model.parameters()).device.type != 'cpu':
+        # if next(models.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
         self.updates = updates  # number of EMA updates
         self.decay = lambda x: decay * (1 - math.exp(-x / tau))  # decay exponential ramp (to help early epochs)
@@ -571,7 +571,7 @@ class ModelEMA:
             self.updates += 1
             d = self.decay(self.updates)
 
-            msd = de_parallel(model).state_dict()  # model state_dict
+            msd = de_parallel(model).state_dict()  # models state_dict
             for k, v in self.ema.state_dict().items():
                 if v.dtype.is_floating_point:
                     v *= d

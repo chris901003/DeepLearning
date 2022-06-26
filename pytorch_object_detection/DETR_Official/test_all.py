@@ -138,7 +138,7 @@ class ONNXExporterTester(unittest.TestCase):
         torch.onnx.export(model, inputs_list[0], onnx_io,
                           do_constant_folding=do_constant_folding, opset_version=12,
                           dynamic_axes=dynamic_axes, input_names=input_names, output_names=output_names)
-        # validate the exported model with onnx runtime
+        # validate the exported models with onnx runtime
         for test_inputs in inputs_list:
             with torch.no_grad():
                 if isinstance(test_inputs, torch.Tensor) or isinstance(test_inputs, list):
@@ -180,7 +180,7 @@ class ONNXExporterTester(unittest.TestCase):
         dummy_image = torch.ones(1, 3, 800, 800) * 0.3
         model(dummy_image)
 
-        # Test exported model on images of different size, or dummy input
+        # Test exported models on images of different size, or dummy input
         self.run_model(
             model,
             [(torch.rand(1, 3, 750, 800),)],
@@ -195,7 +195,7 @@ class ONNXExporterTester(unittest.TestCase):
         dummy_image = torch.ones(1, 3, 800, 800) * 0.3
         model(dummy_image)
 
-        # Test exported model on images of different size, or dummy input
+        # Test exported models on images of different size, or dummy input
         self.run_model(
             model,
             [(torch.rand(1, 3, 750, 800),)],

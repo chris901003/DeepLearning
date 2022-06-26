@@ -66,7 +66,7 @@ class DETR(object):
         # postprocessors = 後處理用的，將預測的結果轉換成我們需要的樣子
         self.net, self.criterion, self.postprocessors = build_model(args)
         # 加載權重，這裡只會加載模型部分的權重
-        self.net.load_state_dict(torch.load(self.model_path, map_location=self.device)['model'])
+        self.net.load_state_dict(torch.load(self.model_path, map_location=self.device)['models'])
         self.net = self.net.eval()
         self.net = self.net.to(self.device)
 

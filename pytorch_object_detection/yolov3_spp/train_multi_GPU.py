@@ -76,7 +76,7 @@ def main(opt, hyp):
         for f in glob.glob(results_file) + glob.glob("tmp.pk"):
             os.remove(f)
 
-    # Initialize model
+    # Initialize models
     model = Darknet(cfg).to(device)
 
     start_epoch = 0
@@ -85,11 +85,11 @@ def main(opt, hyp):
     if weights.endswith(".pt"):
         ckpt = torch.load(weights, map_location=device)
 
-        # load model
+        # load models
         try:
-            ckpt["model"] = {k: v for k, v in ckpt["model"].items()
+            ckpt["models"] = {k: v for k, v in ckpt["models"].items()
                              if model.state_dict()[k].numel() == v.numel()}
-            model.load_state_dict(ckpt["model"], strict=False)
+            model.load_state_dict(ckpt["models"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 "See https://github.com/ultralytics/yolov3/issues/657" % (opt.weights, opt.cfg, opt.weights)
@@ -196,8 +196,8 @@ def main(opt, hyp):
         pin_memory=True, collate_fn=val_dataset.collate_fn)
 
     # Model parameters
-    model.nc = nc  # attach number of classes to model
-    model.hyp = hyp  # attach hyperparameters to model
+    model.nc = nc  # attach number of classes to models
+    model.hyp = hyp  # attach hyperparameters to models
     model.gr = 1.0  # giou loss ratio (obj_loss = 1.0 or giou)
 
     # start training
@@ -266,7 +266,7 @@ def main(opt, hyp):
                     # save weights every epoch
                     with open(results_file, 'r') as f:
                         save_files = {
-                            'model': model.module.state_dict(),
+                            'models': model.module.state_dict(),
                             'optimizer': optimizer.state_dict(),
                             'training_results': f.read(),
                             'epoch': epoch,
@@ -279,7 +279,7 @@ def main(opt, hyp):
                     if best_map == coco_mAP:
                         with open(results_file, 'r') as f:
                             save_files = {
-                                'model': model.module.state_dict(),
+                                'models': model.module.state_dict(),
                                 'optimizer': optimizer.state_dict(),
                                 'training_results': f.read(),
                                 'epoch': epoch,

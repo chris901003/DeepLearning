@@ -114,9 +114,9 @@ def main(parser_data):
                                                      pin_memory=True,
                                                      collate_fn=val_dataset.collate_fn)
 
-    # create model
+    # create models
     model = Darknet(parser_data.cfg, parser_data.img_size)
-    model.load_state_dict(torch.load(parser_data.weights, map_location='cpu')["model"])
+    model.load_state_dict(torch.load(parser_data.weights, map_location='cpu')["models"])
     model.to(device)
 
     # evaluate on the test dataset

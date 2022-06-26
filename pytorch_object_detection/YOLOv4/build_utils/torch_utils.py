@@ -34,7 +34,7 @@ def initialize_weights(model):
 
 
 def model_info(model, verbose=False):
-    # Plots a line-by-line description of a PyTorch model
+    # Plots a line-by-line description of a PyTorch models
     n_p = sum(x.numel() for x in model.parameters())  # number parameters
     n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
     if verbose:
@@ -56,7 +56,7 @@ def model_info(model, verbose=False):
 
 class ModelEMA:
     """ Model Exponential Moving Average from https://github.com/rwightman/pytorch-image-models
-    Keep a moving average of everything in the model state_dict (parameters and buffers).
+    Keep a moving average of everything in the models state_dict (parameters and buffers).
     This is intended to allow functionality like
     https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
     A smoothed version of the weights is necessary for some training schemes to perform well.
@@ -67,18 +67,18 @@ class ModelEMA:
     To keep EMA from using GPU resources, set device='cpu'. This will save a bit of memory but
     disable validation of the EMA weights. Validation will have to be done manually in a separate
     process, or after the training stops converging.
-    This class is sensitive where it is initialized in the sequence of model init,
+    This class is sensitive where it is initialized in the sequence of models init,
     GPU assignment and distributed training wrappers.
     I've tested with the sequence in my own train.py for torch.DataParallel, apex.DDP, and single-GPU.
     """
 
     def __init__(self, model, decay=0.9999, device=''):
-        # make a copy of the model for accumulating moving average of weights
+        # make a copy of the models for accumulating moving average of weights
         self.ema = deepcopy(model)
         self.ema.eval()
         self.updates = 0  # number of EMA updates
         self.decay = lambda x: decay * (1 - math.exp(-x / 2000))  # decay exponential ramp (to help early epochs)
-        self.device = device  # perform ema on different device from model if set
+        self.device = device  # perform ema on different device from models if set
         if device:
             self.ema.to(device=device)
         for p in self.ema.parameters():

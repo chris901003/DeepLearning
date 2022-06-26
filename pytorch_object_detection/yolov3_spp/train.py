@@ -65,7 +65,7 @@ def train(hyp):
     for f in glob.glob(results_file):
         os.remove(f)
 
-    # Initialize model
+    # Initialize models
     # 構建出模型，將模型構建檔案輸入進去，cfg目前只是檔案位置，進去後才會開始解析
     model = Darknet(cfg).to(device)
 
@@ -110,10 +110,10 @@ def train(hyp):
     if weights.endswith(".pt") or weights.endswith(".pth"):
         ckpt = torch.load(weights, map_location=device)
 
-        # load model
+        # load models
         try:
-            ckpt["model"] = {k: v for k, v in ckpt["model"].items() if model.state_dict()[k].numel() == v.numel()}
-            model.load_state_dict(ckpt["model"], strict=False)
+            ckpt["models"] = {k: v for k, v in ckpt["models"].items() if model.state_dict()[k].numel() == v.numel()}
+            model.load_state_dict(ckpt["models"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 "See https://github.com/ultralytics/yolov3/issues/657" % (opt.weights, opt.cfg, opt.weights)
@@ -158,7 +158,7 @@ def train(hyp):
     # plt.tight_layout()
     # plt.savefig('LR.png', dpi=300)
 
-    # model.yolo_layers = model.module.yolo_layers
+    # models.yolo_layers = models.module.yolo_layers
 
     # dataset
     # 训练集的图像尺寸指定为multi_scale_range中最大的尺寸
@@ -193,11 +193,11 @@ def train(hyp):
                                                     collate_fn=val_dataset.collate_fn)
 
     # Model parameters
-    model.nc = nc  # attach number of classes to model
-    model.hyp = hyp  # attach hyperparameters to model
+    model.nc = nc  # attach number of classes to models
+    model.hyp = hyp  # attach hyperparameters to models
     model.gr = 1.0  # giou loss ratio (obj_loss = 1.0 or giou)
     # 计算每个类别的目标个数，并计算每个类别的比重
-    # model.class_weights = labels_to_class_weights(train_dataset.labels, nc).to(device)  # attach class weights
+    # models.class_weights = labels_to_class_weights(train_dataset.labels, nc).to(device)  # attach class weights
 
     # start training
     # caching val_data when you have plenty of memory(RAM)
@@ -253,7 +253,7 @@ def train(hyp):
                 # save weights every epoch
                 with open(results_file, 'r') as f:
                     save_files = {
-                        'model': model.state_dict(),
+                        'models': model.state_dict(),
                         'optimizer': optimizer.state_dict(),
                         'training_results': f.read(),
                         'epoch': epoch,
@@ -266,7 +266,7 @@ def train(hyp):
                 if best_map == coco_mAP:
                     with open(results_file, 'r') as f:
                         save_files = {
-                            'model': model.state_dict(),
+                            'models': model.state_dict(),
                             'optimizer': optimizer.state_dict(),
                             'training_results': f.read(),
                             'epoch': epoch,

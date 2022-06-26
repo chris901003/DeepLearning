@@ -285,7 +285,7 @@ def train():
         # ------------------------------------------------------#
         # 取出預訓練權重
         model_dict = model.state_dict()
-        pretrained_dict = torch.load(model_path, map_location=device)['model']
+        pretrained_dict = torch.load(model_path, map_location=device)['models']
         load_key, no_load_key, temp_dict = [], [], {}
         # 過濾出哪些是我們可以對應上的權重
         for k, v in pretrained_dict.items():
@@ -578,7 +578,7 @@ def train():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--Cuda', type=bool, default=torch.cuda.is_available())
-    parser.add_argument('--model-path', type=str, default='model_data/swin_base_patch4_window12_384.pth')
+    parser.add_argument('--models-path', type=str, default='model_data/swin_base_patch4_window12_384.pth')
     parser.add_argument('--phi', type=str, default='l')
     parser.add_argument('--batch-size', type=int, default=32)
     opt = parser.parse_args()

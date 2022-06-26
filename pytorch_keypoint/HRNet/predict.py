@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from model import HighResolutionNet
+from models import HighResolutionNet
 from draw_utils import draw_keypoints
 import transforms
 
@@ -45,12 +45,12 @@ def predict_single_person():
     img_tensor, target = data_transform(img, {"box": [0, 0, img.shape[1] - 1, img.shape[0] - 1]})
     img_tensor = torch.unsqueeze(img_tensor, dim=0)
 
-    # create model
+    # create models
     # HRNet-W32: base_channel=32
     # HRNet-W48: base_channel=48
     model = HighResolutionNet(base_channel=32)
     weights = torch.load(weights_path, map_location=device)
-    weights = weights if "model" not in weights else weights["model"]
+    weights = weights if "models" not in weights else weights["models"]
     model.load_state_dict(weights)
     model.to(device)
     model.eval()

@@ -69,7 +69,7 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         B, C, H, W = x.shape
         assert H == self.img_size[0] and W == self.img_size[1], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+            f"Input image size ({H}*{W}) doesn't match models ({self.img_size[0]}*{self.img_size[1]})."
 
         # flatten: [B, C, H, W] -> [B, C, HW]
         # transpose: [B, C, HW] -> [B, HW, C]
@@ -191,7 +191,7 @@ class VisionTransformer(nn.Module):
             qkv_bias (bool): enable bias for qkv if True
             qk_scale (float): override default qk scale of head_dim ** -0.5 if set
             representation_size (Optional[int]): enable and set representation layer (pre-logits) to this value if set
-            distilled (bool): model includes a distillation token and head as in DeiT models
+            distilled (bool): models includes a distillation token and head as in DeiT models
             drop_ratio (float): dropout rate
             attn_drop_ratio (float): attention dropout rate
             drop_path_ratio (float): stochastic depth rate
@@ -300,7 +300,7 @@ def _init_vit_weights(m):
 
 def vit_base_patch16_224(num_classes: int = 1000):
     """
-    ViT-Base model (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Base models (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-1k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     链接: https://pan.baidu.com/s/1zqb08naP0RPqqfSXfkB2EA  密码: eu9f
@@ -322,7 +322,7 @@ print(output)
 
 def vit_base_patch16_224_in21k(num_classes: int = 21843, has_logits: bool = True):
     """
-    ViT-Base model (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Base models (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-21k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_base_patch16_224_in21k-e5005f0a.pth
@@ -339,7 +339,7 @@ def vit_base_patch16_224_in21k(num_classes: int = 21843, has_logits: bool = True
 
 def vit_base_patch32_224(num_classes: int = 1000):
     """
-    ViT-Base model (ViT-B/32) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Base models (ViT-B/32) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-1k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     链接: https://pan.baidu.com/s/1hCv0U8pQomwAtHBYc4hmZg  密码: s5hl
@@ -356,7 +356,7 @@ def vit_base_patch32_224(num_classes: int = 1000):
 
 def vit_base_patch32_224_in21k(num_classes: int = 21843, has_logits: bool = True):
     """
-    ViT-Base model (ViT-B/32) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Base models (ViT-B/32) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-21k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_base_patch32_224_in21k-8db57226.pth
@@ -373,7 +373,7 @@ def vit_base_patch32_224_in21k(num_classes: int = 21843, has_logits: bool = True
 
 def vit_large_patch16_224(num_classes: int = 1000):
     """
-    ViT-Large model (ViT-L/16) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Large models (ViT-L/16) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-1k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     链接: https://pan.baidu.com/s/1cxBgZJJ6qUWPSBNcE4TdRQ  密码: qqt8
@@ -390,7 +390,7 @@ def vit_large_patch16_224(num_classes: int = 1000):
 
 def vit_large_patch16_224_in21k(num_classes: int = 21843, has_logits: bool = True):
     """
-    ViT-Large model (ViT-L/16) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Large models (ViT-L/16) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-21k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_large_patch16_224_in21k-606da67d.pth
@@ -407,7 +407,7 @@ def vit_large_patch16_224_in21k(num_classes: int = 21843, has_logits: bool = Tru
 
 def vit_large_patch32_224_in21k(num_classes: int = 21843, has_logits: bool = True):
     """
-    ViT-Large model (ViT-L/32) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Large models (ViT-L/32) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-21k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     weights ported from official Google JAX impl:
     https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_large_patch32_224_in21k-9046d2e7.pth
@@ -424,7 +424,7 @@ def vit_large_patch32_224_in21k(num_classes: int = 21843, has_logits: bool = Tru
 
 def vit_huge_patch14_224_in21k(num_classes: int = 21843, has_logits: bool = True):
     """
-    ViT-Huge model (ViT-H/14) from original paper (https://arxiv.org/abs/2010.11929).
+    ViT-Huge models (ViT-H/14) from original paper (https://arxiv.org/abs/2010.11929).
     ImageNet-21k weights @ 224x224, source https://github.com/google-research/vision_transformer.
     NOTE: converted weights not currently available, too large for github release hosting.
     """

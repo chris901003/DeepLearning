@@ -31,7 +31,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, p
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 model = swin_base_patch4_window7_224(num_classes=100).to(device)
 if os.path.exists(os.path.join('weight', 'swin_base_patch4_window7_224.pth')):
-    weights_dict = torch.load(os.path.join('weight', 'swin_base_patch4_window7_224.pth'), map_location=device)['model']
+    weights_dict = torch.load(os.path.join('weight', 'swin_base_patch4_window7_224.pth'), map_location=device)['models']
     for k in list(weights_dict.keys()):
         if 'head' in k:
             del weights_dict[k]

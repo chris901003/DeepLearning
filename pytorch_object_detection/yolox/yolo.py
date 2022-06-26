@@ -111,7 +111,7 @@ class YOLO(object):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.load_state_dict(torch.load(self.model_path, map_location=device))
         self.net = self.net.eval()
-        print('{} model, and classes loaded.'.format(self.model_path))
+        print('{} models, and classes loaded.'.format(self.model_path))
         if not onnx:
             if self.cuda:
                 # 這裡如果只有單塊gpu就沒有差別
@@ -372,7 +372,7 @@ class YOLO(object):
         input_layer_names   = ["images"]
         output_layer_names  = ["output"]
         
-        # Export the model
+        # Export the models
         print(f'Starting export with onnx {onnx.__version__}.')
         torch.onnx.export(self.net,
                         im,
@@ -386,8 +386,8 @@ class YOLO(object):
                         dynamic_axes    = None)
 
         # Checks
-        model_onnx = onnx.load(model_path)  # load onnx model
-        onnx.checker.check_model(model_onnx)  # check onnx model
+        model_onnx = onnx.load(model_path)  # load onnx models
+        onnx.checker.check_model(model_onnx)  # check onnx models
 
         # Simplify onnx
         if simplify:
@@ -400,7 +400,7 @@ class YOLO(object):
             assert check, 'assert check failed'
             onnx.save(model_onnx, model_path)
 
-        print('Onnx model save as {}'.format(model_path))
+        print('Onnx models save as {}'.format(model_path))
         
     def get_map_txt(self, image_id, image, class_names, map_out_path):
         f = open(os.path.join(map_out_path, "detection-results/"+image_id+".txt"),"w") 

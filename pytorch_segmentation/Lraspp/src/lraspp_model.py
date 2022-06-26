@@ -10,19 +10,19 @@ from .mobilenet_backbone import mobilenet_v3_large
 
 class IntermediateLayerGetter(nn.ModuleDict):
     """
-    Module wrapper that returns intermediate layers from a model
+    Module wrapper that returns intermediate layers from a models
 
     It has a strong assumption that the modules have been registered
-    into the model in the same order as they are used.
+    into the models in the same order as they are used.
     This means that one should **not** reuse the same nn.Module
     twice in the forward if you want this to work.
 
     Additionally, it is only able to query submodules that are directly
-    assigned to the model. So if `model` is passed, `model.feature1` can
-    be returned, but not `model.feature1.layer2`.
+    assigned to the models. So if `models` is passed, `models.feature1` can
+    be returned, but not `models.feature1.layer2`.
 
     Args:
-        model (nn.Module): model on which we will extract the features
+        model (nn.Module): models on which we will extract the features
         return_layers (Dict[name, new_name]): a dict containing the names
             of the modules for which the activations will be returned as
             the key of the dict, and the value of the dict is the name
@@ -35,7 +35,7 @@ class IntermediateLayerGetter(nn.ModuleDict):
 
     def __init__(self, model: nn.Module, return_layers: Dict[str, str]) -> None:
         if not set(return_layers).issubset([name for name, _ in model.named_children()]):
-            raise ValueError("return_layers are not present in model")
+            raise ValueError("return_layers are not present in models")
         orig_return_layers = return_layers
         return_layers = {str(k): str(v) for k, v in return_layers.items()}
 
@@ -68,12 +68,12 @@ class LRASPP(nn.Module):
     <https://arxiv.org/abs/1905.02244>`_.
 
     Args:
-        backbone (nn.Module): the network used to compute the features for the model.
+        backbone (nn.Module): the network used to compute the features for the models.
             The backbone should return an OrderedDict[Tensor], with the key being
             "high" for the high level feature map and "low" for the low level feature map.
         low_channels (int): the number of channels of the low level features.
         high_channels (int): the number of channels of the high level features.
-        num_classes (int): number of output classes of the model (including the background).
+        num_classes (int): number of output classes of the models (including the background).
         inter_channels (int, optional): the number of channels for intermediate computations.
     """
     __constants__ = ['aux_classifier']

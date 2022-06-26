@@ -107,7 +107,7 @@ class ResNet(nn.Module):
 
         # Zero-initialize the last BN in each residual branch,
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        # This improves the models by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if zero_init_residual:
             for m in self.modules():
                 if isinstance(m, Bottleneck):
@@ -165,22 +165,22 @@ def _resnet(block, layers, **kwargs):
 
 
 def resnet50(**kwargs):
-    r"""ResNet-50 model from
+    r"""ResNet-50 models from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
     Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        pretrained (bool): If True, returns a models pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
 
 
 def resnet101(**kwargs):
-    r"""ResNet-101 model from
+    r"""ResNet-101 models from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
     Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        pretrained (bool): If True, returns a models pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet(Bottleneck, [3, 4, 23, 3], **kwargs)

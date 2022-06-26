@@ -33,11 +33,11 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
-    # create model
+    # create models
     model = lraspp_mobilenetv3_large(num_classes=classes+1)
 
     # load weights
-    weights_dict = torch.load(weights_path, map_location='cpu')['model']
+    weights_dict = torch.load(weights_path, map_location='cpu')['models']
     model.load_state_dict(weights_dict)
     model.to(device)
 
@@ -55,7 +55,7 @@ def main():
 
     model.eval()  # 进入验证模式
     with torch.no_grad():
-        # init model
+        # init models
         img_height, img_width = img.shape[-2:]
         init_img = torch.zeros((1, 3, img_height, img_width), device=device)
         model(init_img)

@@ -204,7 +204,7 @@ def main():
     img_path = "test.jpg"
     input_size = (img_size, img_size)  # h, w
 
-    # check onnx model
+    # check onnx models
     onnx_model = onnx.load(save_path)
     onnx.checker.check_model(onnx_model)
     # print(onnx.helper.printable_graph(onnx_model.graph))

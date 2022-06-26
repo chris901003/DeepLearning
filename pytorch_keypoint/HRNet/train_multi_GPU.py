@@ -7,7 +7,7 @@ import torch
 import numpy as np
 
 import transforms
-from model import HighResolutionNet
+from models import HighResolutionNet
 from my_dataset_coco import CocoKeypoint
 import train_utils.train_eval_utils as utils
 from train_utils import init_distributed_mode, save_on_master, mkdir
@@ -103,8 +103,8 @@ def main(args):
                                                    num_workers=args.workers,
                                                    collate_fn=train_dataset.collate_fn)
 
-    print("Creating model")
-    # create model num_classes equal background + classes
+    print("Creating models")
+    # create models num_classes equal background + classes
     model = create_model(num_joints=args.num_joints)
     model.to(device)
 
@@ -131,7 +131,7 @@ def main(args):
         # and then copy each parameter to where it was saved,
         # which would result in all processes on the same machine using the same set of devices.
         checkpoint = torch.load(args.resume, map_location='cpu')  # 读取之前保存的权重文件(包括优化器以及学习率策略)
-        model_without_ddp.load_state_dict(checkpoint['model'])
+        model_without_ddp.load_state_dict(checkpoint['models'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         args.start_epoch = checkpoint['epoch'] + 1
@@ -178,7 +178,7 @@ def main(args):
 
         if args.output_dir:
             # 只在主进程上执行保存权重操作
-            save_files = {'model': model_without_ddp.state_dict(),
+            save_files = {'models': model_without_ddp.state_dict(),
                           'optimizer': optimizer.state_dict(),
                           'lr_scheduler': lr_scheduler.state_dict(),
                           'args': args,

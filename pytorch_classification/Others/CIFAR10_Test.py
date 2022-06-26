@@ -107,7 +107,7 @@ image = transform(image)
 # img = img.save("eight.jpg")
 image = t.reshape(image, (-1, 3, 32, 32))
 model = t.load('CIFAR10_Model/Model_30', map_location='cpu')
-# print(model)
+# print(models)
 #
 output = model(image)
 print(output.argmax(1))

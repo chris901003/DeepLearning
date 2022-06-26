@@ -20,7 +20,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # 已看過
     # 由main.py呼叫，用來train一個epoch
     # ---------------------------------------------------------
-    # model = 就是model，在多gpu下就是有經過DistributedDataParallel的model
+    # models = 就是model，在多gpu下就是有經過DistributedDataParallel的model
     # criterion = 預測後處理
     # data_loader_train = 訓練集的資料
     # optimizer = 優化器
@@ -157,7 +157,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 @torch.no_grad()
 def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
     # ---------------------------------------------------------
-    # model = 預測模型
+    # models = 預測模型
     # criterion = 預測後處理
     # postprocessors = 將輸出變成coco api想要的格式
     # data_loader_val = 驗證集的dataloader

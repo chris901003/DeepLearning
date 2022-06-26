@@ -43,12 +43,12 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
-    # create model
+    # create models
     model = fcn_resnet50(aux=aux, num_classes=classes+1)
 
     # delete weights about aux_classifier
     # 加載權重，這裡會把輔助分類的權重捨棄
-    weights_dict = torch.load(weights_path, map_location='cpu')['model']
+    weights_dict = torch.load(weights_path, map_location='cpu')['models']
     for k in list(weights_dict.keys()):
         if "aux" in k:
             del weights_dict[k]

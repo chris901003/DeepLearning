@@ -578,7 +578,7 @@ def train():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--Cuda', type=bool, default=torch.cuda.is_available())
-    parser.add_argument('--model-path', type=str, default='model_data/yolox_m.pth')
+    parser.add_argument('--models-path', type=str, default='model_data/yolox_m.pth')
     parser.add_argument('--phi', type=str, default='m')
     parser.add_argument('--batch-size', type=int, default=16)
     opt = parser.parse_args()

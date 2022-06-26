@@ -266,7 +266,7 @@ class YOLOLayer(nn.Module):
 
 class Darknet(nn.Module):
     """
-    YOLOv3 spp object detection model
+    YOLOv3 spp object detection models
     """
     def __init__(self, cfg, img_size=(416, 416), verbose=False):
         # 已看過
@@ -283,7 +283,7 @@ class Darknet(nn.Module):
         self.yolo_layers = get_yolo_layers(self)
 
         # 打印下模型的信息，如果verbose为True则打印详细信息
-        self.info(verbose) if not ONNX_EXPORT else None  # print model description
+        self.info(verbose) if not ONNX_EXPORT else None  # print models description
 
     def forward(self, x, verbose=False):
         # 已看過

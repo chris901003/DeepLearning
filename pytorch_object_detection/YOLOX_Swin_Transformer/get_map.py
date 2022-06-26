@@ -88,9 +88,9 @@ if __name__ == "__main__":
     class_names, _ = get_classes(classes_path)
 
     if map_mode == 0 or map_mode == 1:
-        print("Load model.")
+        print("Load models.")
         yolo = YOLO(confidence = confidence, nms_iou = nms_iou)
-        print("Load model done.")
+        print("Load models done.")
 
         print("Get predict result.")
         for image_id in tqdm(image_ids):

@@ -118,13 +118,13 @@ class Detr(nn.Module):
             frozen_weights = cfg.MODEL.DETR.FROZEN_WEIGHTS
             if frozen_weights != '':
                 print("LOAD pre-trained weights")
-                weight = torch.load(frozen_weights, map_location=lambda storage, loc: storage)['model']
+                weight = torch.load(frozen_weights, map_location=lambda storage, loc: storage)['models']
                 new_weight = {}
                 for k, v in weight.items():
                     if 'detr.' in k:
                         new_weight[k.replace('detr.', '')] = v
                     else:
-                        print(f"Skipping loading weight {k} from frozen model")
+                        print(f"Skipping loading weight {k} from frozen models")
                 del weight
                 self.detr.load_state_dict(new_weight)
                 del new_weight
@@ -167,7 +167,7 @@ class Detr(nn.Module):
 
                 Other information that's included in the original dicts, such as:
 
-                * "height", "width" (int): the output resolution of the model, used in inference.
+                * "height", "width" (int): the output resolution of the models, used in inference.
                   See :meth:`postprocess` for details.
         Returns:
             dict[str: Tensor]:

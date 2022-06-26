@@ -10,10 +10,10 @@ import torch
 
 
 def parse_args():
-    parser = argparse.ArgumentParser("D2 model converter")
+    parser = argparse.ArgumentParser("D2 models converter")
 
-    parser.add_argument("--source_model", default="", type=str, help="Path or url to the DETR model to convert")
-    parser.add_argument("--output_model", default="", type=str, help="Path where to save the converted model")
+    parser.add_argument("--source_model", default="", type=str, help="Path or url to the DETR models to convert")
+    parser.add_argument("--output_model", default="", type=str, help="Path where to save the converted models")
     return parser.parse_args()
 
 
@@ -34,7 +34,7 @@ def main():
         checkpoint = torch.hub.load_state_dict_from_url(args.source_model, map_location="cpu", check_hash=True)
     else:
         checkpoint = torch.load(args.source_model, map_location="cpu")
-    model_to_convert = checkpoint["model"]
+    model_to_convert = checkpoint["models"]
 
     model_converted = {}
     for k in model_to_convert.keys():
@@ -61,7 +61,7 @@ def main():
                 continue
         model_converted[k] = model_to_convert[old_k].detach()
 
-    model_to_save = {"model": model_converted}
+    model_to_save = {"models": model_converted}
     torch.save(model_to_save, args.output_model)
 
 

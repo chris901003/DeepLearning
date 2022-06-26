@@ -40,7 +40,7 @@ def main(args):
                                              collate_fn=val_dataset.collate_fn)
 
     model = deeplabv3_resnet50(aux=args.aux, num_classes=num_classes)
-    model.load_state_dict(torch.load(args.weights, map_location=device)['model'])
+    model.load_state_dict(torch.load(args.weights, map_location=device)['models'])
     model.to(device)
 
     confmat = evaluate(model, val_loader, device=device, num_classes=num_classes)
