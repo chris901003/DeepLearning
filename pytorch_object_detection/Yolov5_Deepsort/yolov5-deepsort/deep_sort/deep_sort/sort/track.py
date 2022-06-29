@@ -85,24 +85,44 @@ class Track:
 
     """
 
+    # 在有新的追蹤目標出現時會需要針對該目標實例化一個Track物件，在tracker.py被實例化
     def __init__(self, mean, covariance, track_id, n_init, max_age,
                  feature=None):
+        """
+        :param mean: numpy shape [8]
+        :param covariance: numpy shape [8, 8]
+        :param track_id: 每一個追蹤對象都會有一個獨立的id，這個id只會越來越大除非程式終止
+        :param n_init: 需連續追蹤到幾次
+        :param max_age: 多少次沒有追蹤到就會被刪除
+        :param feature: 該追蹤對象的特徵向量
+        """
+        # 已看過
+        # 記錄下一些帶入的參數
         self.mean = mean
         self.covariance = covariance
         self.track_id = track_id
         # hits代表匹配上了多少次，匹配次数超过n_init，设置Confirmed状态
+        # 設置成Confirmed狀態表示已經開始追蹤
         # hits每次调用update函数的时候+1 
         self.hits = 1
-        self.age = 1 # 和time_since_update功能重复
+        # 和time_since_update功能重复
+        self.age = 1
         # 每次调用predict函数的时候就会+1；   每次调用update函数的时候就会设置为0
+        # 上一次有被匹配到是多久以前，主要用來檢查是否切換到delete狀態以及第二次匹配時要不要放入進行匹配
         self.time_since_update = 0
 
-        self.state = TrackState.Tentative # 初始化一个Track的时设置Tentative状态
+        # 初始化一个Track的时设置Tentative状态
+        # 一開始初始化時會先製成Tentative模式表示有目標需要追蹤，但是還需要再多幾幀才能進入確定追蹤狀態
+        # 這裡一開始會是1，真正開始追蹤時會是2，最後離開畫面時會是3表示結束追蹤
+        self.state = TrackState.Tentative
         # 每个track对应多个features, 每次更新都会将最新的feature添加到列表中
+        # 每個時間點的特徵向量都會被存進去
         self.features = []
+        # 將初始的特徵向量存入進去
         if feature is not None:
             self.features.append(feature)
 
+        # 一些賦值
         self._n_init = n_init 
         self._max_age = max_age
 
@@ -146,8 +166,14 @@ class Track:
             The Kalman filter.
 
         """
+        # 已看過
+        # mean shape = ndarray [8]，裡面會是四個跟座標有關係的值後面四個是跟加速度有關係的值
+        # covariance shape = ndarray [8, 8]，斜方差矩陣
+        # 回傳回來的shape與傳過去相同
         self.mean, self.covariance = kf.predict(self.mean, self.covariance)
+        # 一些紀錄的值加一
         self.age += 1
+        # 在每次傳入新的一幀時都會將time_since_update加一
         self.time_since_update += 1
 
     def update(self, kf, detection):
@@ -163,11 +189,18 @@ class Track:
             The associated detection.
 
         """
+        # kf = 卡爾曼濾波的實例化對象
+        # detection = 對應上的detection的詳細內容
+
+        # 更新卡爾曼濾波當中的內容
+        # 我們會將detection中的座標位置轉換成(center_x, center_y, aspect ratio, height)
         self.mean, self.covariance = kf.update(
             self.mean, self.covariance, detection.to_xyah())
+        # 將特徵向量添加到features裏面保存
         self.features.append(detection.feature)
 
         self.hits += 1
+        # 這一幀有匹配到了就將time_since_update變成0
         self.time_since_update = 0
         # hits代表匹配上了多少次，匹配次数超过n_init，设置Confirmed状态
         # 连续匹配上n_init帧的时候，转变为确定态
@@ -177,23 +210,28 @@ class Track:
     def mark_missed(self):
         """Mark this track as missed (no association at the current time step).
         """
+        # 在追蹤的對象沒有匹配上的標註匡
         # 如果在处于Tentative态的情况下没有匹配上任何detection，转变为删除态。
         if self.state == TrackState.Tentative:
             self.state = TrackState.Deleted
         elif self.time_since_update > self._max_age:
             # 如果time_since_update超过max_age，设置Deleted状态
             # 即失配连续达到max_age次数的时候，转变为删除态
+            # 表示這個目標可能已經離開畫面，最後就不需要再進行追蹤了
             self.state = TrackState.Deleted 
 
+    # 以下三種檢查追蹤目標狀態，由這些接口可以判斷對追蹤目標做什麼操作
     def is_tentative(self):
-        """Returns True if this track is tentative (unconfirmed).
-        """
+        """Returns True if this track is tentative (unconfirmed)."""
+        # 已看過
         return self.state == TrackState.Tentative
 
     def is_confirmed(self):
         """Returns True if this track is confirmed."""
+        # 已看過
         return self.state == TrackState.Confirmed
 
     def is_deleted(self):
         """Returns True if this track is dead and should be deleted."""
+        # 已看過
         return self.state == TrackState.Deleted

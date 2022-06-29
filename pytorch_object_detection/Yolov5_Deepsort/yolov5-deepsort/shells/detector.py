@@ -6,27 +6,39 @@ from utils.datasets import letterbox
 from utils.torch_utils import select_device
 
 
-
 OBJ_LIST = ['person', 'car', 'bus', 'truck']
 
+
 class Detector(object):
+    # 由shell.py實例化
     def __init__(self, weight_path, imgSize=640, threshould=0.3, stride=1):
+        # 已看過
         super(Detector, self).__init__()
+        # 初始化模型
         self.init_model(weight_path)
+        # 圖像大小
         self.img_size = imgSize
+        # 閾值設定
         self.threshold = threshould
+        # 步距
         self.stride = stride
 
     def init_model(self, weight_path):
+        # 已看過
+        # 初始化模型
+        # 模型預訓練權重檔案位置
         self.weights = weight_path
+        # 使用設備
         self.device = '0' if torch.cuda.is_available() else 'cpu'
+        # 設定使用的設備
         self.device = select_device(self.device)
+        # 構建模型，同時將訓練權重放進去
         model = attempt_load(self.weights, map_location=self.device)
+        # 將模型設定成驗證模式
         model.to(self.device).eval()
         model.half()
         self.m = model
-        self.names = model.module.names if hasattr(
-            model, 'module') else model.names
+        self.names = model.module.names if hasattr(model, 'module') else model.names
 
     def preprocess(self, img):
         img0 = img.copy()

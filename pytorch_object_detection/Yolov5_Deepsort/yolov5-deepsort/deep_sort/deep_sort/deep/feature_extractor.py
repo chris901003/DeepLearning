@@ -14,16 +14,22 @@ from .model import Net
 模型训练是按照传统ReID的方法进行，使用Extractor类的时候输入为一个list的图片，得到图片对应的特征。
 '''
 
+
 class Extractor(object):
     def __init__(self, model_path, use_cuda=True):
+        # 已看過
+        # 這裡的reid有被啟動，所以最後輸出會有所不同
         self.net = Net(reid=True)
+        # 指定設備
         self.device = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"
+        # 加載訓練權重
         state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)['net_dict']
         self.net.load_state_dict(state_dict)
         logger = logging.getLogger("root.tracker")
         logger.info("Loading weights from {}... Done!".format(model_path))
         self.net.to(self.device)
         self.size = (64, 128)
+        # 數據調整方式
         self.norm = transforms.Compose([
             # RGB图片数据范围是[0-255]，需要先经过ToTensor除以255归一化到[0,1]之后，
             # 再通过Normalize计算(x - mean)/std后，将数据归一化到[-1,1]。
@@ -42,24 +48,31 @@ class Extractor(object):
             4. normalize
         """
         def _resize(im, size):
-            return cv2.resize(im.astype(np.float32)/255., size)
+            return cv2.resize(im.astype(np.float32) / 255., size)
 
+        # 將數入的照片先經過大小調整後再轉換成tensor之後再標準化，最後添加上batch維度並將多張照片在batch維度上面拼接
         im_batch = torch.cat([self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops], dim=0).float()
+        # img_batch shape [batch_size, 3, height, width] = [batch_size, 3, 128, 64]
         return im_batch
 
 # __call__()是一个非常特殊的实例方法。该方法的功能类似于在类中重载 () 运算符，
 # 使得类实例对象可以像调用普通函数那样，以“对象名()”的形式使用。
     def __call__(self, im_crops):
+        # im_batch shape [batch_size, 3, 128, 64]
         im_batch = self._preprocess(im_crops)
         with torch.no_grad():
             im_batch = im_batch.to(self.device)
+            # features shape [batch_size, channel * height * width]
             features = self.net(im_batch)
         return features.cpu().numpy()
 
 
 if __name__ == '__main__':
-    img = cv2.imread("demo.jpg")[:,:,(2,1,0)]
+    # 已看過
+    # 讀取圖像
+    img = cv2.imread("demo.jpg")[:, :, (2, 1, 0)]
     extr = Extractor("checkpoint/ckpt.t7")
+    # features shape [batch_size, channel * height * width]
     feature = extr(img)
     print(feature.shape)
 

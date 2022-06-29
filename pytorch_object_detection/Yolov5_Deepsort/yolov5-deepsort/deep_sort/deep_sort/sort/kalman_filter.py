@@ -24,6 +24,8 @@ chi2inv95 = {
 (1) 预测track在下一时刻的位置，
 (2) 基于detection来更新预测的位置。
 '''
+
+
 class KalmanFilter(object):
     """
     A simple Kalman filter for tracking bounding boxes in image space.
@@ -45,14 +47,17 @@ class KalmanFilter(object):
     物体运动遵循恒速模型。 边界框位置(x, y, a, h)被视为状态空间的直接观察（线性观察模型）
 
     """
-
+    # 由tracker.py進行實例化
     def __init__(self):
         ndim, dt = 4, 1.
 
         # Create Kalman filter model matrices.
+        # 製造出一個[2 * ndim, 2 * ndim]的矩陣且在對角線上都為1其它為0
         self._motion_mat = np.eye(2 * ndim, 2 * ndim)
+        # 在其中填充值
         for i in range(ndim):
             self._motion_mat[i, ndim + i] = dt
+        # 也是一個矩陣同樣在對角線上為1其它為0
         self._update_mat = np.eye(ndim, 2 * ndim)
 
         # Motion and observation uncertainty are chosen relative to the current
@@ -79,14 +84,22 @@ class KalmanFilter(object):
             to 0 mean.
 
         """
-        
+        # 已看過
+        # 新點會出現在這裡進行初始化
+        # measurement = (center_x, center_y, aspect ratio, height)，aspect ratio = height / width
 
+        # 將傳入的值放到mean_pos裏面
         mean_pos = measurement
+        # 構建一個shape相同的ndarray且裡面的值全為0
         mean_vel = np.zeros_like(mean_pos)
         # Translates slice objects to concatenation along the first axis
+        # numpy r_ = 將兩個東西做拼接
+        # mean shape [8]，這裡拼接完後就會是我們要的格式了，後面的四個0是一開始的加速度，最原先都會是0開始
         mean = np.r_[mean_pos, mean_vel]
 
         # 由测量初始化均值向量（8维）和协方差矩阵（8x8维）
+        # 總之就是一些超參數，這裡都是跟高寬比會有關係
+        # std = List[8]，長度為8的一個list
         std = [
             2 * self._std_weight_position * measurement[3],
             2 * self._std_weight_position * measurement[3],
@@ -96,7 +109,11 @@ class KalmanFilter(object):
             10 * self._std_weight_velocity * measurement[3],
             1e-5,
             10 * self._std_weight_velocity * measurement[3]]
+        # numpy square = 將裡面的值全部做平方
+        # numpy diag = 我們輸入的是一維矩陣，這裡會自動轉成二維矩陣同時對角線上的值會是std其餘的值都會是0
+        # covariance shape [8, 8]
         covariance = np.diag(np.square(std))
+        # 回傳mean以及covariance
         return mean, covariance
 
     def predict(self, mean, covariance):
@@ -118,12 +135,18 @@ class KalmanFilter(object):
             state. Unobserved velocities are initialized to 0 mean.
 
         """
-        #卡尔曼滤波器由目标上一时刻的均值和协方差进行预测。
+        # 已看過
+        # mean shape = ndarray [8]，裡面會是四個跟座標有關係的值後面四個是跟加速度有關係的值
+        # covariance shape = ndarray [8, 8]，斜方差矩陣
+        # 卡爾曼濾波器由目標上一時刻的均值和斜方差進行預測
+
+        # 下一時刻的預測位置
         std_pos = [
             self._std_weight_position * mean[3],
             self._std_weight_position * mean[3],
             1e-2,
             self._std_weight_position * mean[3]]
+        # 下一時刻的預測速度
         std_vel = [
             self._std_weight_velocity * mean[3],
             self._std_weight_velocity * mean[3],
@@ -131,20 +154,27 @@ class KalmanFilter(object):
             self._std_weight_velocity * mean[3]]
        
         # 初始化噪声矩阵Q；np.r_ 按列连接两个矩阵
-        # motion_cov是过程噪声 W_k的 协方差矩阵Qk 
+        # motion_cov是过程噪声 W_k的 协方差矩阵Qk
+        # 透過np.r_將位置以及速度進行拼接 shape ndarray [8]
+        # 之後在對每個數字進行平方，最後變成一個[8, 8]的ndarray，在對角線上會是我們要的值其他部分都會是0
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
         # Update time state x' = Fx (1)
         # x为track在t-1时刻的均值，F称为状态转移矩阵，该公式预测t时刻的x'
         # self._motion_mat为F_k是作用在 x_{k-1}上的状态变换模型
+        # 這裡相乘後就會得到下一時刻的裝態
+        # 這裡會對mean自動廣播，最後輸出shape [8]
         mean = np.dot(self._motion_mat, mean)
         # Calculate error covariance P' = FPF^T+Q (2)
         # P为track在t-1时刻的协方差，Q为系统的噪声矩阵，代表整个系统的可靠程度，一般初始化为很小的值，
         # 该公式预测t时刻的P'
         # covariance为P_{k|k} ，后验估计误差协方差矩阵，度量估计值的精确程度
+        # np.linalg.multi_dot = 多個矩陣乘法
         covariance = np.linalg.multi_dot((
             self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
 
+        # mean shape = ndarray [8]
+        # covariance shape = ndarray [8, 8]
         return mean, covariance
 
     def project(self, mean, covariance):
@@ -188,7 +218,9 @@ class KalmanFilter(object):
         # 将协方差矩阵映射到检测空间，即 HP'H^T
         covariance = np.linalg.multi_dot((
             self._update_mat, covariance, self._update_mat.T))
-        return mean, covariance + innovation_cov # 公式(4)
+        # 公式(4)
+        # 最後對於斜方差矩陣加上噪音
+        return mean, covariance + innovation_cov
 
     def update(self, mean, covariance, measurement):
         """Run Kalman filter correction step.
@@ -211,10 +243,17 @@ class KalmanFilter(object):
             Returns the measurement-corrected state distribution.
 
         """
+        # mean shape = ndarray [8]
+        # covariance shape = ndarray[8, 8]
+        # measurement shape = ndarray[4]
+
         # 将均值和协方差映射到检测空间，得到 Hx'和S
+        # projected_mean shape [4]，projected_cov shape [4, 4]
         projected_mean, projected_cov = self.project(mean, covariance)
 
         # 矩阵分解
+        # chol_factor shape = ndarray [4, 4]
+        # lower = bool
         chol_factor, lower = scipy.linalg.cho_factor(
             projected_cov, lower=True, check_finite=False)
         # 计算卡尔曼增益K；相当于求解公式(5)
@@ -222,19 +261,25 @@ class KalmanFilter(object):
         # 求解卡尔曼滤波增益K 用到了cholesky矩阵分解加快求解；
         # 公式5的右边有一个S的逆，如果S矩阵很大，S的逆求解消耗时间太大，
         # 所以代码中把公式两边同时乘上S，右边的S*S的逆变成了单位矩阵，转化成AX=B形式求解。
+        # 計算卡爾曼增益，shape ndarray [8, 4]
         kalman_gain = scipy.linalg.cho_solve(
             (chol_factor, lower), np.dot(covariance, self._update_mat.T).T,
             check_finite=False).T
         # y = z - Hx' (3)
         # 在公式3中，z为detection的均值向量，不包含速度变化值，即z=[cx, cy, r, h]，
         # H称为测量矩阵，它将track的均值向量x'映射到检测空间，该公式计算detection和track的均值误差
+        # 計算預測與真實的誤差，shape ndarray [4]
         innovation = measurement - projected_mean
 
         # 更新后的均值向量 x = x' + Ky (6)
+        # new_mean shape = ndarray [8]
         new_mean = mean + np.dot(innovation, kalman_gain.T)
         # 更新后的协方差矩阵 P = (I - KH)P' (7)
+        # new_covariance shape = ndarray [8, 8]
         new_covariance = covariance - np.linalg.multi_dot((
             kalman_gain, projected_cov, kalman_gain.T))
+
+        # 最後回傳新的狀態
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements,
@@ -272,15 +317,32 @@ class KalmanFilter(object):
        返回一个长度为N的数组，其中第i个元素包含（mean，covariance）和measurements [i]之间的平方Mahalanobis距离
 
         """
+
+        # mean = 座標位置以及加速度等資訊shape ndarray [8]
+        # covariance = 斜方差矩陣shape ndarray [8, 8]
+        # measurements = 當前幀還未匹配的標註匡shape ndarray [unmatched_detection, 4]
+        # only_position = 預設為False，就是看是否只關注位置部分
+
+        # 通過一次投射，這裡會加上一些噪音等等的東西
+        # mean shape = ndarray [4]
+        # covariance shape = ndarray [4, 4]
         mean, covariance = self.project(mean, covariance)
         if only_position:
+            # 預設不會進來
+            # 如果只要看位置部分就將後面與速度有關係的值去除
             mean, covariance = mean[:2], covariance[:2, :2]
             measurements = measurements[:, :2]
 
+        # cholesky_factor shape = ndarray [4, 4]
         cholesky_factor = np.linalg.cholesky(covariance)
+        # 計算當前追蹤對象與標注匡之間的差距
+        # d shape [unmatched_detection, 4]
         d = measurements - mean
+        # solve_triangular = 對ax=b求x的值會是多少
+        # z shape = ndarray [4, unmatched_detection]
         z = scipy.linalg.solve_triangular(
             cholesky_factor, d.T, lower=True, check_finite=False,
             overwrite_b=True)
+        # squared_maha shape = ndarray [unmatched_detection]
         squared_maha = np.sum(z * z, axis=0)
         return squared_maha

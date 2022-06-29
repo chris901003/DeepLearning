@@ -25,8 +25,15 @@ class Detection(object):
         A feature vector that describes the object contained in this image.
 
     """
+    # 由deep_sort.py實例化
 
     def __init__(self, tlwh, confidence, feature):
+        """
+        :param tlwh: tensor shape [4] (xmin, ymin, width, height)
+        :param confidence: tensor shape [1]，就只有放置信度分數
+        :param feature: 特徵值 shape [512]
+        """
+        # 已看過
         self.tlwh = np.asarray(tlwh, dtype=np.float)
         self.confidence = float(confidence)
         self.feature = np.asarray(feature, dtype=np.float32)

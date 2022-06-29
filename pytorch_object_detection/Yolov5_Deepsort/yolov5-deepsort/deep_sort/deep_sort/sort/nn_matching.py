@@ -63,11 +63,21 @@ def _cosine_distance(a, b, data_is_normalized=False):
     
 
     """
+    # a shape = List[ndarray[512]]，List長度就是對於這個追蹤對象之前記錄下的特徵向量
+    # b shape = ndarray [num_detection, 512]，num_detection就是這次有偵測到的標註匡
+    # data_is_normalized預設為False
     if not data_is_normalized:
-        # np.linalg.norm 求向量的范式，默认是 L2 范式 
+        # 我們會進來這裡
+        # np.linalg.norm 求向量的范式，默认是 L2 范式
+        # l2范式就是全部平方後相加最後再開根號
+        # 透過這個就可以標準化
         a = np.asarray(a) / np.linalg.norm(a, axis=1, keepdims=True)
         b = np.asarray(b) / np.linalg.norm(b, axis=1, keepdims=True)
-    return 1. - np.dot(a, b.T) # 余弦距离 = 1 - 余弦相似度
+    # a shape = ndarray [num_feature, 512]
+    # b shape = ndarray [num_detection, 512]
+    # return shape [num_feature, num_detection]
+    # 余弦距离 = 1 - 余弦相似度
+    return 1. - np.dot(a, b.T)
 
 
 def _nn_euclidean_distance(x, y):
@@ -108,7 +118,13 @@ def _nn_cosine_distance(x, y):
         smallest cosine distance to a sample in `x`.
 
     """
+    # 我們會使用這個函數計算特徵之間的匹配cost
+    # x shape = List[ndarray[512]]，List長度就是對於這個追蹤對象之前記錄下的特徵向量
+    # y shape = ndarray [num_detection, 512]，num_detection就是這次有偵測到的標註匡
+    # distances shape [追蹤對象有紀錄的特徵向量長度, num_detections]
     distances = _cosine_distance(x, y)
+    # 對於一個detection我們找一個餘弦距離最小的當作，當前追蹤對象與detection的餘弦距離
+    # return shape [num_detections]
     return distances.min(axis=0)
 
 
@@ -141,19 +157,30 @@ class NearestNeighborDistanceMetric(object):
         一个从目标ID映射到到目前为止已经观察到的样本列表的字典
 
     """
-
+    # 由deep_sort.py實例化
     def __init__(self, metric, matching_threshold, budget=None):
-
-
+        """
+        :param metric: 設定要用哪種模式計算，有歐式距離或是餘弦距離可以使用，預設為cosine
+        :param matching_threshold: 閾值，預設為0.2
+        :param budget: 控制一個追蹤目標我們只保留多少個特徵向量，這裡預設為100
+        """
+        # 已看過
         if metric == "euclidean":
-            self._metric = _nn_euclidean_distance # 欧式距离
+            # 欧式距离
+            self._metric = _nn_euclidean_distance
         elif metric == "cosine":
-            self._metric = _nn_cosine_distance # 余弦距离
+            # 余弦距离，預設會使用這個
+            self._metric = _nn_cosine_distance
         else:
+            # 如果輸入不在上述兩個就會報錯
             raise ValueError(
                 "Invalid metric; must be either 'euclidean' or 'cosine'")
+        # 一些賦值
         self.matching_threshold = matching_threshold
-        self.budget = budget # budge用于控制 feature 的数目
+        # budge用于控制 feature 的数目
+        # 控制一個追蹤目標我們只保留多少個特徵向量，這裡預設為100
+        self.budget = budget
+        # 存放正在追蹤目標的特徵向量
         self.samples = {}
 
     def partial_fit(self, features, targets, active_targets):
@@ -171,14 +198,25 @@ class NearestNeighborDistanceMetric(object):
         传入特征列表及其对应id，partial_fit构造一个活跃目标的特征字典。
 
         """
+        # features = 特徵向量shape [num_confirmed(大約), channel] (已經正在追蹤的對象數量, 特徵向量的深度)
+        # targets = 每個特徵向量對應到的對象id shape [num_confirmed(大約)]
+        # 前面會是大約是因為在追蹤狀態變成confirmed之前每個追蹤對象的特徵向量是不會每次都被刪除的
+        # 也就是第一次變成confirmed狀態的追蹤對象會有3個左右的特徵向量，所以這裡只是大約
+        # active_targets = 已經confirmed的追蹤對象的追蹤id shape [num_confirmed]，這個就是確定的了
+
+        # 遍歷features以及targets
         for feature, target in zip(features, targets):
             # 对应目标下添加新的feature，更新feature集合
             # samples字典    d: feature list}
+            # setdefault用法 = 如果字典中沒有target我們就會創建一個key為target且value為[]的鍵值對
+            # 之後我們會在value的地方做append將特徵向量添加進去
             self.samples.setdefault(target, []).append(feature)
+            # 對於一個追蹤目標我們只會存放100個特徵向量，太久以前的就會被捨棄
             if self.budget is not None:
-                # 只考虑budget个目标，超过直接忽略
+                # 對於一個追蹤目標我們只考慮最進的100個特徵向量
                 self.samples[target] = self.samples[target][-self.budget:]
-        
+
+        # 透過這層過濾後會將已經沒有在追蹤的對象從samples中刪除
         # 筛选激活的目标；samples是一个字典{id->feature list}
         self.samples = {k: self.samples[k] for k in active_targets}
 
@@ -201,7 +239,15 @@ class NearestNeighborDistanceMetric(object):
         
         计算features和targets之间的距离，返回一个成本矩阵（代价矩阵）
         """
+        # features = 將要匹配的匡選對象的特徵向量取出來，shape [detection_indices, channel]
+        # targets = 取出要匹配的的追蹤對象的追蹤id，shape [track_indices]
+        # 構建一個shape = ndarray [len(targets), len(features)]且全為0
         cost_matrix = np.zeros((len(targets), len(features)))
         for i, target in enumerate(targets):
+            # 透過追蹤對象之前的特徵向量與現在的標註匡的特徵向量計算cost
+            # samples[targets]裡面會有這個追蹤對象之前的特徵向量，shape list[ndarray(512)]
+            # list長度就會是這個追蹤對象記錄下來的特徵向量，最多只會紀錄往前的100個
+            # 這裡的_metric我們會用的是_nn_cosine_distance函數
+            # _metric shape [num_detections]
             cost_matrix[i, :] = self._metric(self.samples[target], features)
         return cost_matrix

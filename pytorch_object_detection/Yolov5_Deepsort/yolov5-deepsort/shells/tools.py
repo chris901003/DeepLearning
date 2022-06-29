@@ -1,20 +1,28 @@
 import cv2
 import numpy as np
 
+
 def plot_bboxes(image, bboxes, line_thickness=None):
+    # 已看過
+    # 根據輸入的標註匡訊息，在輸入的圖像上面進行標註
+
     # Plots one bounding box on image img
+    # 如果沒有傳入標註匡寬度就會依據圖像大小決定標註匡寬度
     tl = line_thickness or round(
         0.002 * (image.shape[0] + image.shape[1]) / 2) + 1  # line/font thickness
     list_pts = []
     point_radius = 4
 
+    # 遍歷整個需要標註的標註匡訊息
     for (x1, y1, x2, y2, cls_id, pos_id) in bboxes:
+        # 依據不同的類別可以給不同的標註匡顏色
         if cls_id in ['car', 'bus', 'truck']:
             color = (0, 0, 255)
         else:
             color = (0, 255, 255)
 
         # check whether hit line
+        # 在標註匡上面會有一個點
         check_point_x = x1
         check_point_y = int(y1 + ((y2 - y1) * 0.6))
 
