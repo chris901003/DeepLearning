@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torch import nn
 from PIL import ImageFont, ImageDraw, Image
-from models import build_model
-import datasets.transforms as T
-from datasets.coco import make_coco_transforms
+from obj_detection.models import build_model
+import obj_detection.datasets.transforms as T
+from obj_detection.datasets.coco import make_coco_transforms
 from torchvision import transforms
 import json
 
@@ -26,13 +26,13 @@ class DETR(object):
         self.postprocessors = None
         self.criterion = None
         # 預訓練權重位置
-        self.model_path = 'C://Users//88698//Desktop//Pytorch//DETR_Official//weight/detr_segmentation.pth'
+        self.model_path = 'C://Users//88698//Desktop//Pytorch//DETR_Official//weight/detr-r50-e632da11.pth'
         # 類別文件位置
         self.classes_path = 'C://Users//88698//Desktop//Pytorch//DETR_Official//model_data//coco_classes.txt'
         # 標註標界匡中內容的字體檔案位置
         self.word_type = 'C://Users//88698//Desktop//Pytorch//DETR_Official//model_data//simhei.ttf'
         # 在用segmentation時需要的調色板json檔案位置
-        self.palette_path = 'C://Users//88698//Desktop//Pytorch//DETR_Official//model_data//palette.json'
+        self.palette_path = '/DETR_Official/model_data/palette.json'
         # 輸入模型圖像大小
         self.input_shape = [800, 800]
         # 預測值大於這個閾值的邊界匡才會被留下
@@ -80,11 +80,11 @@ class DETR(object):
 
         # 進行圖像變換，我們只需要image的轉換就可以了
         # 提供兩種方式進行圖像轉換，第一種fps會比較穩定，但是準確度理論上來說會比較好
-        # images = self.transforms(image, None)[0]
+        images = self.transforms(image, None)[0]
 
         # 第二種轉換方式要依據對螢幕截圖大小決定fps，同時如果擷取大小過小可能導致預測不準確
-        images = transforms.ToTensor()(image)
-        images = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(images)
+        # images = transforms.ToTensor()(image)
+        # images = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(images)
 
         h, w = images.shape[1], images.shape[2]
         # 保存輸入到模型中圖片大小
@@ -123,106 +123,14 @@ class DETR(object):
             # ]
             # results的長度就會是batch_size
             # ---------------------------------------------------------
-            if 'segm' in self.postprocessors.keys():
-                results = self.postprocessors['segm'](results, outputs, orig_size, target_size)
-            # 根據分類類別置信度進行過濾，將置信度低於閾值的邊界匡移除
             for result in results:
-                score_mask = result['scores'] > self.confidence
+                score_mask = result['scores'] > 0.9
                 result['scores'] = result['scores'][score_mask]
                 result['labels'] = result['labels'][score_mask]
                 result['boxes'] = result['boxes'][score_mask]
                 if 'masks' in result.keys():
                     result['masks'] = result['masks'][score_mask]
-            # 進行預測時只會有一張圖片，所以我們先把圖片的計算結果都拿出來，這樣就沒有batch_size的部分
-            top_scores, top_labels, top_boxes = results[0]['scores'], results[0]['labels'], results[0]['boxes']
-            if 'masks' in results[0].keys():
-                top_masks = results[0]['masks']
-
-            #  如果經過過濾後沒有標界匡就直接返回原圖
-            if len(top_boxes) == 0:
-                return image
-
-            # 將結果都轉換成numpy格式，因為tensor格式無法進行操做
-            top_conf = top_scores.cpu().numpy()
-            top_label = top_labels.cpu().numpy()
-            top_boxes = top_boxes.cpu().numpy()
-            if 'masks' in results[0].keys():
-                top_masks = top_masks.squeeze(1)
-                top_masks = top_masks.cpu().numpy().astype(np.uint8)
-
-        # top_masks shape [num_queries, 1, height, width]
-        if 'masks' in results[0].keys():
-            h, w = top_masks.shape[-2], top_masks.shape[-1]
-            segmentation_masks = np.zeros([h, w])
-            with open(self.palette_path, 'rb') as f:
-                palette_dict = json.load(f)
-                palette = []
-                for v in palette_dict.values():
-                    palette += v
-            for idx, mask in enumerate(top_masks):
-                label = int(top_label[idx])
-                mask[mask == 1] = label
-                mask_filter = np.where(segmentation_masks == 0)
-                segmentation_masks[mask_filter] = mask[mask_filter]
-            segmentation_masks = segmentation_masks.astype(np.uint8)
-            segmentation_masks = Image.fromarray(segmentation_masks)
-            segmentation_masks.putpalette(palette)
-            segmentation_masks = segmentation_masks.convert('RGB')
-
-        # font = 字體選擇，這裡指定字體的檔案位置
-        # size = 字體大小，會根據輸入圖片做調整
-        font = ImageFont.truetype(font=self.word_type, size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        # 邊界框寬度，也是會根據輸入圖片大小有所調整
-        thickness = int(max((image.size[0] + image.size[1]) // np.mean(self.input_shape), 1))
-
-        # ---------------------------------------------------------#
-        #   图像绘制
-        # ---------------------------------------------------------#
-        for i, c in list(enumerate(top_label)):
-            # 找到對應的類別名稱
-            predicted_class = self.class_names[int(c)]
-            # box = (xmin, ymin, xmax, ymax)
-            box = top_boxes[i]
-            # score = 預測分數
-            score = top_conf[i]
-
-            # 把座標拆出來
-            left, top, right, bottom = box
-
-            # 限定範圍，不可超出圖片大小
-            top = max(0, np.floor(top).astype('int32'))
-            left = max(0, np.floor(left).astype('int32'))
-            bottom = min(image.size[1], np.floor(bottom).astype('int32'))
-            right = min(image.size[0], np.floor(right).astype('int32'))
-
-            # 如果想要獲取詳細框框資料以及概率分數可以從這裡岔出去
-            # 下面就是把匡畫上去
-            # label = string，裡面內容就是"類別名稱 分數(取小數點兩位)"
-            label = '{} {:.2f}'.format(predicted_class, score)
-            # 創建一個可以在給定圖像上面繪圖的實例對象，這裡會直接改image圖像
-            draw = ImageDraw.Draw(image)
-            # 獲取文字大小(w, h)寬高
-            label_size = draw.textsize(label, font)
-            label = label.encode('utf-8')
-            print(label, top, left, bottom, right)
-
-            # 依據高度來決定類別字體要放在哪裡
-            if top - label_size[1] >= 0:
-                text_origin = np.array([left, top - label_size[1]])
-            else:
-                text_origin = np.array([left, top + 1])
-
-            # 依據線條的寬度來決定要畫幾圈，迴圈每跑一次代表畫一圈，所以迴圈越多寬度就會越寬
-            for i in range(thickness):
-                draw.rectangle([left + i, top + i, right - i, bottom - i], outline=self.colors[c])
-            # 類別文字的匡
-            draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=self.colors[c])
-            # 添加上類別文字
-            draw.text(text_origin, str(label, 'UTF-8'), fill=(0, 0, 0), font=font)
-            # 刪除可繪畫實例對象
-            del draw
-        if 'masks' in results[0].keys():
-            # 回傳畫好框框的圖片
-            segmentation_image = Image.blend(segmentation_masks, image, 0.5)
-            return segmentation_image
-        return image
+            results = results[0]
+            res = [(results['boxes'][i][0], results['boxes'][i][1], results['boxes'][i][2], results['boxes'][i][3],
+                    results['labels'][i], results['scores'][i]) for i in range(len(results['boxes']))]
+            return res

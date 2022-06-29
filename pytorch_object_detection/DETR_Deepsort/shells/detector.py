@@ -1,10 +1,5 @@
-import time
-import cv2
-import numpy as np
-from PIL import Image
-from detr import DETR
 import argparse
-import pyautogui
+from obj_detection.detr import DETR
 
 
 def get_args_parser():
@@ -26,7 +21,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
-                        help="Path to the pretrained model. If set, only the mask head will be trained")
+                        help="Path to the pretrained models. If set, only the mask head will be trained")
     # * Backbone
     # 選擇使用哪種backbone
     parser.add_argument('--backbone', default='resnet50', type=str,
@@ -123,30 +118,11 @@ def get_args_parser():
     return parser
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser('DETR training and evaluation script', parents=[get_args_parser()])
-    args = parser.parse_args()
-    args.masks = True
-    args.aux_loss = False
-    detr = DETR(args)
-    fps = 0.0
-    while True:
-        # 顯示視窗需要用到的，不加上的話會有問題
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-        # 計算開始時間
-        t1 = time.time()
-        # 擷取螢幕指定部分畫面
-        frame = pyautogui.screenshot(region=[0, 0, 850, 500])
-        # 放入模型預測，並且回傳的是已經加上標註匡的
-        frame = np.asarray(detr.detect_image(frame))
-        # 將圖像的格式從rgb變成bgr
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        # 簡單計算fps
-        fps = (fps + (1. / (time.time() - t1))) / 2
-        print("fps= %.2f" % fps)
-        # 將fps放到畫面中
-        frame = cv2.putText(frame, "fps= %.2f" % fps, (0, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        # 將圖片放到視窗上
-        cv2.imshow("video", frame)
-    cv2.destroyAllWindows()
+class Detector:
+    def __init__(self):
+        parser = argparse.ArgumentParser('DETR training and evaluation script', parents=[get_args_parser()])
+        args = parser.parse_args()
+        self.detr = DETR(args)
+
+    def detect(self, im):
+        return self.detr.detect_image(im)
