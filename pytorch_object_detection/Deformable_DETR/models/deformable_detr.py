@@ -67,7 +67,7 @@ class DeformableDETR(nn.Module):
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.num_feature_levels = num_feature_levels
         if not two_stage:
-            # 會進來這裡
+            # 1-stage會進來這裡
             self.query_embed = nn.Embedding(num_queries, hidden_dim*2)
         if num_feature_levels > 1:
             # 預設會進來這裡
@@ -114,6 +114,7 @@ class DeformableDETR(nn.Module):
 
         # if two-stage, the last class_embed and bbox_embed is for region proposal generation
         # num_pred = transformer.decoder.num_layers，預設會是這樣
+        # 2-stage會比1-stage多一
         num_pred = (transformer.decoder.num_layers + 1) if two_stage else transformer.decoder.num_layers
         if with_box_refine:
             self.class_embed = _get_clones(self.class_embed, num_pred)
@@ -130,6 +131,8 @@ class DeformableDETR(nn.Module):
             self.transformer.decoder.bbox_embed = None
         if two_stage:
             # hack implementation for two-stage
+            # 使用2-stage會進來這裡
+            # 在decoder內放入分類頭
             self.transformer.decoder.class_embed = self.class_embed
             for box_embed in self.bbox_embed:
                 nn.init.constant_(box_embed.layers[-1].bias.data[2:], 0.0)
@@ -168,11 +171,13 @@ class DeformableDETR(nn.Module):
             # masks也儲存起來
             masks.append(mask)
             assert mask is not None
-        # 當從backbone拿出的特徵圖數量不足時會在這裡補足
+        # 當從backbone拿出的特徵圖數量不足時會在這裡補足，這裡的num_feature_levels預設會是4
+        # 這裡應該就是要達到多層特徵層的結構
         if self.num_feature_levels > len(srcs):
             _len_srcs = len(srcs)
             for l in range(_len_srcs, self.num_feature_levels):
                 # 透過一些方法將srcs數量變成num_feature_levels
+                # 這裡因為Liner的輸出chanel有不同所以需要分辨是從第幾個開始
                 if l == _len_srcs:
                     src = self.input_proj[l](features[-1].tensors)
                 else:
@@ -188,9 +193,10 @@ class DeformableDETR(nn.Module):
                 masks.append(mask)
                 pos.append(pos_l)
 
+        # 2-stage的query_embeds就只會是None
         query_embeds = None
         if not self.two_stage:
-            # 我們會進來這裡，直接獲取embed參數
+            # 1-stage我們會進來這裡，直接獲取embed參數
             query_embeds = self.query_embed.weight
         # 將特徵圖以及mask以及位置編碼以及query位置編碼傳到transformer當中
         # hs shape = [decoder_layers, batch_size, num_queries, channel]
@@ -222,9 +228,10 @@ class DeformableDETR(nn.Module):
             # tmp shape [batch_size, num_queries, channel=4]
             tmp = self.bbox_embed[lvl](hs[lvl])
             if reference.shape[-1] == 4:
+                # 2-stage往這裡
                 tmp += reference
             else:
-                # 我們會走這裡
+                # 1-stage我們會走這裡
                 assert reference.shape[-1] == 2
                 tmp[..., :2] += reference
             # 對預測匡進行sigmoid讓值控制在[0, 1]之間
@@ -245,8 +252,10 @@ class DeformableDETR(nn.Module):
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
 
         if self.two_stage:
-            # 我們不會走這裡
+            # 2-stage會走這裡
             enc_outputs_coord = enc_outputs_coord_unact.sigmoid()
+            # 這兩個東西是在encoder輸出時會進行標註匡預測，這裡預測到的標註匡會拿到decoder當中作為一開始的參考點
+            # 所以這裡我們也會同步進行損失計算，最後一起訓練
             out['enc_outputs'] = {'pred_logits': enc_outputs_class, 'pred_boxes': enc_outputs_coord}
         # return會是一個dict裡面分別會有主要輸出以及輔助輸出
         return out

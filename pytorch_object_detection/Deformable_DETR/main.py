@@ -31,10 +31,13 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Deformable DETR Detector', add_help=False)
     # transformer部分的學習率
     parser.add_argument('--lr', default=2e-4, type=float)
+    # 在這裡面的結構都不會被訓練
     parser.add_argument('--lr_backbone_names', default=["backbone.0"], type=str, nargs='+')
     # backbone部分的學習率
     parser.add_argument('--lr_backbone', default=2e-5, type=float)
+    # 在這裡面的結構都不會被訓練
     parser.add_argument('--lr_linear_proj_names', default=['reference_points', 'sampling_offsets'], type=str, nargs='+')
+    # 指定該層的學習率
     parser.add_argument('--lr_linear_proj_mult', default=0.1, type=float)
     # batch_size大小
     parser.add_argument('--batch_size', default=2, type=int)
@@ -53,6 +56,7 @@ def get_args_parser():
 
     # Variants of Deformable DETR
     parser.add_argument('--with_box_refine', default=False, action='store_true')
+    # 啟用2-stage模式，這樣就會讓encoder也會進行預測
     parser.add_argument('--two_stage', default=False, action='store_true')
 
     # Model parameters
@@ -97,6 +101,7 @@ def get_args_parser():
     # 一張圖預先設定會抓取多少個預測匡
     parser.add_argument('--num_queries', default=300, type=int,
                         help="Number of query slots")
+    # 一個特徵點的頭會取周遭點的特徵值
     parser.add_argument('--dec_n_points', default=4, type=int)
     parser.add_argument('--enc_n_points', default=4, type=int)
 
@@ -202,6 +207,7 @@ def main(args):
     else:
         # 從資料集中選出照片的方式
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
+        # 在驗證集當中不會讓每次都是透過亂數給圖像
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
     batch_sampler_train = torch.utils.data.BatchSampler(
@@ -217,6 +223,7 @@ def main(args):
 
     # lr_backbone_names = ["backbone.0", "backbone.neck", "input_proj", "transformer.encoder"]
     def match_name_keywords(n, name_keywords):
+        # 檢查name_keywords當中有沒有n這個東西，如果有就會回傳True
         out = False
         for b in name_keywords:
             if b in n:
@@ -268,6 +275,7 @@ def main(args):
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
     else:
+        # 獲取計算mAP會需要用到的coco api
         base_ds = get_coco_api_from_dataset(dataset_val)
 
     if args.frozen_weights is not None:

@@ -52,7 +52,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         #   'aux_outputs': [
         #       {'pred_logits': [batch_size, num_queries, num_classes], 'pred_boxes': [batch_size, num_queries, 4]},
         #       {},...
-        #   ]
+        #   ] (只有在開啟輔助訓練下才會有),
+        #   'enc_outputs': [
+        #       {'pred_logits': [], 'pred_boxes': []}
+        #   ] (只有在2-stage的模式下才會有)
         # }
         outputs = model(samples)
         # 計算損失

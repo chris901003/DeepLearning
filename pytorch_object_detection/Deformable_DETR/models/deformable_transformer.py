@@ -39,7 +39,7 @@ class DeformableTransformer(nn.Module):
         :param dec_n_points:
         :param enc_n_points:
         :param two_stage: 預設為False
-        :param two_stage_num_proposals:
+        :param two_stage_num_proposals: 如果是使用2-stage模式，就會在encoder就會有proposal，我們會取前top-k個
         """
         super().__init__()
 
@@ -65,12 +65,13 @@ class DeformableTransformer(nn.Module):
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
 
         if two_stage:
+            # 2-stage會在這個地方
             self.enc_output = nn.Linear(d_model, d_model)
             self.enc_output_norm = nn.LayerNorm(d_model)
             self.pos_trans = nn.Linear(d_model * 2, d_model * 2)
             self.pos_trans_norm = nn.LayerNorm(d_model * 2)
         else:
-            # 預設會往這個地方
+            # 1-stage預設會往這個地方
             self.reference_points = nn.Linear(d_model, 2)
 
         # 初始化權重
@@ -90,50 +91,88 @@ class DeformableTransformer(nn.Module):
         normal_(self.level_embed)
 
     def get_proposal_pos_embed(self, proposals):
+        # 獲取proposal的位置編碼
+        # proposals shape [batch_size, topk, 4]
         num_pos_feats = 128
         temperature = 10000
         scale = 2 * math.pi
 
+        # dim_t shape [128]
         dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=proposals.device)
         dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats)
-        # N, L, 4
+        # proposals shape [batch_size, top_k, 4]
         proposals = proposals.sigmoid() * scale
-        # N, L, 4, 128
+        # proposals shape [batch_size, top_k, 4, 128]
         pos = proposals[:, :, :, None] / dim_t
         # N, L, 4, 64, 2
+        # pos shape [batch_size, top_k, 4, 64, 2] -> [batch_size, top_k, 512]
         pos = torch.stack((pos[:, :, :, 0::2].sin(), pos[:, :, :, 1::2].cos()), dim=4).flatten(2)
+        # return shape [batch_size, top_k, 512]
         return pos
 
     def gen_encoder_output_proposals(self, memory, memory_padding_mask, spatial_shapes):
+        """
+        :param memory: shape [batch_size, total_pixel, channel=256]
+        :param memory_padding_mask: [batch_size, total_pixel]
+        :param spatial_shapes: [lvl, 2]
+        :return:
+        """
+        # 這裡只有在2-stage中通過encoder時會進來
+        # 獲取encoder的輸出維度資料
         N_, S_, C_ = memory.shape
         base_scale = 4.0
         proposals = []
         _cur = 0
+        # 遍歷每一層特徵層
         for lvl, (H_, W_) in enumerate(spatial_shapes):
+            # mask_flatten shape [batch_size, height, width, 1]
             mask_flatten_ = memory_padding_mask[:, _cur:(_cur + H_ * W_)].view(N_, H_, W_, 1)
+            # 統計總共有多少個點是非padding的
+            # valid_H shape [batch_size], valid_W shape [batch_size]
             valid_H = torch.sum(~mask_flatten_[:, :, 0, 0], 1)
             valid_W = torch.sum(~mask_flatten_[:, 0, :, 0], 1)
 
+            # grid_y, grid_x shape [height, width]
             grid_y, grid_x = torch.meshgrid(torch.linspace(0, H_ - 1, H_, dtype=torch.float32, device=memory.device),
                                             torch.linspace(0, W_ - 1, W_, dtype=torch.float32, device=memory.device))
+            # grid shape [height, width, 2]
             grid = torch.cat([grid_x.unsqueeze(-1), grid_y.unsqueeze(-1)], -1)
 
+            # scale shape [batch_size, 1, 1, 2]
             scale = torch.cat([valid_W.unsqueeze(-1), valid_H.unsqueeze(-1)], 1).view(N_, 1, 1, 2)
+            # grid shape [height, width, 2] -> [1, height, width, 2] -> [batch_size, height, width, 2]
+            # 最後除以了scale會將座標縮放到相對空間當中
             grid = (grid.unsqueeze(0).expand(N_, -1, -1, -1) + 0.5) / scale
+            # wh shape [batch_size, height, width, 2]
             wh = torch.ones_like(grid) * 0.05 * (2.0 ** lvl)
+            # 將gird與wh合併變成一個預測匡，前面的是(x, y)座標後面的是(w, h)高寬
+            # proposal shape [batch_size, height, width, 4] -> [batch_size, height * width, 4]
             proposal = torch.cat((grid, wh), -1).view(N_, -1, 4)
+            # 添加到proposals當中記錄下來
             proposals.append(proposal)
+            # 這樣下一層才會知道mask要從哪裡開始
             _cur += (H_ * W_)
+        # output_proposals shape [batch_size, total_pixel, 4]
         output_proposals = torch.cat(proposals, 1)
+        # all就是檢查是否全為True，keepdim就是會不會保留最後一個維度
+        # output_proposals_valid shape [batch_size, total_pixel, 1] (True, False)
         output_proposals_valid = ((output_proposals > 0.01) & (output_proposals < 0.99)).all(-1, keepdim=True)
+        # output_proposals shape [batch_size, total_pixel, 4]
         output_proposals = torch.log(output_proposals / (1 - output_proposals))
+        # 將padding的部分全部設定為無窮，表示沒有作用
         output_proposals = output_proposals.masked_fill(memory_padding_mask.unsqueeze(-1), float('inf'))
+        # 將不在范為內的值設定成無窮，表示沒有作用
         output_proposals = output_proposals.masked_fill(~output_proposals_valid, float('inf'))
 
         output_memory = memory
+        # 將padding的部分設定成0
         output_memory = output_memory.masked_fill(memory_padding_mask.unsqueeze(-1), float(0))
+        # 將無效區域設定成0
         output_memory = output_memory.masked_fill(~output_proposals_valid, float(0))
+        # 透過一層全連接層再透過一次標準化層
         output_memory = self.enc_output_norm(self.enc_output(output_memory))
+        # output_memory shape [batch_size, total_pixel, channel=256]
+        # output_proposals shape [batch_size, total_pixel, channel=4]
         return output_memory, output_proposals
 
     def get_valid_ratio(self, mask):
@@ -157,6 +196,7 @@ class DeformableTransformer(nn.Module):
         :param query_embed: query的位置編碼
         :return:
         """
+        # 如果使用2-stage就不會傳入query_embed，如果是用1-stage就會傳入query_embed
         assert self.two_stage or query_embed is not None
 
         # prepare input for encoder
@@ -181,6 +221,7 @@ class DeformableTransformer(nn.Module):
             pos_embed = pos_embed.flatten(2).transpose(1, 2)
             # level_embed[lvl] shape [1, 1, hidden_dim]
             # 這裡的作用是每一層的特徵層又會透過一個層位置編碼進行分別
+            # lvl_pos_embed shape [batch_size, height * width, hidden_dim=256]
             lvl_pos_embed = pos_embed + self.level_embed[lvl].view(1, 1, -1)
             # 將結果保存下來
             lvl_pos_embed_flatten.append(lvl_pos_embed)
@@ -213,22 +254,45 @@ class DeformableTransformer(nn.Module):
         # 獲取encoder輸出資料
         bs, _, c = memory.shape
         if self.two_stage:
+            # 2-stage會走這裡
+            # output_memory shape [batch_size, total_pixel, channel=256]
+            # output_proposals shape [batch_size, total_pixel, channel=4]
             output_memory, output_proposals = self.gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)
 
             # hack implementation for two-stage Deformable DETR
+            # self.decoder.num_layers = decoder總共會重複堆疊多少層
+            # self.decoder.class_embed = 應該要是一個全連結層，將channel深度調整到與num_classes相同
+            # 也就是通過class_embed就會是預測出來的分類類別，只不過這裡好像沒有實作完成
+            # enc_outputs_class shape [batch_size, total_pixel, num_classes]
             enc_outputs_class = self.decoder.class_embed[self.decoder.num_layers](output_memory)
+            # enc_outputs_coord_unact shape [batch_size, total_pixel, channel=4]
+            # 這裡就可以獲得預測的邊界匡
             enc_outputs_coord_unact = self.decoder.bbox_embed[self.decoder.num_layers](output_memory) + output_proposals
 
+            # 獲取我們會取的前k個proposals
             topk = self.two_stage_num_proposals
+            # 這裡有一點問題，我們只去用第一種類別的預測概率去選則保留的匡，如果這裡是二分類那就沒有問題
+            # 同時這裡的class_embed是使用decoder中的，可能會導致decoder訓練過程中傾向對第一類別的分類
+            # 這邊應該可以改成先找到每個預測類別的最大概率類別，之後再依據這個類別的分數進行挑選前k大的，這樣就可以顧及到所有類別
+            # topk_proposals shape [batch_size, topk=300]
             topk_proposals = torch.topk(enc_outputs_class[..., 0], topk, dim=1)[1]
+            # topk_coords_unact shape [batch_size, topk, 4]，獲取到我們需要的標註訊息
             topk_coords_unact = torch.gather(enc_outputs_coord_unact, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))
+            # 取消梯度
             topk_coords_unact = topk_coords_unact.detach()
+            # 使用sigmoid將值控制在[0, 1]之間
+            # reference_points shape [batch_size, top_k, 4]
             reference_points = topk_coords_unact.sigmoid()
+            # init_reference_out最終會被放到decoder中作為初始bbox估計
             init_reference_out = reference_points
+            # get_proposal_pos_embed shape [batch_size, top_k, 512]
+            # pos_trans = 將剛剛輸出的部分再通過一個全連接層，這裡的channel不會改變
+            # 做後再通過pos_trans_norm進行標準化層
             pos_trans_out = self.pos_trans_norm(self.pos_trans(self.get_proposal_pos_embed(topk_coords_unact)))
+            # query_embed, tgt shape [batch_size, top_k, 256]
             query_embed, tgt = torch.split(pos_trans_out, c, dim=2)
         else:
-            # 預設會是走這裡
+            # 1-stage預設會是走這裡
             # query_embed, tgt shape [num_queries, channel=256]
             query_embed, tgt = torch.split(query_embed, c, dim=1)
             # shape [num_queries, channel] -> [1, num_queries, channel] -> [batch_size, num_queries, channel]
@@ -249,6 +313,7 @@ class DeformableTransformer(nn.Module):
 
         inter_references_out = inter_references
         if self.two_stage:
+            # 2-stage會回傳這兩個東西，最後可以用來計算損失
             return hs, init_reference_out, inter_references_out, enc_outputs_class, enc_outputs_coord_unact
         # 我們會回傳下面這個
         return hs, init_reference_out, inter_references_out, None, None
@@ -433,7 +498,8 @@ class DeformableTransformerDecoderLayer(nn.Module):
         """
         :param tgt: shape [batch_size, num_queries=300, channel=256]
         :param query_pos: shape [batch_size, num_queries=300, channel=256]
-        :param reference_points: shape [batch_size, num_queries=300, levels=4, 2]
+        :param reference_points: 1-stage shape [batch_size, num_queries=300, levels=4, 2]
+        2-stage shape [batch_size, num_queries, levels=4, channel=4]
         :param src: shape [batch_size, total_pixel, channel=256]
         :param src_spatial_shapes: shape [levels, 2]
         :param level_start_index: shape [levels]
@@ -488,6 +554,7 @@ class DeformableTransformerDecoder(nn.Module):
         """
         :param tgt: 在1-stage下shape [batch_size, num_queries=300, channel=256]
         :param reference_points: 在1-stage下shape [batch_size, num_queries=300, channel=2]
+        在2-stage下shape [batch_size, num_queries, channel=4]
         :param src: shape [batch_size, total_pixel, channel=256]
         :param src_spatial_shapes: shape [levels, 2]
         :param src_level_start_index: [levels]
@@ -505,6 +572,8 @@ class DeformableTransformerDecoder(nn.Module):
         for lid, layer in enumerate(self.layers):
             if reference_points.shape[-1] == 4:
                 # 2-stage會走這裡
+                # [batch_size, num_queries, 1, channel=4] \ [batch_size, 1, levels, 4]
+                # reference_points_input shape [batch_size, num_queries, levels, channel=4]
                 reference_points_input = reference_points[:, :, None] \
                                          * torch.cat([src_valid_ratios, src_valid_ratios], -1)[:, None]
             else:

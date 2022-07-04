@@ -128,7 +128,8 @@ class MSDeformAttn(nn.Module):
         # ---------------------------------------------------------------
         # 以下是從backbone出來的
         # query shape [batch_size, total_pixel, channel]
-        # reference_points shape [batch_size, total_pixel, lvl, 2]
+        # reference_points shape (1-stage = [batch_size, total_pixel, lvl, 2],
+        #                         2-stage = [batch_size, total_pixel, lvl, 4])
         # input_flatten shape [batch_size, total_pixel, channel]
         # input_spatial_shapes shape [lvl, 2]
         # input_level_start_index shape [lvl]
@@ -166,6 +167,9 @@ class MSDeformAttn(nn.Module):
             sampling_locations = reference_points[:, :, None, :, None, :] \
                                  + sampling_offsets / offset_normalizer[None, None, None, :, None, :]
         elif reference_points.shape[-1] == 4:
+            # 2-stage會走這裡
+            # 這裡分別取出的是(x, y)，下面的是取出(w, h)
+            # 最後變成sampling_locations，可以跟上面的1-stage稍微對比一下
             sampling_locations = reference_points[:, :, None, :, None, :2] \
                                  + sampling_offsets / self.n_points * reference_points[:, :, None, :, None, 2:] * 0.5
         else:
