@@ -25,21 +25,37 @@ from datasets.data_prefetcher import data_prefetcher
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, max_norm: float = 0):
+    # 將模型設定成訓練模式
     model.train()
+    # 將損失計算設定成訓練模式
     criterion.train()
+    # 構建MetricLogger
     metric_logger = utils.MetricLogger(delimiter="  ")
+    # 創建一些需要紀錄的資料
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     metric_logger.add_meter('grad_norm', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # 顯示多少個epoch
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
+    # 一種讀取資料的方式
     prefetcher = data_prefetcher(data_loader, device, prefetch=True)
     samples, targets = prefetcher.next()
 
     # for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
     for _ in metric_logger.log_every(range(len(data_loader)), print_freq, header):
+        # 將圖像放入到模型當中進行預測
+        # outputs = {
+        #   'pred_logits': [batch_size, num_queries, num_classes],
+        #   'pred_boxes': [batch_size, num_queries, channel=4],
+        #   'aux_outputs': [
+        #       {'pred_logits': [batch_size, num_queries, num_classes], 'pred_boxes': [batch_size, num_queries, 4]},
+        #       {},...
+        #   ]
+        # }
         outputs = model(samples)
+        # 計算損失
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)

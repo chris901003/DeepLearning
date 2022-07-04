@@ -23,6 +23,13 @@ class PositionEmbeddingSine(nn.Module):
     used by the Attention is all you need paper, generalized to work on images.
     """
     def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
+        """
+        :param num_pos_feats: 一個特徵點會用多少的深度的向量表示，這裡只會取一半的深度因為會分成奇偶數
+        :param temperature: 指數的超參數
+        :param normalize: 是否使用標準化
+        :param scale: 倍率，預設為None
+        """
+        # 固定式位置編碼
         super().__init__()
         self.num_pos_feats = num_pos_feats
         self.temperature = temperature
@@ -34,9 +41,13 @@ class PositionEmbeddingSine(nn.Module):
         self.scale = scale
 
     def forward(self, tensor_list: NestedTensor):
+        # 把backbone出來的特徵圖進行位置編碼
+        # 將圖像的tensor取出來
         x = tensor_list.tensors
+        # 從NestedTensor中的mask取出來
         mask = tensor_list.mask
         assert mask is not None
+        # 將mask取反
         not_mask = ~mask
         y_embed = not_mask.cumsum(1, dtype=torch.float32)
         x_embed = not_mask.cumsum(2, dtype=torch.float32)
@@ -53,6 +64,7 @@ class PositionEmbeddingSine(nn.Module):
         pos_x = torch.stack((pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3)
         pos_y = torch.stack((pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3)
         pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
+        # pos shape = [batch_size, channel, height, width]
         return pos
 
 
@@ -61,9 +73,11 @@ class PositionEmbeddingLearned(nn.Module):
     Absolute pos embedding, learned.
     """
     def __init__(self, num_pos_feats=256):
+        # 透過學習的方式獲得位置參數
         super().__init__()
         self.row_embed = nn.Embedding(50, num_pos_feats)
         self.col_embed = nn.Embedding(50, num_pos_feats)
+        # 重設參數
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -85,13 +99,21 @@ class PositionEmbeddingLearned(nn.Module):
 
 
 def build_position_encoding(args):
+    # 構建位置編碼
+    # N_steps會是transformer一個特徵點的channel深度的一半
     N_steps = args.hidden_dim // 2
+    # 選擇是用哪種的位置編碼方式
     if args.position_embedding in ('v2', 'sine'):
         # TODO find a better way of exposing other arguments
+        # 使用固定的位置編碼，由sine函數構建
+        # 將需要的深度輸入進去，以及是否標準化
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
     elif args.position_embedding in ('v3', 'learned'):
+        # 選擇使用可訓練位置編碼
+        # 將需要的深度輸入進去
         position_embedding = PositionEmbeddingLearned(N_steps)
     else:
         raise ValueError(f"not supported {args.position_embedding}")
 
+    # 回傳位置編碼實例化對象
     return position_embedding

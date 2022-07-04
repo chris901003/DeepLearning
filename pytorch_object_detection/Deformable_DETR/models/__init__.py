@@ -11,5 +11,6 @@ from .deformable_detr import build
 
 
 def build_model(args):
+    # 呼叫函數構建模型
     return build(args)
 

@@ -37,6 +37,7 @@ class HungarianMatcher(nn.Module):
             cost_giou: This is the relative weight of the giou loss of the bounding box in the matching cost
         """
         super().__init__()
+        # 構建匈牙利匹配
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
@@ -97,6 +98,7 @@ class HungarianMatcher(nn.Module):
 
 
 def build_matcher(args):
+    # 構建匈牙利匹配，這裡傳入每個資料對應的cost係數
     return HungarianMatcher(cost_class=args.set_cost_class,
                             cost_bbox=args.set_cost_bbox,
                             cost_giou=args.set_cost_giou)
