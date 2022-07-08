@@ -19,6 +19,8 @@ from models import build_model
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
+    # 分類類別數(注意一下如果不是91分類類在載入預訓練權重需要特別處理一下)
+    parser.add_argument('--num_classes', default=91, type=int)
     # 初始學習率
     parser.add_argument('--lr', default=1e-4, type=float)
     # 初始骨幹學習率

@@ -570,7 +570,8 @@ def build(args):
     # num_classes = 要預測的目標數量再加一，以VOC為例我們就需要把num_classes設定成21
     # coco_panoptic是全景分析的數據集
     # ----------------------------------------------------------------------------
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    # num_classes = 20 if args.dataset_file != 'coco' else 91
+    num_classes = args.num_classes
 
     # 全景分割，我們將分類類別數進行擴充，不在意到底要是多少只要夠用就可以了
     # 這裡我們先看實例分割

@@ -9,6 +9,7 @@ import pyautogui
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
+    parser.add_argument('--num_classes', default=91, type=int)
     # 初始學習率
     parser.add_argument('--lr', default=1e-4, type=float)
     # 初始骨幹學習率
