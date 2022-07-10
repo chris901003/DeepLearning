@@ -110,7 +110,7 @@ class ConvertCocoPolysToMask(object):
         if keypoints is not None:
             target["keypoints"] = keypoints
 
-        # for conversion to coco api
+        # for conversion to coco apis
         area = torch.tensor([obj["area"] for obj in anno])
         iscrowd = torch.tensor([obj["iscrowd"] if "iscrowd" in obj else 0 for obj in anno])
         target["area"] = area[keep]

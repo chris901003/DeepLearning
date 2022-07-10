@@ -22,7 +22,7 @@ from util.misc import all_gather
 class CocoEvaluator(object):
     def __init__(self, coco_gt, iou_types):
         """
-        :param coco_gt: COCO api
+        :param coco_gt: COCO apis
         :param iou_types: ('bbox')
         """
         # 已看過

@@ -41,14 +41,14 @@ class EvalCOCOMetric:
                  classes_mapping: dict = None,
                  threshold: float = 0.2):
         """
-        :param coco: coco api，從驗證集的dataloader中拿出來的
+        :param coco: coco apis，從驗證集的dataloader中拿出來的
         :param iou_type: 要計算iou的東西，這裡會是keypoints
         :param results_file_name: 暫時不確定作用
         :param classes_mapping: 預設為None
         :param threshold: 預設為0.2
         """
         # 已看過
-        # 深拷貝一份coco api
+        # 深拷貝一份coco apis
         self.coco = copy.deepcopy(coco)
         self.obj_ids = []  # 记录每个进程处理目标(person)的ids
         self.results = []
@@ -152,7 +152,7 @@ class EvalCOCOMetric:
         # 只在主进程上评估即可
         if is_main_process():
             # accumulate predictions from all images
-            # 拿到正確的coco api
+            # 拿到正確的coco apis
             coco_true = self.coco
             # 讀取預測輸出的json檔案
             coco_pre = coco_true.loadRes(self.results_file_name)

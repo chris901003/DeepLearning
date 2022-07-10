@@ -233,9 +233,9 @@ maskUtils = mask_util
 
 def loadRes(self, resFile):
     """
-    Load result file and return a result api object.
+    Load result file and return a result apis object.
     :param   resFile (str)     : file name of result file
-    :return: res (obj)         : result api object
+    :return: res (obj)         : result apis object
     """
     res = COCO()
     res.dataset['images'] = [img for img in self.dataset['images']]

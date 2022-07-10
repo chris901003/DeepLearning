@@ -22,7 +22,7 @@ def attempt_download(file, repo='ultralytics/yolov5'):
 
     if not file.exists():
         try:
-            response = requests.get(f'https://api.github.com/repos/{repo}/releases/latest').json()  # github api
+            response = requests.get(f'https://api.github.com/repos/{repo}/releases/latest').json()  # github apis
             assets = [x['name'] for x in response['assets']]  # release assets, i.e. ['yolov5s.pt', 'yolov5m.pt', ...]
             tag = response['tag_name']  # i.e. 'v1.0'
         except:  # fallback plan

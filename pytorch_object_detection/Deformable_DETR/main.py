@@ -275,7 +275,7 @@ def main(args):
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
     else:
-        # 獲取計算mAP會需要用到的coco api
+        # 獲取計算mAP會需要用到的coco apis
         base_ds = get_coco_api_from_dataset(dataset_val)
 
     if args.frozen_weights is not None:

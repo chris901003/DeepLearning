@@ -5,7 +5,15 @@ import os.path as osp
 import time
 import warnings
 
+import torch
+import torch.distributed as dist
 from learn_mmcv.mmmcv.utils import DictAction, Config
+from learn_mmcv.mmmcv.runner import init_dist, get_dist_info
+from learn_mmcv import mmmcv
+from learn_mmcv.mmmseg.utils import get_root_logger, collect_env
+from learn_mmcv.mmmseg.apis import set_random_seed, init_random_seed
+from learn_mmcv.mmmseg.utils import setup_multi_processes
+from learn_mmcv.mmmseg.utils import get_device
 
 
 def parse_args():
@@ -98,7 +106,100 @@ def parse_args():
 def main():
     args = parse_args()
     cfg = Config.fromfile(args.config)
+    if args.cfg_options is not None:
+        # 這裡預設會是None，所以不會進來
+        cfg.merge_from_dict(args.cfg_options)
+
+    # 設定cudnn_benchmark相關東西(這裡我們不去在意是做什麼用的)
+    if cfg.get('cudnn_benchmark', False):
+        torch.backends.cudnn.benchmark = True
+
+    # work_dir is determined in this priority: CLI > segment in file > filename
+    # 將訓練過程以及結果記錄下來的儲存地方(會將儲存地址存到cfg裏面)
+    if args.work_dir is not None:
+        # update configs according to CLI args if args.work_dir is not None
+        cfg.work_dir = args.work_dir
+    elif cfg.get('work_dir', None) is None:
+        # use config filename as default work_dir if cfg.work_dir is None
+        cfg.work_dir = osp.join('./work_dirs',
+                                osp.splitext(osp.basename(args.config))[0])
+
+    # 加載模型權重相關內容
+    if args.load_from is not None:
+        cfg.load_from = args.load_from
+    #  可以加載上次訓練到一半的模型
+    if args.resume_from is not None:
+        cfg.resume_from = args.resume_from
+    # 多gpu相關的內容
+    if args.gpus is not None:
+        cfg.gpu_ids = range(1)
+        warnings.warn('`--gpus` is deprecated because we only support '
+                      'single GPU mode in non-distributed training. '
+                      'Use `gpus=1` now.')
+    # 多gpu相關內容
+    if args.gpu_ids is not None:
+        cfg.gpu_ids = args.gpu_ids[0:1]
+        warnings.warn('`--gpu-ids` is deprecated, please use `--gpu-id`. '
+                      'Because we only support single GPU mode in '
+                      'non-distributed training. Use the first GPU '
+                      'in `gpu_ids` now.')
+    if args.gpus is None and args.gpu_ids is None:
+        cfg.gpu_ids = [args.gpu_id]
+
+    cfg.auto_resume = args.auto_resume
+
+    # init distributed env first, since logger depends on the dist info.
+    # 分布式訓練的東西，也算是多gpu的內容
+    if args.launcher == 'none':
+        distributed = False
+    else:
+        distributed = True
+        init_dist(args.launcher, **cfg.dist_params)
+        # gpu_ids is used to calculate iter when resuming checkpoint
+        _, world_size = get_dist_info()
+        cfg.gpu_ids = range(world_size)
+
+    # create work_dir，創建保存文件夾
+    mmmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
+    # dump config
+    cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
+    # init the logger before other steps
+    # 保存log相關檔案
+    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
+    logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
+
+    # set multi-process settings
+    setup_multi_processes(cfg)
+
+    # init the meta dict to record some important information such as
+    # environment info and seed, which will be logged
+    meta = dict()
+    # log env info
+    env_info_dict = collect_env()
+    env_info = '\n'.join([f'{k}: {v}' for k, v in env_info_dict.items()])
+    dash_line = '-' * 60 + '\n'
+    logger.info('Environment info:\n' + dash_line + env_info + '\n' +
+                dash_line)
+    meta['env_info'] = env_info
+
+    # log some basic info
+    logger.info(f'Distributed training: {distributed}')
+    logger.info(f'Config:\n{cfg.pretty_text}')
+
+    # set random seeds
+    # 亂數種子相關東西，透過設定種子碼可以使結果復現
+    cfg.device = get_device()
+    seed = init_random_seed(args.seed, device=cfg.device)
+    seed = seed + dist.get_rank() if args.diff_seed else seed
+    logger.info(f'Set random seed to {seed}, '
+                f'deterministic: {args.deterministic}')
+    set_random_seed(seed, deterministic=args.deterministic)
+    cfg.seed = seed
+    meta['seed'] = seed
+    meta['exp_name'] = osp.basename(args.config)
     print('Start training.')
+    print(cfg)
 
 
 if __name__ == '__main__':

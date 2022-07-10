@@ -165,7 +165,7 @@ def evaluate(model, data_loader, device, flip=False, flip_pairs=None):
         # maxvals shape [batch_size, num_kps, 1]
         outputs = transforms.get_final_preds(outputs, reverse_trans, post_processing=True)
 
-        # 更新coco api
+        # 更新coco apis
         key_metric.update(targets, outputs)
         # 更新狀態
         metric_logger.update(model_time=model_time)

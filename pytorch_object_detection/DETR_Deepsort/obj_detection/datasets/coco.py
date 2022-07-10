@@ -189,7 +189,7 @@ class ConvertCocoPolysToMask(object):
         if keypoints is not None:
             target["keypoints"] = keypoints
 
-        # for conversion to coco api
+        # for conversion to coco apis
         # 為了之後要做coco mAP計算要用到的
         # 每個gt_box的面積
         area = torch.tensor([obj["area"] for obj in anno])

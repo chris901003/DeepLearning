@@ -316,7 +316,7 @@ class Registry:
         """
         if not isinstance(force, bool):
             raise TypeError(f'force must be a boolean, but got {type(force)}')
-        # NOTE: This is a walkaround to be compatible with the old api,
+        # NOTE: This is a walkaround to be compatible with the old apis,
         # while it may introduce unexpected bugs.
         if isinstance(name, type):
             return self.deprecated_register_module(name, force=force)
