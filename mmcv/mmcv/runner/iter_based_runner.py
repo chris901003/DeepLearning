@@ -180,7 +180,6 @@ class IterBasedRunner(BaseRunner):
         self.call_hook('before_epoch')
 
         # 開始訓練一個epoch，總共會迭代max_iters次
-        self._max_iters = 1  # 晚點記得刪除
         while self.iter < self._max_iters:
             for i, flow in enumerate(workflow):
                 # 將內部的iter設定成0，這個是用來計算batch的iter的
