@@ -24,7 +24,7 @@ def load(file: Union[str, Path, FileLikeObject],
          **kwargs):
     """Load data from json/yaml/pickle files.
 
-    This method provides a unified apis for loading data from serialized files.
+    This method provides a unified api for loading data from serialized files.
 
     Note:
         In v1.3.16 and later, ``load`` supports loading data from serialized
@@ -80,7 +80,7 @@ def dump(obj: Any,
          **kwargs):
     """Dump data to json/yaml/pickle strings or files.
 
-    This method provides a unified apis for dumping data as strings or to files,
+    This method provides a unified api for dumping data as strings or to files,
     and also supports custom arguments for each file format.
 
     Note:

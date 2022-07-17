@@ -12,9 +12,18 @@ from mmcv.runner import BaseModule, auto_fp16
 
 class BaseSegmentor(BaseModule, metaclass=ABCMeta):
     """Base class for segmentors."""
+    # 繼承於BaseModule，同時BaseModule是MMCV共同繼承的Module，也就是pytorch當中的nn.Module一樣
+    # BaseModule最後也是繼承torch.nn.Module，只是BaseModule有多了一些功能
 
     def __init__(self, init_cfg=None):
+        """
+        :param init_cfg: model config裏面的init_cfg，控制初始化用的
+        """
+        # 已看過
+        # EncoderDecoder繼承於這個class
+        # 初始化繼承的class
         super(BaseSegmentor, self).__init__(init_cfg)
+        # fp16_enabled = 目前不確定是做什麼用的
         self.fp16_enabled = False
 
     @property
@@ -135,9 +144,23 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
                 DDP, it means the batch size on each GPU), which is used for
                 averaging the logs.
         """
+
+        """
+        :param data_batch: 一個batch的資料，裡面包括訓練圖片的tensor以及標註的tensor 
+        :param optimizer: 優化器
+        :param kwargs: 其他參數通常都是空的
+        :return: loss值
+        """
+
+        # 將data_batch傳入，這裡就會到層結構當中的forward當中
+        # losses = dict格式，裏面就會有主損失以及主分支正確率，也會有輔助損失以及輔助正確率
         losses = self(**data_batch)
+        # 將losses傳入到parse_losses進行解析
+        # loss = 總損失值(float)
+        # log_vars = 損失值以及正確率(dict{str:float})
         loss, log_vars = self._parse_losses(losses)
 
+        # 再將outputs進行包裝，num_samples=batch_size
         outputs = dict(
             loss=loss,
             log_vars=log_vars,
@@ -180,22 +203,30 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
                 which may be a weighted sum of all losses, log_vars contains
                 all the variables to be sent to the logger.
         """
+        # 已看過，整理loss字典當中的數值
+        # losses = 損失的字典，裡面包括損失值以及正確率
         log_vars = OrderedDict()
+        # 遍歷losses當中的資訊
         for loss_name, loss_value in losses.items():
             if isinstance(loss_value, torch.Tensor):
+                # value是tensor格式就直接取均值
                 log_vars[loss_name] = loss_value.mean()
             elif isinstance(loss_value, list):
+                # value是list格式就取均值後相加
                 log_vars[loss_name] = sum(_loss.mean() for _loss in loss_value)
             else:
+                # 其他就直接報錯
                 raise TypeError(
                     f'{loss_name} is not a tensor or list of tensors')
 
+        # 計算總損失，這裡會將key當中含有loss的value全部相加，也就是正確率的部分不會被加進來
         loss = sum(_value for _key, _value in log_vars.items()
                    if 'loss' in _key)
 
         # If the loss_vars has different length, raise assertion error
         # to prevent GPUs from infinite waiting.
         if dist.is_available() and dist.is_initialized():
+            # 分布式訓練會用到的
             log_var_length = torch.tensor(len(log_vars), device=loss.device)
             dist.all_reduce(log_var_length)
             message = (f'rank {dist.get_rank()}' +
@@ -204,14 +235,19 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
             assert log_var_length == len(log_vars) * dist.get_world_size(), \
                 'loss log variables are different across GPUs!\n' + message
 
+        # 將loss保存起來
         log_vars['loss'] = loss
+        # 遍歷log_vars當中的內容
         for loss_name, loss_value in log_vars.items():
             # reduce loss when distributed training
             if dist.is_available() and dist.is_initialized():
                 loss_value = loss_value.data.clone()
                 dist.all_reduce(loss_value.div_(dist.get_world_size()))
+            # 這裡將tensor的外皮去除，我們只需要當中的值就可以
             log_vars[loss_name] = loss_value.item()
 
+        # loss = 總損失值(float)
+        # log_vars = 損失值以及正確率(dict{str:float})
         return loss, log_vars
 
     def show_result(self,

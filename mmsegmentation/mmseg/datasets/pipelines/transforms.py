@@ -112,15 +112,29 @@ class Resize(object):
                  ratio_range=None,
                  keep_ratio=True,
                  min_size=None):
+        """
+        :param img_scale: 最終圖像輸入到網路中的大小，這裡如果是給tuple應該就是只一個範圍
+        :param multiscale_mode: 輸入到網路中是固定大小或是一個範圍，這裡預設會是一個範圍也就是多尺度的訓練
+        :param ratio_range: 高寬比的範圍
+        :param keep_ratio: 在進行縮放時是否保留原始圖像的比例，也就是不會改變原始圖像的比例
+        :param min_size: 最小尺寸，有些網路模型不支援過小的圖像
+        """
+        # 已看過
+        # 主要就是在改變圖像的大小尺寸
+
         if img_scale is None:
+            # 如果沒有設定img_scale就設定成None
             self.img_scale = None
         else:
             if isinstance(img_scale, list):
+                # 如果是list就直接記錄下來就可了
                 self.img_scale = img_scale
             else:
+                # 如果是tuple就在外面多加上一層，變成list(tuple)
                 self.img_scale = [img_scale]
             assert mmcv.is_list_of(self.img_scale, tuple)
 
+        # 根據有沒有傳入ratio_range會分成四種resize的方法，這裡會檢查是否不合法的參數傳入
         if ratio_range is not None:
             # mode 1: given img_scale=None and a range of image ratio
             # mode 2: given a scale and a range of image ratio
@@ -129,6 +143,7 @@ class Resize(object):
             # mode 3 and 4: given multiple scales or a range of scales
             assert multiscale_mode in ['value', 'range']
 
+        # 將剩下的部分記錄下來
         self.multiscale_mode = multiscale_mode
         self.ratio_range = ratio_range
         self.keep_ratio = keep_ratio
@@ -397,6 +412,16 @@ class Pad(object):
                  size_divisor=None,
                  pad_val=0,
                  seg_pad_val=255):
+        """
+        :param size: 經過padding後圖像應該要的大小
+        :param size_divisor: 預設為None
+        :param pad_val: 對於要輸入到網路當中要填充的值，預設為0
+        :param seg_pad_val: 對於正確的圖像要填充的值，預設為255
+        """
+        # 已看過
+        # 主要是透過padding將圖像大小不足的部分透過填充擴大圖像大小
+
+        # 將一些變數進行保留
         self.size = size
         self.size_divisor = size_divisor
         self.pad_val = pad_val
@@ -461,6 +486,15 @@ class Normalize(object):
     """
 
     def __init__(self, mean, std, to_rgb=True):
+        """
+        :param mean: 均值
+        :param std: 方差
+        :param to_rgb: 是否轉換成RGB，因為cv2載入圖像時會是BGR
+        """
+        # 已看過
+        # 主要是調整圖像的均值以及方差，同時也可以決定是否轉換成RGB格式
+
+        # 將變數保留下來
         self.mean = np.array(mean, dtype=np.float32)
         self.std = np.array(std, dtype=np.float32)
         self.to_rgb = to_rgb
@@ -591,7 +625,17 @@ class RandomCrop(object):
     """
 
     def __init__(self, crop_size, cat_max_ratio=1., ignore_index=255):
+        """
+        :param crop_size: 隨機剪裁後的圖像大小
+        :param cat_max_ratio:
+        :param ignore_index: 哪個index是可以忽略掉的
+        """
+        # 已看過
+        # 進行隨機剪裁
+
+        # 剪裁後的圖像大小必須大於0
         assert crop_size[0] > 0 and crop_size[1] > 0
+        # 將參數保留下來
         self.crop_size = crop_size
         self.cat_max_ratio = cat_max_ratio
         self.ignore_index = ignore_index
@@ -883,6 +927,16 @@ class PhotoMetricDistortion(object):
                  contrast_range=(0.5, 1.5),
                  saturation_range=(0.5, 1.5),
                  hue_delta=18):
+        """
+        :param brightness_delta: 亮度的delta值
+        :param contrast_range: 對比度的範圍
+        :param saturation_range: 飽和度的範圍
+        :param hue_delta: hue的delta值
+        """
+        # 已看過
+        # 這裡主要就是對圖像的彩度亮度以及飽和度進行調整，圖像增強的方法之一
+
+        # 將值保留下來
         self.brightness_delta = brightness_delta
         self.contrast_lower, self.contrast_upper = contrast_range
         self.saturation_lower, self.saturation_upper = saturation_range

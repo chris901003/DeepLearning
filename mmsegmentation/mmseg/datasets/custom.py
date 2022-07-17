@@ -92,7 +92,27 @@ class CustomDataset(Dataset):
                  palette=None,
                  gt_seg_map_loader_cfg=None,
                  file_client_args=dict(backend='disk')):
+        """
+        :param pipeline: 存放對資料集處理的流程，這裡會是list裡面會是dict，每個dict會有自己的type表示要處理的方式
+        :param img_dir: 圖像路徑
+        :param img_suffix: 圖像的後綴(副檔名)
+        :param ann_dir: 標註文件的檔案路徑
+        :param seg_map_suffix: 分割圖的檔案名稱後綴，這裡因為這個資料集比較奇特，一個照片會有兩個分割的圖片，所以是指定後綴
+        :param split: 如果設定為None，就會將原始圖像以及正確結果圖像的資料夾內的所有檔案都載入，預設為None
+        :param data_root: 檔案資料夾的根路徑，img_dir與ann_dir會接在這個後面
+        :param test_mode: 當test_mode為True時，就不會載入正確的分割圖像，預設為False
+        :param ignore_index: 哪個數字是要被當作忽略掉的，預設為255
+        :param reduce_zero_label: 是否將0視為忽略值，這裡預設為False
+        :param classes: 預設為None
+        :param palette: 如果沒有給定的話就會自動生成，估計是調色盤要用的
+        :param gt_seg_map_loader_cfg:
+        :param file_client_args:
+        """
+        # 已看過
+
+        # 透過Compose後self.pipeline裡面就存放了一系列對資料集的處理方式，這個是一系列的從一開始的讀取圖片到最後統整資料
         self.pipeline = Compose(pipeline)
+        # 保存傳入的參數
         self.img_dir = img_dir
         self.img_suffix = img_suffix
         self.ann_dir = ann_dir
@@ -103,8 +123,11 @@ class CustomDataset(Dataset):
         self.ignore_index = ignore_index
         self.reduce_zero_label = reduce_zero_label
         self.label_map = None
+        # self.CLASSES = tuple(str)，tuple的長度就是分類類別數，str就是類別名稱
+        # self.PALETTE = list(list)，list的長度會與CLASSES相同，裏面的list就是RGB，每個對應上就是要顯示的顏色
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(
             classes, palette)
+        # 根據有沒有傳入gt_seg_map_loader_cfg決定
         self.gt_seg_map_loader = LoadAnnotations(
         ) if gt_seg_map_loader_cfg is None else LoadAnnotations(
             **gt_seg_map_loader_cfg)
@@ -117,15 +140,20 @@ class CustomDataset(Dataset):
                 '`cls.CLASSES` or `classes` should be specified when testing'
 
         # join paths if data_root is specified
+        # 如果有指定的root路徑位置就會在這裡將完整路徑添上
         if self.data_root is not None:
             if not osp.isabs(self.img_dir):
+                # 如果img_dir傳入的不是絕對路徑，就會將root添加上去
                 self.img_dir = osp.join(self.data_root, self.img_dir)
             if not (self.ann_dir is None or osp.isabs(self.ann_dir)):
+                # 如果ann_dir傳入的不是絕對路徑，就會將root添加上去
                 self.ann_dir = osp.join(self.data_root, self.ann_dir)
             if not (self.split is None or osp.isabs(self.split)):
+                # 如果split傳入的不是絕對路徑，就會將root添加上去
                 self.split = osp.join(self.data_root, self.split)
 
-        # load annotations
+        # load annotations，載入標註檔案
+        # img_infos = list[dict{'filename': str, 'ann': {'seg_map': str}}]，img_infos長度就是圖片的張數
         self.img_infos = self.load_annotations(self.img_dir, self.img_suffix,
                                                self.ann_dir,
                                                self.seg_map_suffix, self.split)
@@ -150,9 +178,18 @@ class CustomDataset(Dataset):
         Returns:
             list[dict]: All image info of dataset.
         """
+        # 已看過
+        # 主要是將標註訊息讀入
 
+        # img_dir = 原始圖像資料夾檔案位置
+        # img_suffix = 原始圖像檔案名稱後綴(.png, .jpg)
+        # ann_dir = 標註圖像資料夾檔案位置
+        # seg_map_suffix = 標註圖像檔案後綴(.png, .jpg)，但可能會遇到特殊資料集會有不同
+
+        # img_infos = 保存原始圖像名稱以及標註圖像名稱
         img_infos = []
         if split is not None:
+            # 通常來說是不會用到split，只要資料夾內的檔案都是我們需要的就不會需要用到
             lines = mmcv.list_from_file(
                 split, file_client_args=self.file_client_args)
             for line in lines:
@@ -168,14 +205,24 @@ class CustomDataset(Dataset):
                     list_dir=False,
                     suffix=img_suffix,
                     recursive=True):
+                # img = 原始照片的檔案名稱，這裡是名稱不是路徑
+                # img_info = dict格式，裏面存了資料圖像的相關資訊
                 img_info = dict(filename=img)
                 if ann_dir is not None:
+                    # 如果有標註訊息就會添加上
+                    # 標註圖像的檔案名稱就是將原始圖像的後綴改成標註圖像的後綴
                     seg_map = img.replace(img_suffix, seg_map_suffix)
+                    # 將資料存放進去，這裡會是在key=ann底下添加一個dict且有seg_map這個key裏面的value才是標註圖像的檔案名稱
                     img_info['ann'] = dict(seg_map=seg_map)
+                # 將結果保存到img_infos當中
                 img_infos.append(img_info)
+            # img_infos = list[dict{'filename': str, 'ann': {'seg_map': str}}]，img_infos長度就是圖片的張數
+            # 根據filename進行排序，這樣可以保證每個人的輸出順序會是相同的
             img_infos = sorted(img_infos, key=lambda x: x['filename'])
 
+        # 打印一些資訊同時也會記錄下來
         print_log(f'Loaded {len(img_infos)} images', logger=get_root_logger())
+        # 回傳img_infos
         return img_infos
 
     def get_ann_info(self, idx):
@@ -326,7 +373,12 @@ class CustomDataset(Dataset):
                 The palette of segmentation map. If None is given, random
                 palette will be generated. Default: None
         """
+        # classes = 如果沒有傳入就會用資料集自帶的預設CLASSES，這個是每個資料集都會有不同預設的，也可以傳入一個檔案裡面每一條表示有一種分類
+        # palette = 如果給定的是None就會隨機生成，不過資料集也是有預設的值，在self裏面可以找到PALETTE，不確定是否會優先使用
+
         if classes is None:
+            # 如果沒有傳入自訂的classes就直接使用資料集預設的值，這裡就直接回傳
+            # 這裡我們就先全部使用預設的就可以了
             self.custom_classes = False
             return self.CLASSES, self.PALETTE
 

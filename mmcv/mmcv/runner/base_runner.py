@@ -61,10 +61,27 @@ class BaseRunner(metaclass=ABCMeta):
                  meta: Optional[Dict] = None,
                  max_iters: Optional[int] = None,
                  max_epochs: Optional[int] = None) -> None:
+        """
+        :param model: 模型本身
+        :param batch_processor: 是一個可以呼叫的函數，用來處理一個batch的資料用的，預設為None
+        :param optimizer: 優化器實例對象，通常會是一個torch.optim.Optimizer的實例對象
+        :param work_dir: 資料集的檔案位置
+        :param logger: 紀錄log使用的東西，對我們來說並不是很重要
+        :param meta: 也是用來紀錄使用的，對我們來說並不是很重要
+        :param max_iters: 最大的迭代數量
+        :param max_epochs: 總共需要迭代多少個epoch
+        """
+        # 已看過
+        # 這個class實現四個api
+        # run(), train(), val(), save_checkpoint()
+
         if batch_processor is not None:
+            # 如果有傳入batch_processor會進來
             if not callable(batch_processor):
+                # 如果是不能call的class就會報錯
                 raise TypeError('batch_processor must be callable, '
                                 f'but got {type(batch_processor)}')
+            # 會跳出警告表示該方法已經要被淘汰
             warnings.warn(
                 'batch_processor is deprecated, please implement '
                 'train_step() and val_step() in the model instead.',
@@ -82,48 +99,59 @@ class BaseRunner(metaclass=ABCMeta):
         else:
             assert hasattr(model, 'train_step')
 
+        # 下面就是一系列的檢查，如果都是正常的config文件就不會有任何問題
         # check the type of `optimizer`
         if isinstance(optimizer, dict):
+            # 如果優化器是dict格式就遍歷每個優化器，查看是否都是Optimizer類
             for name, optim in optimizer.items():
                 if not isinstance(optim, Optimizer):
                     raise TypeError(
                         f'optimizer must be a dict of torch.optim.Optimizers, '
                         f'but optimizer["{name}"] is a {type(optim)}')
         elif not isinstance(optimizer, Optimizer) and optimizer is not None:
+            # 如果只有一個就直接檢查就可以了
             raise TypeError(
                 f'optimizer must be a torch.optim.Optimizer object '
                 f'or dict or None, but got {type(optimizer)}')
 
         # check the type of `logger`
         if not isinstance(logger, logging.Logger):
+            # 檢查logger的類型
             raise TypeError(f'logger must be a logging.Logger object, '
                             f'but got {type(logger)}')
 
         # check the type of `meta`
         if meta is not None and not isinstance(meta, dict):
+            # 檢查meta的類型
             raise TypeError(
                 f'meta must be a dict or None, but got {type(meta)}')
 
+        # 將傳入的資料進行保存
         self.model = model
         self.batch_processor = batch_processor
         self.optimizer = optimizer
         self.logger = logger
         self.meta = meta
-        # create work_dir
+        # create work_dir，檢查保存資料夾是否存在，如果不存在就創建一個
         if isinstance(work_dir, str):
+            # 如果有指定路徑就檢查是否存在，如果不存在就進行創建
             self.work_dir: Optional[str] = osp.abspath(work_dir)
             mmcv.mkdir_or_exist(self.work_dir)
         elif work_dir is None:
+            # 如果是None就是不保存訓練過程以及結果
             self.work_dir = None
         else:
+            # 其他輸入型態就直接報錯
             raise TypeError('"work_dir" must be a str or None')
 
         # get model name from the model class
+        # 獲取使用的模型名稱
         if hasattr(self.model, 'module'):
             self._model_name = self.model.module.__class__.__name__
         else:
             self._model_name = self.model.__class__.__name__
 
+        # 一些有的沒的的資料
         self._rank, self._world_size = get_dist_info()
         self.timestamp = get_time_str()
         self.mode: Optional[str] = None
@@ -133,9 +161,11 @@ class BaseRunner(metaclass=ABCMeta):
         self._inner_iter = 0
 
         if max_epochs is not None and max_iters is not None:
+            # 不能同時設定max_epochs以及max_iters，否則這裡會報錯
             raise ValueError(
                 'Only one of `max_epochs` or `max_iters` can be set.')
 
+        # 保存資料
         self._max_epochs = max_epochs
         self._max_iters = max_iters
         # TODO: Redesign LogBuffer, it is not flexible and elegant enough
@@ -313,7 +343,13 @@ class BaseRunner(metaclass=ABCMeta):
             fn_name (str): The function name in each hook to be called, such as
                 "before_train_epoch".
         """
+        # 已看過
+        # 主要是在呼叫指定時間的鉤子函數，所謂的指定時間就是像是before_run之類的
+        # fn_name = 指定當前要使用哪個時間的鉤子函數
+
+        # 遍歷所有的鉤子函數
         for hook in self._hooks:
+            # 透過getattr獲取指定時間的鉤子函數
             getattr(hook, fn_name)(self)
 
     def get_hook_info(self) -> str:
@@ -410,10 +446,15 @@ class BaseRunner(metaclass=ABCMeta):
         self.logger.info('resumed epoch %d, iter %d', self.epoch, self.iter)
 
     def register_lr_hook(self, lr_config: Union[Dict, Hook, None]) -> None:
+        # 已看過
+        # 構建lr的鉤子函數
         if lr_config is None:
+            # 如果沒有傳入config就直接return
             return
         elif isinstance(lr_config, dict):
+            # 如果傳入的是dict就找出當中的policy，表示要使用的學習率調整方式
             assert 'policy' in lr_config
+            # 取出policy的value
             policy_type = lr_config.pop('policy')
             # If the type of policy is all in lower case, e.g., 'cyclic',
             # then its first letter will be capitalized, e.g., to be 'Cyclic'.
@@ -421,10 +462,13 @@ class BaseRunner(metaclass=ABCMeta):
             # Since this is not applicable for `
             # CosineAnnealingLrUpdater`,
             # the string will not be changed if it contains capital letters.
+            # 調整大小寫
             if policy_type == policy_type.lower():
                 policy_type = policy_type.title()
             hook_type = policy_type + 'LrUpdaterHook'
+            # 將要使用的type放到lr_config當中，這樣才可以透過build_from_cfg進行構建
             lr_config['type'] = hook_type
+            # 構建鉤子實例對象
             hook = mmcv.build_from_cfg(lr_config, HOOKS)
         else:
             hook = lr_config
@@ -454,10 +498,13 @@ class BaseRunner(metaclass=ABCMeta):
 
     def register_optimizer_hook(
             self, optimizer_config: Union[Dict, Hook, None]) -> None:
+        # 已看過
         if optimizer_config is None:
             return
         if isinstance(optimizer_config, dict):
+            # 如果傳入的是dict就檢查是否有type，如果沒有就直接加上一個且value為OptimizerHook
             optimizer_config.setdefault('type', 'OptimizerHook')
+            # 透過build_from_cfg進行實例化
             hook = mmcv.build_from_cfg(optimizer_config, HOOKS)
         else:
             hook = optimizer_config
@@ -465,9 +512,12 @@ class BaseRunner(metaclass=ABCMeta):
 
     def register_checkpoint_hook(
             self, checkpoint_config: Union[Dict, Hook, None]) -> None:
+        # 已看過
+        # checkpoint_config = 檢查點相關的設定資料
         if checkpoint_config is None:
             return
         if isinstance(checkpoint_config, dict):
+            # 如果沒有type就給一個CheckpointHook的類型
             checkpoint_config.setdefault('type', 'CheckpointHook')
             hook = mmcv.build_from_cfg(checkpoint_config, HOOKS)
         else:
@@ -475,10 +525,14 @@ class BaseRunner(metaclass=ABCMeta):
         self.register_hook(hook, priority='NORMAL')
 
     def register_logger_hooks(self, log_config: Optional[Dict]) -> None:
+        # 已看過
         if log_config is None:
             return
+        # 獲取多少個iter會進行log紀錄
         log_interval = log_config['interval']
+        # log_config當中可能會有多個hooks，所以這裡用遍歷的
         for info in log_config['hooks']:
+            # 透過build_from_cfg將hook進行實例化
             logger_hook = mmcv.build_from_cfg(
                 info, HOOKS, default_args=dict(interval=log_interval))
             self.register_hook(logger_hook, priority='VERY_LOW')
@@ -487,6 +541,9 @@ class BaseRunner(metaclass=ABCMeta):
         self,
         timer_config: Union[Dict, Hook, None],
     ) -> None:
+        # 已看過
+        # timer_config = 在預設情況下會直接傳入鉤子函數，所以就可以直接使用就可以了
+        # 不需要再透過build_from_cfg去找到對應的函數
         if timer_config is None:
             return
         if isinstance(timer_config, dict):
@@ -557,6 +614,20 @@ class BaseRunner(metaclass=ABCMeta):
         If custom hooks have same priority with default hooks, custom hooks
         will be triggered after default hooks.
         """
+
+        """
+        :param lr_config: 跟學習率相關的設定資料
+        :param optimizer_config: 跟優化器設定相關的資料
+        :param checkpoint_config: 保存點相關資料
+        :param log_config: log保存相關設定
+        :param momentum_config: momentum相關設定，預設為None
+        :param timer_config: 時間相關的鉤子
+        :param custom_hooks_config: 自定義鉤子
+        :return:
+        """
+        # 已看過
+
+        # 以下開始創建各種鉤子函數，將對應到的設定檔放入到函數當中進行初始化
         self.register_lr_hook(lr_config)
         self.register_momentum_hook(momentum_config)
         self.register_optimizer_hook(optimizer_config)

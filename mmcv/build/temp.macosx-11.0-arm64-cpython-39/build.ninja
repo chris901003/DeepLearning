@@ -1,0 +1,86 @@
+ninja_required_version = 1.3
+cxx = clang++
+
+cflags = -Wno-unused-result -Wsign-compare -Wunreachable-code -DNDEBUG -fwrapv -O2 -Wall -fPIC -O2 -isystem /Users/huanghongyan/miniforge3/envs/torch/include -arch arm64 -fPIC -O2 -isystem /Users/huanghongyan/miniforge3/envs/torch/include -arch arm64 -stdlib=libc++ -I/Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/common -I/Users/huanghongyan/miniforge3/envs/torch/lib/python3.9/site-packages/torch/include -I/Users/huanghongyan/miniforge3/envs/torch/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -I/Users/huanghongyan/miniforge3/envs/torch/lib/python3.9/site-packages/torch/include/TH -I/Users/huanghongyan/miniforge3/envs/torch/lib/python3.9/site-packages/torch/include/THC -I/Users/huanghongyan/miniforge3/envs/torch/include/python3.9 -c
+post_cflags = -std=c++14 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_clang"' '-DPYBIND11_STDLIB="_libcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1002"' -DTORCH_EXTENSION_NAME=_ext -D_GLIBCXX_USE_CXX11_ABI=0
+ldflags = 
+
+rule compile
+  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags
+  depfile = $out.d
+  deps = gcc
+
+
+
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/active_rotated_filter.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/active_rotated_filter.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/assign_score_withk.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/assign_score_withk.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/ball_query.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/ball_query.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/bbox_overlaps.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/bbox_overlaps.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/border_align.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/border_align.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/box_iou_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/box_iou_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/carafe.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/carafe.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/carafe_naive.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/carafe_naive.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/chamfer_distance.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/chamfer_distance.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/contour_expand.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/contour_expand.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/convex_iou.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/convex_iou.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/correlation.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/correlation.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/active_rotated_filter.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/active_rotated_filter.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/box_iou_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/box_iou_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/deform_conv.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/deform_conv.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/modulated_deform_conv.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/modulated_deform_conv.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/nms.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/nms.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/nms_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/nms_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/pixel_group.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/pixel_group.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/points_in_boxes.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/points_in_boxes.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/psamask.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/psamask.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/roi_align.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/roi_align.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/roi_align_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/roi_align_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/rotated_feature_align.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/rotated_feature_align.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/sparse_indice.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/sparse_indice.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/sparse_maxpool.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/sparse_maxpool.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/sparse_reordering.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/sparse_reordering.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/cpu/voxelization.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/cpu/voxelization.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/deform_conv.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/deform_conv.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/deform_roi_pool.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/deform_roi_pool.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/diff_iou_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/diff_iou_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/focal_loss.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/focal_loss.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/furthest_point_sample.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/furthest_point_sample.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/fused_bias_leakyrelu.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/fused_bias_leakyrelu.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/fused_spconv_ops.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/fused_spconv_ops.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/gather_points.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/gather_points.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/group_points.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/group_points.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/info.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/info.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/iou3d.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/iou3d.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/knn.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/knn.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/masked_conv2d.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/masked_conv2d.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/min_area_polygons.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/min_area_polygons.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/modulated_deform_conv.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/modulated_deform_conv.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/ms_deform_attn.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/ms_deform_attn.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/nms.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/nms.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/nms_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/nms_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/pixel_group.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/pixel_group.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/points_in_boxes.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/points_in_boxes.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/points_in_polygons.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/points_in_polygons.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/psamask.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/psamask.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/pybind.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/pybind.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/riroi_align_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/riroi_align_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/roi_align.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/roi_align.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/roi_align_rotated.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/roi_align_rotated.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/roi_pool.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/roi_pool.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/roiaware_pool3d.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/roiaware_pool3d.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/roipoint_pool3d.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/roipoint_pool3d.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/rotated_feature_align.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/rotated_feature_align.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/scatter_points.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/scatter_points.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/sparse_pool_ops.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/sparse_pool_ops.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/spconv_ops.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/spconv_ops.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/sync_bn.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/sync_bn.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/three_interpolate.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/three_interpolate.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/three_nn.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/three_nn.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/tin_shift.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/tin_shift.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/upfirdn2d.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/upfirdn2d.cpp
+build /Users/huanghongyan/Documents/DeepLearning/mmcv/build/temp.macosx-11.0-arm64-cpython-39/./mmcv/ops/csrc/pytorch/voxelization.o: compile /Users/huanghongyan/Documents/DeepLearning/mmcv/mmcv/ops/csrc/pytorch/voxelization.cpp
+
+
+
+
+

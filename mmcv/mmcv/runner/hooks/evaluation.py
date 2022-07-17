@@ -204,9 +204,12 @@ class EvalHook(Hook):
             self.compare_func = self.rule_map[self.rule]
 
     def before_run(self, runner):
+        # 已看過
         if not self.out_dir:
+            # 如果沒有指定的輸出就會與runner當中指定的位置相同
             self.out_dir = runner.work_dir
 
+        # 設定儲存設備相關的東西
         self.file_client = FileClient.infer_client(self.file_client_args,
                                                    self.out_dir)
 
@@ -222,10 +225,14 @@ class EvalHook(Hook):
                 f'{self.file_client.name}')
 
         if self.save_best is not None:
+            # 如果有設定要保存最佳結果就會進來
             if runner.meta is None:
+                # 如果沒有meta就會創建一個空的，正常來說都會有所以不會在這裡創建空的
                 warnings.warn('runner.meta is None. Creating an empty one.')
                 runner.meta = dict()
+            # 在meta當中新增一個資訊
             runner.meta.setdefault('hook_msgs', dict())
+            # 獲取最佳結果儲存的檔案位置
             self.best_ckpt_path = runner.meta['hook_msgs'].get(
                 'best_ckpt', None)
 

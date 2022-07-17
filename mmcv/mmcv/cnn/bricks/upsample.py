@@ -68,20 +68,32 @@ def build_upsample_layer(cfg: Dict, *args, **kwargs) -> nn.Module:
     Returns:
         nn.Module: Created upsample layer.
     """
+    # 已看過
+
+    # cfg = 上採樣設定檔
+    # kwargs = 一些參數，因為會先透過上採樣後在與其他層進行融合，所以這裡需要將channel以及特徵圖大小設定到與之後融合的特徵圖相同
+
     if not isinstance(cfg, dict):
+        # 檢查cfg必須為dict格式，如果不是這裡會報錯
         raise TypeError(f'cfg must be a dict, but got {type(cfg)}')
     if 'type' not in cfg:
+        # 如果cfg當中沒有type就會報錯
         raise KeyError(
             f'the cfg dict must contain the key "type", but got {cfg}')
+    # 複製cfg到cfg_當中
     cfg_ = cfg.copy()
 
+    # 取出要上採樣的方式
     layer_type = cfg_.pop('type')
     if layer_type not in UPSAMPLE_LAYERS:
+        # 如果上採樣的方式不再UPSAMPLE_LAYERS當中就會在這裡報錯
         raise KeyError(f'Unrecognized upsample type {layer_type}')
     else:
+        # 獲取upsample class
         upsample = UPSAMPLE_LAYERS.get(layer_type)
 
     if upsample is nn.Upsample:
         cfg_['mode'] = layer_type
+    # layer = upsample實例對象，將參數傳入class當中進行初始化
     layer = upsample(*args, **kwargs, **cfg_)
     return layer

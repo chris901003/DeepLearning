@@ -37,9 +37,17 @@ class DefaultRunnerConstructor:
     """
 
     def __init__(self, runner_cfg: dict, default_args: Optional[dict] = None):
+        """
+        :param runner_cfg: runner相關的設定參數，保括使用哪種runner
+        :param default_args: 裏面包含許多資料，有完整模型，優化器，資料集檔案位置，logger以及meta
+        """
+        # 已看過
+
+        # 檢查runner_cfg型態是否為dict
         if not isinstance(runner_cfg, dict):
             raise TypeError('runner_cfg should be a dict',
                             f'but got {type(runner_cfg)}')
+        # 保存傳入的變量
         self.runner_cfg = runner_cfg
         self.default_args = default_args
 

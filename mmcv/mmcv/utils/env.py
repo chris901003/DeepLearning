@@ -36,6 +36,8 @@ def collect_env():
             - MMCV Compiler: The GCC version for compiling MMCV ops.
             - MMCV CUDA Compiler: The CUDA version for compiling MMCV ops.
     """
+    # 已看過
+    # 就是在收集以上的資訊，詳細可以看上面的Returns的內容
     env_info = {}
     env_info['sys.platform'] = sys.platform
     env_info['Python'] = sys.version.replace('\n', '')

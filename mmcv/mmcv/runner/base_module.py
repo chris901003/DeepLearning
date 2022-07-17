@@ -32,6 +32,11 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
 
     def __init__(self, init_cfg: Optional[dict] = None):
         """Initialize BaseModule, inherited from `torch.nn.Module`"""
+        # 已看過
+        # init_cfg = 用來設定初始化方法的，預設會是None
+
+        # BaseModule是MMCV最底層的模型class就像是torch.nn.Module一樣
+        # 同時BaseModule也是繼承於torch.nn.Module，後面還有一個metaclass這個我們可以不用知道是什麼
 
         # NOTE init_cfg can be defined in different levels, but init_cfg
         # in low levels has a higher priority.
@@ -41,6 +46,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         # in init_weights() function
         self._is_init = False
 
+        # 記錄下init_cfg的內容，預設會是None
         self.init_cfg = copy.deepcopy(init_cfg)
 
         # Backward compatibility in derived classes
@@ -55,10 +61,13 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
 
     def init_weights(self) -> None:
         """Initialize the weights."""
+        # 已看過
+        # 初始化權重
 
         is_top_level_module = False
         # check if it is top-level module
         if not hasattr(self, '_params_init_info'):
+            # 當如果沒有_params_init_info就會進入到這裡記錄下最一開始時的權重參數
             # The `_params_init_info` is used to record the initialization
             # information of the parameters
             # the key should be the obj:`nn.Parameter` of model and the value
@@ -68,13 +77,16 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
             #       which indicates whether the parameter has been modified.
             # this attribute would be deleted after all parameters
             # is initialized.
+            # 構建出一個dict到self當中
             self._params_init_info: defaultdict = defaultdict(dict)
+            # 標記為最上層結構
             is_top_level_module = True
 
             # Initialize the `_params_init_info`,
             # When detecting the `tmp_mean_value` of
             # the corresponding parameter is changed, update related
             # initialization information
+            # 遍歷所有層結構記錄下原始權重
             for name, param in self.named_parameters():
                 self._params_init_info[param][
                     'init_info'] = f'The value is the same before and ' \
@@ -87,19 +99,23 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
             # All submodules share the same `params_init_info`,
             # so it will be updated when parameters are
             # modified at any level of the model.
+            # 將剛才紀錄好的初始權重放到所有的模塊當中，這樣其他模塊也會有相同的資料
             for sub_module in self.modules():
                 sub_module._params_init_info = self._params_init_info
 
         # Get the initialized logger, if not exist,
         # create a logger named `mmcv`
+        # 獲取logger的名稱
         logger_names = list(logger_initialized.keys())
         logger_name = logger_names[0] if logger_names else 'mmcv'
 
         from ..cnn import initialize
         from ..cnn.utils.weight_init import update_init_info
+        # 獲取總模型的架構名稱
         module_name = self.__class__.__name__
         if not self._is_init:
             if self.init_cfg:
+                # 如果有指定的初始化方式就會從這裡進來
                 print_log(
                     f'initialize {module_name} with init_cfg {self.init_cfg}',
                     logger=logger_name)
@@ -113,6 +129,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
                         return
 
             for m in self.children():
+                # 遞歸往下去初始化下面層結構
                 if hasattr(m, 'init_weights'):
                     m.init_weights()
                     # users may overload the `init_weights`

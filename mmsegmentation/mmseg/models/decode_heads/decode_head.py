@@ -71,8 +71,29 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
                  align_corners=False,
                  init_cfg=dict(
                      type='Normal', std=0.01, override=dict(name='conv_seg'))):
+        """
+        :param in_channels: 輸入的channel
+        :param channels: 輸出的channel，這裡還不會是最後分類類別數的數量
+        :param num_classes: 最後輸出的channel，也就是最後的分類類別數
+        :param dropout_ratio: dropout的概率值
+        :param conv_cfg: 卷積設定資料
+        :param norm_cfg: 標準化層結構的設定
+        :param act_cfg: 激活函數的設定
+        :param in_index: 輸入特徵圖的index(?)
+        :param input_transform: 如果有要將多層的特徵層一起放到解碼頭就會設定融合的方式
+        :param loss_decode: 損失計算的設定
+        :param ignore_index: 在分割時哪個值在計算損失時不會納入，就是物體邊緣交界處
+        :param sampler:
+        :param align_corners:
+        :param init_cfg: 初始化config
+        """
+        # 已看過
+
+        # 將init_cfg傳到繼承當中，BaseModule為MMCV當中最基底的Module
         super(BaseDecodeHead, self).__init__(init_cfg)
+        # _init_inputs = 檢查in_channels與in_index與input_transform之間有沒有錯誤，同時會將值進行保存
         self._init_inputs(in_channels, in_index, input_transform)
+        # 保存其他的變數
         self.channels = channels
         self.num_classes = num_classes
         self.dropout_ratio = dropout_ratio
@@ -84,25 +105,34 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         self.ignore_index = ignore_index
         self.align_corners = align_corners
 
+        # 構建損失計算方式
         if isinstance(loss_decode, dict):
+            # 如果是dict就直接構建
+            # self.loss_decode = 損失函數的實例對象
             self.loss_decode = build_loss(loss_decode)
         elif isinstance(loss_decode, (list, tuple)):
+            # 如果是list就遍歷list進行構建
             self.loss_decode = nn.ModuleList()
             for loss in loss_decode:
                 self.loss_decode.append(build_loss(loss))
         else:
+            # 如果loss_decode有其他型態這裡就直接報錯
             raise TypeError(f'loss_decode must be a dict or sequence of dict,\
                 but got {type(loss_decode)}')
 
+        # sampler相關的設定，這裡我們先跳過
         if sampler is not None:
             self.sampler = build_pixel_sampler(sampler, context=self)
         else:
             self.sampler = None
 
+        # 最後會再通過self.conv_seg將channel深度調整到最終深度，也就是channel=num_classes，這裡會用卷積核大小為1的做channel調整
         self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
         if dropout_ratio > 0:
+            # 如果有設定dropout_ratio就會有Dropout層
             self.dropout = nn.Dropout2d(dropout_ratio)
         else:
+            # 否則就會是None
             self.dropout = None
         self.fp16_enabled = False
 
@@ -133,22 +163,34 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
                     a list and passed into decode head.
                 None: Only one select feature map is allowed.
         """
+        # 已看過
+        # 該函數主要是在確認[in_channels,l in_index, input_transform]是否正確同時保存值
 
+        # 如果有要將多層的特徵層一起放到解碼頭就會設定融合的方式
         if input_transform is not None:
+            # 這裡只提供兩種方式，如果使用其他種就會在這裡報錯
             assert input_transform in ['resize_concat', 'multiple_select']
+        # 將融合方式保存下來
         self.input_transform = input_transform
+        # 輸入到解碼頭的特徵層的index
         self.in_index = in_index
         if input_transform is not None:
+            # 如果是要融合多個特徵層的話，in_channels以及in_index都是要list或是tuple型態
             assert isinstance(in_channels, (list, tuple))
             assert isinstance(in_index, (list, tuple))
+            # 同時in_channels與in_index是一組的，所以長度比需要一樣
             assert len(in_channels) == len(in_index)
+            # 這裡會有兩種融合模式，一種是透過拼接(需要將高寬調整成一樣)，另一種是透過multiple_select(不知道是什麼)
             if input_transform == 'resize_concat':
+                # 透過concat的最後通道數就會是所有特徵層channel的總和
                 self.in_channels = sum(in_channels)
             else:
                 self.in_channels = in_channels
         else:
+            # 如果只有將一個特徵層放到預測頭那麼in_channels與in_index都必須要是int格式
             assert isinstance(in_channels, int)
             assert isinstance(in_index, int)
+            # 保留in_channels
             self.in_channels = in_channels
 
     def _transform_inputs(self, inputs):
@@ -160,6 +202,8 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         Returns:
             Tensor: The transformed inputs
         """
+        # 已看過
+        # inputs = 多層特徵層，有不同的維度以及尺度的特徵圖
 
         if self.input_transform == 'resize_concat':
             inputs = [inputs[i] for i in self.in_index]
@@ -174,6 +218,7 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         elif self.input_transform == 'multiple_select':
             inputs = [inputs[i] for i in self.in_index]
         else:
+            # 如果都沒有設定任何特徵圖融合方式，就會使用指定的特徵圖的層數
             inputs = inputs[self.in_index]
 
         return inputs
@@ -200,7 +245,18 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        """
+        :param inputs: list類型，多層特徵層，有不大小以及深度的特徵層 
+        :param img_metas: list類型，圖像的詳細資料
+        :param gt_semantic_seg: tensor類型，堆疊了標註好的圖像的tensor 
+        :param train_cfg: 訓練的一些配置，這裡預設會是空
+        :return: 
+        """
+        # 已看過
+        # 使用forward函數進行向前傳播獲取最後的輸出結果
+        # seg_logits shape = [batch_size, channel=num_classes, height, width]
         seg_logits = self.forward(inputs)
+        # 將最終輸出與標註圖進行損失計算
         losses = self.losses(seg_logits, gt_semantic_seg)
         return losses
 
@@ -223,15 +279,25 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
 
     def cls_seg(self, feat):
         """Classify each pixel."""
+        # 已看過
+        # 最終輸出將channel調整到與num_classes相同
         if self.dropout is not None:
+            # 通過dropout層
             feat = self.dropout(feat)
+        # output shape = [batch_size, channel=num_classes, height, width]
         output = self.conv_seg(feat)
         return output
 
     @force_fp32(apply_to=('seg_logit', ))
     def losses(self, seg_logit, seg_label):
         """Compute segmentation loss."""
+        # 已看過，主要是用來計算segmentation損失使用的
+        # seg_logit = 透過模型計算出來的結果
+        # seg_label = 人工標記的結果
+
+        # 構建一個損失的字典
         loss = dict()
+        # 透過resize將seg_logit的高寬調整到與標註的圖像大小相同
         seg_logit = resize(
             input=seg_logit,
             size=seg_label.shape[2:],
@@ -241,26 +307,34 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
             seg_weight = self.sampler.sample(seg_logit, seg_label)
         else:
             seg_weight = None
+        # 將標註的tensor從第一個維度展平
+        # seg_label shape = [batch_size, height * width]
         seg_label = seg_label.squeeze(1)
 
         if not isinstance(self.loss_decode, nn.ModuleList):
+            # 如果當前的損失計算不是用list包裝起來，就在最外層加上list，主要是有時候需要多種損失計算，這樣才可以通用
             losses_decode = [self.loss_decode]
         else:
+            # 如果已經是用list包裝起來就直接拿過去用就可以
             losses_decode = self.loss_decode
+        # 遍歷所有的損失計算方式
         for loss_decode in losses_decode:
+            # 兩個操作都一樣只是開新的與相加的差別而已
             if loss_decode.loss_name not in loss:
+                # 如果該損失計算沒有在loss字典當中就需要在字典當中添加
                 loss[loss_decode.loss_name] = loss_decode(
                     seg_logit,
                     seg_label,
                     weight=seg_weight,
                     ignore_index=self.ignore_index)
             else:
+                # 如果該損失計算已經有在loss字典當中就直接相加
                 loss[loss_decode.loss_name] += loss_decode(
                     seg_logit,
                     seg_label,
                     weight=seg_weight,
                     ignore_index=self.ignore_index)
-
+        # 透過accuracy進行計算正確率
         loss['acc_seg'] = accuracy(
             seg_logit, seg_label, ignore_index=self.ignore_index)
         return loss

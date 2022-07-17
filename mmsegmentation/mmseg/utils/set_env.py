@@ -9,6 +9,8 @@ from ..utils import get_root_logger
 
 
 def setup_multi_processes(cfg):
+    # 已看過
+    # 設定一些關於多線程的東西
     """Setup multi-processing environment variables."""
     logger = get_root_logger()
 

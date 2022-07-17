@@ -10,6 +10,8 @@ def add_prefix(inputs, prefix):
 
         dict: The dict with keys updated with ``prefix``.
     """
+    # 已看過
+    # 更改dict當中的key使用的，透過添加prefix可以區別從哪裡輸出的
 
     outputs = dict()
     for name, value in inputs.items():

@@ -19,14 +19,27 @@ def fopen(filepath, *args, **kwargs):
 
 
 def check_file_exist(filename, msg_tmpl='file "{}" does not exist'):
+    """
+    :param filename: config檔案位置
+    :param msg_tmpl: 當config文件找不到時要輸出的提示文字
+    """
+    # 已看過
     if not osp.isfile(filename):
+        # 檢查config是否存在
         raise FileNotFoundError(msg_tmpl.format(filename))
 
 
 def mkdir_or_exist(dir_name, mode=0o777):
+    """
+    :param dir_name: 需要存在的資料夾路徑
+    :param mode: 資料夾權限設定
+    """
+    # 已看過
+
     if dir_name == '':
         return
     dir_name = osp.expanduser(dir_name)
+    # 如果資料夾不存在就會創建一個新的，如果已經存在就不會有任何操作
     os.makedirs(dir_name, mode=mode, exist_ok=True)
 
 

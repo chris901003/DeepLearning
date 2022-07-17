@@ -34,6 +34,16 @@ class LoadImageFromFile(object):
                  color_type='color',
                  file_client_args=dict(backend='disk'),
                  imdecode_backend='cv2'):
+        """
+        :param to_float32: 是否需要將圖像轉換成float32，如果為False就會是uint8的型態
+        :param color_type: 預設為color，目前不確定作用
+        :param file_client_args:
+        :param imdecode_backend: 用哪個模組開啟圖像，這裡預設用cv2
+        """
+        # 已看過
+        # 該class主要是用來從資料夾當中讀取照片
+
+        # 將傳入的值進行保存
         self.to_float32 = to_float32
         self.color_type = color_type
         self.file_client_args = file_client_args.copy()
@@ -106,6 +116,15 @@ class LoadAnnotations(object):
                  reduce_zero_label=False,
                  file_client_args=dict(backend='disk'),
                  imdecode_backend='pillow'):
+        """
+        :param reduce_zero_label: 是否要將所有的label的值減去一，主要是用在數據集0表示背景，預設為False
+        :param file_client_args: 跟著預設就行了，這裡作用不太清楚
+        :param imdecode_backend: 預設使用pillow進行圖像載入
+        """
+        # 已看過
+        # 該class主要目的是將標註好的圖像載入進來
+
+        # 將參數保留下來
         self.reduce_zero_label = reduce_zero_label
         self.file_client_args = file_client_args.copy()
         self.file_client = None

@@ -259,6 +259,8 @@ class Collect(object):
                  meta_keys=('filename', 'ori_filename', 'ori_shape',
                             'img_shape', 'pad_shape', 'scale_factor', 'flip',
                             'flip_direction', 'img_norm_cfg')):
+        # 已看過
+        # 通常來說會是在data loader的最後一步，這個就跟collect_func一樣的功能，對於資料做最後的統整
         self.keys = keys
         self.meta_keys = meta_keys
 

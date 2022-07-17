@@ -43,11 +43,17 @@ def infer_abbr(class_type):
     Returns:
         str: The inferred abbreviation.
     """
+    # 已看過
+    # 依據上面第一條內容這個函數主要是用來，從類名推斷縮寫
+
     if not inspect.isclass(class_type):
+        # 如果傳入的不是class類型在這裡就會報錯
         raise TypeError(
             f'class_type must be a type, but got {type(class_type)}')
     if hasattr(class_type, '_abbr_'):
+        # 如果已經有命名就依據裏面的命名回傳
         return class_type._abbr_
+    # 下面就是根據裏面用的標準化方式給定名稱
     if issubclass(class_type, _InstanceNorm):  # IN is a subclass of BN
         return 'in'
     elif issubclass(class_type, _BatchNorm):
@@ -90,35 +96,58 @@ def build_norm_layer(cfg: Dict,
         of abbreviation and postfix, e.g., bn1, gn. The second element is the
         created norm layer.
     """
+    # 已看過
+
+    # cfg = 標準化層的設定檔，裏面有指定的標準化層以及是否可以學習
+    # num_features = 進入標準化層的channel深度
+    # postfix = 在命名當中後面加上特殊標示，沒有特別重要
+
     if not isinstance(cfg, dict):
+        # 檢查cfg是否為dict格式，如果不是就會報錯
         raise TypeError('cfg must be a dict')
     if 'type' not in cfg:
+        # 檢查cfg當中有沒有type，沒有就會報錯
         raise KeyError('the cfg dict must contain the key "type"')
+    # 將cfg拷貝到cfg_當中
     cfg_ = cfg.copy()
 
+    # 取出要使用的標準化層
     layer_type = cfg_.pop('type')
     if layer_type not in NORM_LAYERS:
+        # 如果layer_type沒有在NORM_LAYERS當中這裡就會報錯
         raise KeyError(f'Unrecognized norm type {layer_type}')
 
+    # 獲取標準化層的類(假設我們需要的是BN，返回的就會是torch.nn.BatchNorm2d的class)，**這裡都不會是實例化對象
     norm_layer = NORM_LAYERS.get(layer_type)
+    # 將norm_layer放入判斷該class要給的名稱(假設傳入的是torch.nn.BatchNorm2d的class，abbr=BN)
     abbr = infer_abbr(norm_layer)
 
+    # 用來在名稱後面加上一些東西，沒有特別重要
     assert isinstance(postfix, (int, str))
     name = abbr + str(postfix)
 
+    # 檢查是否要將可學習打開，如果沒有特別設定默認就會是開啟學習
     requires_grad = cfg_.pop('requires_grad', True)
+    # 在cfg_當中加上eps的設定值，在進行標準化操作時的分佈修正項，預設就會是1e-5
     cfg_.setdefault('eps', 1e-5)
     if layer_type != 'GN':
+        # 如果不是GN就會往這裡
+        # layer = 標準化層實例化對象，**cfg_裏面應該就只會有一些設定的參數
         layer = norm_layer(num_features, **cfg_)
         if layer_type == 'SyncBN' and hasattr(layer, '_specify_ddp_gpu_num'):
+            # 如果使用的是SyncBn這裡會需要進行微調
             layer._specify_ddp_gpu_num(1)
     else:
+        # GN會往這裡
         assert 'num_groups' in cfg_
+        # 因為在pytorch當中num_channels不是在第一個，所以這裡要特別設定
         layer = norm_layer(num_channels=num_features, **cfg_)
 
+    # 設定是否啟用學習
     for param in layer.parameters():
         param.requires_grad = requires_grad
 
+    # 回傳標準化層名稱以及標準化層實例對象
     return name, layer
 
 

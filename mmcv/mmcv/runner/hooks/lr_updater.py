@@ -30,39 +30,58 @@ class LrUpdaterHook(Hook):
                  warmup_iters: int = 0,
                  warmup_ratio: float = 0.1,
                  warmup_by_epoch: bool = False) -> None:
+        """
+        :param by_epoch: 學習率是否依據一個epoch進行調整
+        :param warmup: 是否啟用暖身訓練，這裡直接傳入暖身方式，如果是None表示不啟用
+        :param warmup_iters: 暖身訓練的iter次數
+        :param warmup_ratio: 暖身訓練時的學習率倍率
+        :param warmup_by_epoch: 如果為True表示暖身訓練是用多少個epoch計算而不是iter
+        """
+        # 已看過
+        # 所有LR Scheduler繼承的對象
+
         # validate the "warmup" argument
         if warmup is not None:
+            # warmup的方式必須要是下列3種，不然會報錯
             if warmup not in ['constant', 'linear', 'exp']:
                 raise ValueError(
                     f'"{warmup}" is not a supported type for warming up, valid'
                     ' types are "constant", "linear" and "exp"')
         if warmup is not None:
+            # 如果有啟用warmup傳入的warmup_iters與warmup_ratio就必須要合法，不然這裡就會報錯
             assert warmup_iters > 0, \
                 '"warmup_iters" must be a positive integer'
             assert 0 < warmup_ratio <= 1.0, \
                 '"warmup_ratio" must be in range (0,1]'
 
+        # 保存相關資料
         self.by_epoch = by_epoch
         self.warmup = warmup
         self.warmup_iters: Optional[int] = warmup_iters
         self.warmup_ratio = warmup_ratio
         self.warmup_by_epoch = warmup_by_epoch
 
+        # 依據暖身訓練是iter或是epoch進行值的調整
         if self.warmup_by_epoch:
             self.warmup_epochs: Optional[int] = self.warmup_iters
             self.warmup_iters = None
         else:
             self.warmup_epochs = None
 
+        # 一些參數保存空間
         self.base_lr: Union[list, dict] = []  # initial lr for all param groups
         self.regular_lr: list = []  # expected lr if no warming up is performed
 
     def _set_lr(self, runner, lr_groups):
+        # 已看過
+        # 主要是在設定當前學習率，會在準備進行向前傳遞時更新
         if isinstance(runner.optimizer, dict):
+            # 如果有多個優化器會往這裡，分別對每個優化器進行更新
             for k, optim in runner.optimizer.items():
                 for param_group, lr in zip(optim.param_groups, lr_groups[k]):
                     param_group['lr'] = lr
         else:
+            # 如果只有一個優化器直接更新就可以了，將所有的學習率都設定到當前學習率
             for param_group, lr in zip(runner.optimizer.param_groups,
                                        lr_groups):
                 param_group['lr'] = lr
@@ -71,7 +90,9 @@ class LrUpdaterHook(Hook):
         raise NotImplementedError
 
     def get_regular_lr(self, runner: 'runner.BaseRunner'):
+        # 已看過
         if isinstance(runner.optimizer, dict):
+            # 如果optimizer是dict就會需要用遍歷的去得到原始學習率
             lr_groups = {}
             for k in runner.optimizer.keys():
                 _lr_group = [
@@ -82,6 +103,7 @@ class LrUpdaterHook(Hook):
 
             return lr_groups
         else:
+            # 如果只有單一一個optimizer就可以直接獲得，這裡調用的get_lr會是到指定的lr獲取class當中，不是正上方的那個
             return [self.get_lr(runner, _base_lr) for _base_lr in self.base_lr]
 
     def get_warmup_lr(self, cur_iters: int):
@@ -109,7 +131,12 @@ class LrUpdaterHook(Hook):
     def before_run(self, runner: 'runner.BaseRunner'):
         # NOTE: when resuming from a checkpoint, if 'initial_lr' is not saved,
         # it will be set according to the optimizer params
+        # 已看過
+        # before_run會在還沒有開始訓練的時候被調用，也就當before_run跑完後就會開始將資料放入到模型當中
+        # 這裡會傳入runner的資訊
+
         if isinstance(runner.optimizer, dict):
+            # 如果優化器是dict格式，我們就會需要用遍歷的方式
             self.base_lr = {}
             for k, optim in runner.optimizer.items():
                 for group in optim.param_groups:
@@ -119,8 +146,11 @@ class LrUpdaterHook(Hook):
                 ]
                 self.base_lr.update({k: _base_lr})
         else:
+            # 遍歷優化器當中需要訓練的參數組
             for group in runner.optimizer.param_groups:  # type: ignore
+                # 在每個組當中新增initial_lr且值為當前的學習率，也就是保存初始學習率
                 group.setdefault('initial_lr', group['lr'])
+            # self.base_lr = 保存初始學習率，保存在self當中
             self.base_lr = [
                 group['initial_lr']
                 for group in runner.optimizer.param_groups  # type: ignore
@@ -138,16 +168,24 @@ class LrUpdaterHook(Hook):
         self._set_lr(runner, self.regular_lr)
 
     def before_train_iter(self, runner: 'runner.BaseRunner'):
+        # 已看過
+        # 獲取當前的迭代數量
         cur_iter = runner.iter
+        # warmup_iters需要是整數型態，如果不是就會報錯
         assert isinstance(self.warmup_iters, int)
         if not self.by_epoch:
+            # 如果是以迭代多少個batch進行計算的會到這裡，通常是segmentation
+            # regular_lr = 正常現在的學習率，會是一個list，長度會與優化器的數量相同，因為一個優化器會對應上一種學習率
             self.regular_lr = self.get_regular_lr(runner)
             if self.warmup is None or cur_iter >= self.warmup_iters:
+                # 如果已經過了熱身階段或是沒有要啟用熱身訓練會在這裡
                 self._set_lr(runner, self.regular_lr)
             else:
+                # 如果使用熱身訓練會到這裡
                 warmup_lr = self.get_warmup_lr(cur_iter)
                 self._set_lr(runner, warmup_lr)
         elif self.by_epoch:
+            # 如果是以迭代多少個epoch進行計算就會到這裡，通常是object_detection
             if self.warmup is None or cur_iter > self.warmup_iters:
                 return
             elif cur_iter == self.warmup_iters:
@@ -237,11 +275,20 @@ class PolyLrUpdaterHook(LrUpdaterHook):
                  power: float = 1.,
                  min_lr: float = 0.,
                  **kwargs) -> None:
+        """
+        :param power: 每次調整會將當前學習率乘上的倍數
+        :param min_lr: 最小學習率，調整後的學習率不會小於該值
+        :param kwargs: 可能會有by_epoch之類的參數
+        """
+        # 已看過
         self.power = power
         self.min_lr = min_lr
+        # 該class繼承於LrUpdateHook
         super().__init__(**kwargs)
 
     def get_lr(self, runner: 'runner.BaseRunner', base_lr: float):
+        # 已看過
+        # 透過get_lr獲取當前的學習率，base_lr=原始學習率(最大學習率)
         if self.by_epoch:
             progress = runner.epoch
             max_progress = runner.max_epochs

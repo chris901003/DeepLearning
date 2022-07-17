@@ -55,10 +55,18 @@ class MMDataParallel(DataParallel):
         return scatter_kwargs(inputs, kwargs, device_ids, dim=self.dim)
 
     def train_step(self, *inputs, **kwargs):
+        # 已看過
+        # inputs = tuple(dict, optimizer)
+        # dict當中存了當前batch的詳細資訊，包含堆疊好的圖像tensor，以及標註好的tensor
+        # optimizer = 優化器
+        # kwargs = 大部分會是空的
         if not self.device_ids:
             # We add the following line thus the module could gather and
             # convert data containers as those in GPU inference
+            # 通過scatter後inputs與kwargs會在外面多一層tuple
             inputs, kwargs = self.scatter(inputs, kwargs, [-1])
+            # 因為會多一層tuple所以這裡取[0]，放到模型當中的train_step進行向前傳遞
+            # 這裡回傳的就是損失計算後的結果
             return self.module.train_step(*inputs[0], **kwargs[0])
 
         assert len(self.device_ids) == 1, \

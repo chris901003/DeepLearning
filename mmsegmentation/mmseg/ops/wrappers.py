@@ -11,6 +11,15 @@ def resize(input,
            mode='nearest',
            align_corners=None,
            warning=True):
+    """
+    :param input: tensor格式shape [batch_size, channel, height, width]
+    :param size: 要調整到的大小
+    :param scale_factor:
+    :param mode: 擴大圖像的方式
+    :param align_corners:
+    :param warning: 是否啟用警告
+    :return:
+    """
     if warning:
         if size is not None and align_corners:
             input_h, input_w = tuple(int(x) for x in input.shape[2:])
@@ -24,6 +33,7 @@ def resize(input,
                         'the output would more aligned if '
                         f'input size {(input_h, input_w)} is `x+1` and '
                         f'out size {(output_h, output_w)} is `nx+1`')
+    # 直接使用pytorch官方實現的差值上採樣
     return F.interpolate(input, size, scale_factor, mode, align_corners)
 
 

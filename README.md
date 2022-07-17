@@ -2,7 +2,7 @@
 
 ### pytorch_classification
 圖像分類相關程式碼\
-目前實現的分類網路\
+目前實現的分類網路
 1. EfficientNet
 2. Mobilenet V2
 3. Mobilenet V3
@@ -13,13 +13,13 @@
 
 ### pytorch_keypoint
 人物關鍵點相關程式碼\
-目前實現的網路\
+目前實現的網路
 1. HRNet
 
 ### pytorch_object_detection
 目標檢測相關程式碼\
 同時還有實現DeepSort\
-目前實現網路\
+目前實現網路
 1. Deformable-Detr
 2. Detr
 3. Faster-Rcnn
@@ -29,19 +29,24 @@
 
 ### pytorch_segmentation
 語意分割相關程式碼\
-目前實現網路\
+目前實現網路
 1. Deeplab V3
 2. FCN
 3. Lraspp
 
 ### mmcv
-MMCV官方原始碼
+[官方Github](https://github.com/open-mmlab/mmcv) \
+[官方文檔](https://mmcv.readthedocs.io/zh_CN/latest/understand_mmcv/registry.html) \
+MMCV官方原始碼，目前是直接在官方原始碼上進行標注
 
 ### mmsegmentation
-MMSegmentation官方原始碼
+[官方Github](https://github.com/open-mmlab/mmsegmentation) \
+[官方文檔](https://mmsegmentation.readthedocs.io/zh_CN/latest/tutorials/config.html) \
+MMSegmentation官方原始碼，目前是直接在官方原始碼上進行標注
 
 ### learn_mmcv
-學習mmcv官方原始碼，將需要的部分擷取出來，同時學習mmcv框架
+學習mmcv官方原始碼，將需要的部分擷取出來，同時學習mmcv框架\
+暫時停止更新
 
 ### some_utils
 有存放一些轉換用的程式工具

@@ -34,40 +34,70 @@ def build_from_cfg(cfg: Dict,
     Returns:
         object: The constructed object.
     """
+
+    """
+    :param cfg: config文件當中的model部分 
+    :param registry: 註冊器，裏面有module_dict有很多的backbone
+    :param default_args: train_cfg以及test_cfg
+    :return: 
+    """
+    # 已看過
+
+    # 一下都是做一些檢查，正常的config文件是不會有問題的
+    # 如果cfg不是dict格式在這裡就會報錯
     if not isinstance(cfg, dict):
         raise TypeError(f'cfg must be a dict, but got {type(cfg)}')
+    # 在cfg當中一定會有一個type，來表示要用哪個class或是function
     if 'type' not in cfg:
         if default_args is None or 'type' not in default_args:
             raise KeyError(
                 '`cfg` or `default_args` must contain the key "type", '
                 f'but got {cfg}\n{default_args}')
+    # 如果registry不是Registry格式會報錯
     if not isinstance(registry, Registry):
         raise TypeError('registry must be an mmcv.Registry object, '
                         f'but got {type(registry)}')
+    # 如果default_args不是dict格式或是default_args是None就會報錯
     if not (isinstance(default_args, dict) or default_args is None):
         raise TypeError('default_args must be a dict or None, '
                         f'but got {type(default_args)}')
 
+    # args = cfg的深度拷貝，這裡的cfg是config裏面的model部分
     args = cfg.copy()
 
     if default_args is not None:
+        # 如果args裏面沒有default_args的key就會添加上去，同時value也會放上去
+        # 如果已經有了就不會有任何操作
         for name, value in default_args.items():
             args.setdefault(name, value)
 
+    # 將args當中key為type的value取出，同時將type從args當中移除
+    # obj_type = 目前的type
     obj_type = args.pop('type')
     if isinstance(obj_type, str):
+        # 如果obj_type的型態為str就會進入這裡
+
+        # 這裡就是在已經實現好的class當中找到我們配置文件指定的class並拿出來做使用
+        # obj_cls = class型態，根據type會找到我們需要的實例對象
+        # 如果去找到該檔案位置的class可以發現該class會有裝飾器@xxx.register_module()，xxx依據不同的註冊表會有不同
         obj_cls = registry.get(obj_type)
         if obj_cls is None:
+            # 如果obj_cls=None表示沒有該實例對象，這裡就會直接報錯
             raise KeyError(
                 f'{obj_type} is not in the {registry.name} registry')
     elif inspect.isclass(obj_type) or inspect.isfunction(obj_type):
+        # 透過inspect可以檢查obj_type是什麼類別
+        # 如果是class或是function類別就直接給到obj_cls，通常是不會有這種情況
         obj_cls = obj_type
     else:
+        # 其他類別就直接報錯
         raise TypeError(
             f'type must be a str or valid type, but got {type(obj_type)}')
     try:
+        # 嘗試將args裡的東西放到obj_cls裏面，也就是對obj_cls進行實例化，args就是初始化中的參數
         return obj_cls(**args)
     except Exception as e:
+        # 依照正常的config不會跑到這裡來，這裡就是有問題
         # Normal TypeError does not print class name.
         raise type(e)(f'{obj_cls.__name__}: {e}')
 
@@ -109,11 +139,24 @@ class Registry:
     """
 
     def __init__(self, name, build_func=None, parent=None, scope=None):
+        """
+        :param name: 就是註冊器的名稱，這裡好像要取什麼都可以
+        :param build_func:
+        :param parent: 繼承來自其他註冊器
+        :param scope:
+        """
+        # 已看過
+
+        # 將註冊器名稱記錄下來
         self._name = name
+        # 主要的str對應到class或是function就會記錄在_module_dict當中
         self._module_dict = dict()
+        # 繼承於這個register的子register
         self._children = dict()
+        # 作用域，這個部分我還沒有很清楚，之後再來看看是做什麼用的
         self._scope = self.infer_scope() if scope is None else scope
 
+        # build_func的優先順序
         # self.build_func will be set with the following priority:
         # 1. build_func
         # 2. parent.build_func
@@ -126,7 +169,9 @@ class Registry:
         else:
             self.build_func = build_func
         if parent is not None:
+            # parent也必須要是一個註冊器
             assert isinstance(parent, Registry)
+            # 在parent中添加上children
             parent._add_children(self)
             self.parent = parent
         else:
@@ -161,6 +206,9 @@ class Registry:
         Returns:
             str: The inferred scope name.
         """
+        # 已看過
+        # 可使用範圍
+
         # We access the caller using inspect.currentframe() instead of
         # inspect.stack() for performance reasons. See details in PR #1844
         frame = inspect.currentframe()
@@ -186,10 +234,14 @@ class Registry:
             tuple[str | None, str]: The former element is the first scope of
             the key, which can be ``None``. The latter is the remaining key.
         """
+        # 已看過
+        # 將作用域以及class的名稱分開來
         split_index = key.find('.')
         if split_index != -1:
+            # 當有著名作用域時中間會用.隔開，這裡就會分別回傳
             return key[:split_index], key[split_index + 1:]
         else:
+            # 沒有.表示作用域為None，輸入的就是key
             return None, key
 
     @property
@@ -212,28 +264,39 @@ class Registry:
         """Get the registry record.
 
         Args:
+            # 傳入的資料
             key (str): The class name in string format.
 
         Returns:
             class: The corresponding class.
         """
+        # 已看過
+
+        # 透過split_scope_key可以將key分成scope與real_key兩個部分，如果原本key當中只有key部分scope就會是None
         scope, real_key = self.split_scope_key(key)
         if scope is None or scope == self._scope:
-            # get from self
+            # 如果scope是None或是與當前的scope相同就會走這裡
+            # get from self，從self當中獲取該key對應上去的對象
             if real_key in self._module_dict:
+                # 獲取到實例對象後就直接回傳
                 return self._module_dict[real_key]
         else:
-            # get from self._children
+            # get from self._children，從children找實例對象
             if scope in self._children:
                 return self._children[scope].get(real_key)
             else:
-                # goto root
+                # goto root，直接到root找實例對象
                 parent = self.parent
                 while parent.parent is not None:
                     parent = parent.parent
                 return parent.get(key)
 
     def build(self, *args, **kwargs):
+        """
+        :param args: tuple(ConfigDict)，裡面放的就會是model的config
+        :param kwargs: dict，裡面會有train_cfg以及test_cfg，在新版本中這兩個東西都會是None，都已經寫在model裏面了
+        :return:
+        """
         return self.build_func(*args, **kwargs, registry=self)
 
     def _add_children(self, registry):
@@ -316,7 +379,7 @@ class Registry:
         """
         if not isinstance(force, bool):
             raise TypeError(f'force must be a boolean, but got {type(force)}')
-        # NOTE: This is a walkaround to be compatible with the old apis,
+        # NOTE: This is a walkaround to be compatible with the old api,
         # while it may introduce unexpected bugs.
         if isinstance(name, type):
             return self.deprecated_register_module(name, force=force)

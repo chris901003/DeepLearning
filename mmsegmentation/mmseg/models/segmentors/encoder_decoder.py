@@ -28,43 +28,85 @@ class EncoderDecoder(BaseSegmentor):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
+        """
+        :param backbone: 骨幹部分的配置內容，這裡還會有一層也就是會有type在裡面，type指定的就是backbone類型
+        :param decode_head: 使用的解碼頭，這裡還會有一層也就是會有type在裡面，type決定要用哪種解碼頭
+        :param neck:
+        :param auxiliary_head: 輔助訓練部分，這裡還會有一層也就是會有type在裡面，type決定要用哪種輔助分類頭
+        :param train_cfg:
+        :param test_cfg:
+        :param pretrained: 使用的預訓練權重下載位置
+        :param init_cfg: 用來控制初始化用的，預設為None
+        """
+        # 已看過，空下來的部分表示還不清楚
+
+        # 初始化繼承的class，最後會初始化到最底層的module class
         super(EncoderDecoder, self).__init__(init_cfg)
         if pretrained is not None:
+            # 如果有設定pretrained那麼backbone中的pretrained就必須要關閉
             assert backbone.get('pretrained') is None, \
                 'both backbone and segmentor set pretrained weight'
+            # 將backbone的pretrained設定成跟EncoderDecoder當中的pretrained一樣
             backbone.pretrained = pretrained
+        # 透過builder中的build_backbone構建backbone，同時將backbone設定資料傳入
+        # self.backbone = 構建好的backbone，這裡就是backbone的實例對象了裡面包括了encoder以及decoder
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
+            # 如果有neck結構就會進行neck結構的構建，這裡我們先不去看，因為還沒有遇到
             self.neck = builder.build_neck(neck)
+        # decode_head = 解碼頭的配置參數，使用backbone特徵提取出來的特徵圖進行最後的預測
+        # _init_decode_head會構建出完整解碼頭
         self._init_decode_head(decode_head)
+        # auxiliary_head = 輔助訓練頭，使用backbone特徵提取出來的特徵圖進行預測，在訓練過程中可以讓淺層網路有比較好的學習效果
         self._init_auxiliary_head(auxiliary_head)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
+        # 檢查一定要設定解碼頭，如果沒有半個解碼頭這裡就會報錯
         assert self.with_decode_head
 
     def _init_decode_head(self, decode_head):
         """Initialize ``decode_head``"""
+        # 已看過
+        # 初始化解碼頭，decode_head = 解碼頭的config內容
+
+        # 透過build_head構建解碼頭實例對象
+        # self.decode_head = 解碼頭的實例對象，也會有損失計算在內
         self.decode_head = builder.build_head(decode_head)
+        # self.align_corners = 將decode_head中的align_corners拿出來
         self.align_corners = self.decode_head.align_corners
+        # self.num_classes = 分類類別數
         self.num_classes = self.decode_head.num_classes
 
     def _init_auxiliary_head(self, auxiliary_head):
         """Initialize ``auxiliary_head``"""
+        # 已看過
+        # 初始化輔助解碼頭，auxiliary_head = 輔助解碼頭配置參數
+
+        # 如果傳入的不是None就會開始配置
         if auxiliary_head is not None:
             if isinstance(auxiliary_head, list):
+                # 如果是list型態就會透過nn.ModuleList變成列表
                 self.auxiliary_head = nn.ModuleList()
                 for head_cfg in auxiliary_head:
                     self.auxiliary_head.append(builder.build_head(head_cfg))
             else:
+                # 如果是dict就直接開始解析dict，這裡也是調用build_head構建，所以其實跟decode_head相同
                 self.auxiliary_head = builder.build_head(auxiliary_head)
 
     def extract_feat(self, img):
         """Extract features from images."""
+        # 已看過，主要是用來從圖像提取出特徵圖
+        # img shape [batch_size, channel, height, width]
+        # 將原始tensor傳入到backbone當中進行特徵提取
+        # x = list[tensor]，tensor shape [batch_size, channel, height, width]，list長度就是有多少輸出出來的特徵層
+        # x的最後一個就是decoder最終的輸出
         x = self.backbone(img)
         if self.with_neck:
+            # 如果有neck層結構就會進入到neck當中進行正向傳播
             x = self.neck(x)
+        # 回傳特徵層
         return x
 
     def encode_decode(self, img, img_metas):
@@ -80,13 +122,17 @@ class EncoderDecoder(BaseSegmentor):
         return out
 
     def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg):
-        """Run forward function and calculate loss for decode head in
-        training."""
+        """Run forward function and calculate loss for decode head in training."""
+        # 已看過
+        # 將特徵圖透過解碼頭預測出最終結果，並且與正確圖像進行損失計算
+        # 創建loss字典
         losses = dict()
+        # 透過decode_head中的forward_train進行
         loss_decode = self.decode_head.forward_train(x, img_metas,
                                                      gt_semantic_seg,
                                                      self.train_cfg)
 
+        # 在key前面加上decode
         losses.update(add_prefix(loss_decode, 'decode'))
         return losses
 
@@ -135,20 +181,35 @@ class EncoderDecoder(BaseSegmentor):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        """
+        :param img: 一個batch圖像的tensor堆疊，shape [batch_size, channel, height, width] 
+        :param img_metas: list裏面的資料是每張圖像的詳細資訊，list長度會與batch_size相同
+        :param gt_semantic_seg: 一個batch的標註圖像tensor堆疊，shape [batch_size, channel, height, width]
+        :return: 一個由dict組成的loss
+        """
+        # 已看過
 
+        # x = list[tensor]，tensor shape [batch_size, channel, height, width]，list長度就是有多少輸出出來的特徵層
+        # x最後一層的輸出就是decoder的輸出(如果沒有neck層結構的話)
         x = self.extract_feat(img)
 
+        # 構建losses字典，這個會是最後要回傳的損失計算值
         losses = dict()
 
+        # 透過decode_head_forward_train將特徵圖變成最終的預測圖，同時傳入標註圖像進行損失計算
         loss_decode = self._decode_head_forward_train(x, img_metas,
                                                       gt_semantic_seg)
+        # 將loss_decode的值更新到losses當中
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
+            # 如果有使用輔助分類頭就會到這裡計算輔助分類損失
+            # 這裡與上面的decode_head_forward_train幾乎相同，只是差在解碼的地方有些不同而以
             loss_aux = self._auxiliary_head_forward_train(
                 x, img_metas, gt_semantic_seg)
             losses.update(loss_aux)
 
+        # 最後將整個損失計算的東西返回出去
         return losses
 
     # TODO refactor

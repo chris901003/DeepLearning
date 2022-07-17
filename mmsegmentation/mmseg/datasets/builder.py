@@ -66,11 +66,19 @@ def _concat_dataset(cfg, default_args=None):
 
 def build_dataset(cfg, default_args=None):
     """Build datasets."""
+    # 已看過
+    # 構建dataset
+    # cfg = 構建dataset的詳細參數，每一個dict表示一種處理的方式，cfg本身也是dict格式
     from .dataset_wrappers import (ConcatDataset, MultiImageMixDataset,
                                    RepeatDataset)
+
     if isinstance(cfg, (list, tuple)):
+        # 當cfg的型態是list或是tuple時表示，我們會用多個資料集，所以需要進行合併(目前先不去看細節)
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
     elif cfg['type'] == 'RepeatDataset':
+        # 當我們的type為RepeatDataset會往這裡，目前只有看到這個先從這裡開始
+        # 將構建dataset詳細內容傳入以及default_args以及要重複多少次，由RepeatDataset構建
+        # 在進入RepeatDataset前會先再次進入build_dataset當中一次
         dataset = RepeatDataset(
             build_dataset(cfg['dataset'], default_args), cfg['times'])
     elif cfg['type'] == 'MultiImageMixDataset':
@@ -82,6 +90,9 @@ def build_dataset(cfg, default_args=None):
             cfg.get('split', None), (list, tuple)):
         dataset = _concat_dataset(cfg, default_args)
     else:
+        # 當cfg['type']都不符合上面的條件就是type是資料集名稱
+        # 使用build_from_cfg構建資料集
+        # 這裡的DATASETS支援20種資料集
         dataset = build_from_cfg(cfg, DATASETS, default_args)
 
     return dataset
@@ -128,6 +139,21 @@ def build_dataloader(dataset,
     Returns:
         DataLoader: A PyTorch dataloader.
     """
+    # dataset = MMCV格式的資料集
+    # samples_per_gpu = 這個跟batch_size是一樣的東西
+    # worker_per_gpu = 會使用幾個cpu去加載數據集，這裡跟num_workers相同
+    # num_gpus = 使用多少個gpu進行訓練
+    # dist = 是否啟用分布式訓練
+    # shuffle = 每個epoch是否進行重排數據集
+    # seed = 亂數種子
+    # drop_last = 當最後一組數據量不到一個batch_size時，是否拋棄該組數據
+    # pin_memory = 開啟後可以提高速度
+    # persistent_workers = 如果開啟後dataloader就不會被關閉
+    # return = 這裡會回傳一個pytorch格式的dataloader
+
+    # 已看過
+
+    # 獲取分布式訓練的一些資訊
     rank, world_size = get_dist_info()
     if dist:
         sampler = DistributedSampler(
@@ -136,14 +162,19 @@ def build_dataloader(dataset,
         batch_size = samples_per_gpu
         num_workers = workers_per_gpu
     else:
+        # 沒有使用分布式訓練會從這裡
         sampler = None
+        # 總共的batch_size = 使用到的gpu數量 * 每個gpu一次訓練的圖片數量
         batch_size = num_gpus * samples_per_gpu
+        # 總共的num_workers = 使用的gpu數量 * 每個gpu需要用到的cpu數量
         num_workers = num_gpus * workers_per_gpu
 
+    # 透過worker_init_fn設定種子碼
     init_fn = partial(
         worker_init_fn, num_workers=num_workers, rank=rank,
         seed=seed) if seed is not None else None
 
+    # 根據torch版本會有不同的方式創建dataloader
     if digit_version(torch.__version__) >= digit_version('1.8.0'):
         data_loader = DataLoader(
             dataset,
@@ -184,6 +215,8 @@ def worker_init_fn(worker_id, num_workers, rank, seed):
         rank (int): The rank of current process.
         seed (int): The random seed to use.
     """
+    # 已看過
+    # 主要是用來設定種子碼的
 
     worker_seed = num_workers * rank + worker_id + seed
     np.random.seed(worker_seed)

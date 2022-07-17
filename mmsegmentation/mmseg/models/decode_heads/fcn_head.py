@@ -27,17 +27,35 @@ class FCNHead(BaseDecodeHead):
                  concat_input=True,
                  dilation=1,
                  **kwargs):
+        """
+        :param num_convs: 卷積層堆疊數量
+        :param kernel_size: 卷積核大小
+        :param concat_input: 是否會將輸入的特徵圖與卷積後的特徵圖進行融合，也就是是否有殘差結構
+        :param dilation: 膨脹係數
+        :param kwargs: 其他參數
+        """
+        # 已看過
+
+        # 檢查一些簡單的東西，正常都不會有問題
         assert num_convs >= 0 and dilation > 0 and isinstance(dilation, int)
+        # 保存一些資料
         self.num_convs = num_convs
         self.concat_input = concat_input
         self.kernel_size = kernel_size
+
+        # 繼承自BaseDecodeHead，與ASPP相同都先對繼承對象進行初始化
         super(FCNHead, self).__init__(**kwargs)
         if num_convs == 0:
+            # 如果num_convs==0那麼輸入的channel需要跟輸出的channel深度相同
             assert self.in_channels == self.channels
 
+        # 計算出卷積時需要的padding大小，確保輸入的特徵圖高寬透過卷積後不會改變
         conv_padding = (kernel_size // 2) * dilation
+        # 卷積列表
         convs = []
+        # 添加第一層的卷積層
         convs.append(
+            # 使用卷積加標準化加激活函數層，在這裡就會將channel調整到輸出的channel深度
             ConvModule(
                 self.in_channels,
                 self.channels,
@@ -47,6 +65,7 @@ class FCNHead(BaseDecodeHead):
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg,
                 act_cfg=self.act_cfg))
+        # 創建剩下的卷積層結構，與上方只差在輸入channel深度
         for i in range(num_convs - 1):
             convs.append(
                 ConvModule(
@@ -59,10 +78,16 @@ class FCNHead(BaseDecodeHead):
                     norm_cfg=self.norm_cfg,
                     act_cfg=self.act_cfg))
         if num_convs == 0:
+            # 如果num_convs=0表示不需要通過任何的卷積層，這裡就用nn.Identity表示
+            # nn.Identity裏面就是x=y
             self.convs = nn.Identity()
         else:
+            # 否則就將convs用nn.Sequential包裝起來
             self.convs = nn.Sequential(*convs)
         if self.concat_input:
+            # 如果有需要將輸入與輸出進行融合就會進來
+            # 融合後的特徵圖channel會需要進行調整，所以這裡透過ConvModule進行融合後的channel調整
+            # 因為前面有用padding所以特徵圖的高寬是不會改變的
             self.conv_cat = ConvModule(
                 self.in_channels + self.channels,
                 self.channels,

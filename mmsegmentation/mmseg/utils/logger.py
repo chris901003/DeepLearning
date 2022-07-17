@@ -22,7 +22,11 @@ def get_root_logger(log_file=None, log_level=logging.INFO):
     Returns:
         logging.Logger: The root logger.
     """
+    # 已看過
 
+    # log_file = log檔案位置，副檔名為.log
+    # log_level = 感覺是用來控制只有在第一塊gpu才獲打印輸出
     logger = get_logger(name='mmseg', log_file=log_file, log_level=log_level)
 
+    # logger會是logger型態，這是python官方的logging模組的東西，主要就是用來記錄log的
     return logger

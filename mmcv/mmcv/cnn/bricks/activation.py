@@ -92,4 +92,8 @@ def build_activation_layer(cfg: Dict) -> nn.Module:
     Returns:
         nn.Module: Created activation layer.
     """
+    # 已看過
+    # 獲取激活函數實例對象，ACTIVATION_LAYERS = 激活函數的註冊表
+    # 會從激活函數註冊表當中找到符合cfg的激活函數
+    # build_from_cfg會先從傳入的註冊表當中找到cfg指定的class，之後將初始化參數放入到class當中進行實例化，最後回傳實例化對象
     return build_from_cfg(cfg, ACTIVATION_LAYERS)

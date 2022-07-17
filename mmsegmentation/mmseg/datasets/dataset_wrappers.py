@@ -177,10 +177,18 @@ class RepeatDataset(object):
     """
 
     def __init__(self, dataset, times):
+        """
+        :param dataset: Dataset實例對象，這個是已經針對選定數據集實例化的Dataset
+        :param times: 重複次數
+        """
+        # 已看過
+
+        # 將一些資料保存下來
         self.dataset = dataset
         self.times = times
         self.CLASSES = dataset.CLASSES
         self.PALETTE = dataset.PALETTE
+        # 原始圖像總共有多少張
         self._ori_len = len(self.dataset)
 
     def __getitem__(self, idx):

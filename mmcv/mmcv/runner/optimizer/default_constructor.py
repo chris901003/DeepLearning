@@ -98,16 +98,26 @@ class DefaultOptimizerConstructor:
     def __init__(self,
                  optimizer_cfg: Dict,
                  paramwise_cfg: Optional[Dict] = None):
+        # 已看過
+        # optimizer_cfg = 優化器的設定，包含指定使用哪種優化器
+
         if not isinstance(optimizer_cfg, dict):
+            # 如果optimizer_cfg不是dict就會報錯
             raise TypeError('optimizer_cfg should be a dict',
                             f'but got {type(optimizer_cfg)}')
+        # 將優化器配置文件保存
         self.optimizer_cfg = optimizer_cfg
+        # 保存paramwise設定
         self.paramwise_cfg = {} if paramwise_cfg is None else paramwise_cfg
+        # 獲取基礎學習率
         self.base_lr = optimizer_cfg.get('lr', None)
+        # 獲取weight_decay
         self.base_wd = optimizer_cfg.get('weight_decay', None)
+        # 用來檢查cfg當中有沒有格式錯誤的地方
         self._validate_cfg()
 
     def _validate_cfg(self) -> None:
+        # 用來檢查cfg當中有沒有格式錯誤的地方
         if not isinstance(self.paramwise_cfg, dict):
             raise TypeError('paramwise_cfg should be None or a dict, '
                             f'but got {type(self.paramwise_cfg)}')
@@ -241,15 +251,24 @@ class DefaultOptimizerConstructor:
                 is_dcn_module=is_dcn_module)
 
     def __call__(self, model: nn.Module):
+        # 已看過
+        # 我們會將模型傳入進行優化器實例化
+
         if hasattr(model, 'module'):
+            # 因為我們需要的model是在傳入的model當中，所以需要取出來
             model = model.module
 
+        # 將優化器設定資料取出來，這裡使用copy方法
         optimizer_cfg = self.optimizer_cfg.copy()
         # if no paramwise option is specified, just use the global setting
         if not self.paramwise_cfg:
+            # 如果沒有指定哪些部分要使用多少學習率，這裡就統一設定
+            # 獲取需要學習的層結構的參數
             optimizer_cfg['params'] = model.parameters()
+            # 將設定檔以及註冊器傳入，獲得指定優化器的實例對象
             return build_from_cfg(optimizer_cfg, OPTIMIZERS)
 
+        # 有特別設定不同區塊的學習率就會到這裡進行設定
         # set param-wise lr and weight decay recursively
         params: List[Dict] = []
         self.add_params(params, model)

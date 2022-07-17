@@ -5,12 +5,15 @@ HOOKS = Registry('hook')
 
 
 class Hook:
+    # 所有的Hook class都會繼承這個class，這裡面就會有各種鉤子，預設都會是直接pass
     stages = ('before_run', 'before_train_epoch', 'before_train_iter',
               'after_train_iter', 'after_train_epoch', 'before_val_epoch',
               'before_val_iter', 'after_val_iter', 'after_val_epoch',
               'after_run')
 
     def before_run(self, runner):
+        # 如果繼承Hook的鉤子class沒有重寫before_run就會到這裡來
+        # 這裡會直接使用pass跳過
         pass
 
     def after_run(self, runner):

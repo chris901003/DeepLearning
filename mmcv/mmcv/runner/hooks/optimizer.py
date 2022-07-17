@@ -45,6 +45,7 @@ class OptimizerHook(Hook):
     def __init__(self,
                  grad_clip: Optional[dict] = None,
                  detect_anomalous_params: bool = False):
+        # 已看過
         self.grad_clip = grad_clip
         self.detect_anomalous_params = detect_anomalous_params
 
@@ -55,9 +56,12 @@ class OptimizerHook(Hook):
             return clip_grad.clip_grad_norm_(params, **self.grad_clip)
 
     def after_train_iter(self, runner):
+        # 已看過，反向傳播
+        # 將優化器內部資訊清空
         runner.optimizer.zero_grad()
         if self.detect_anomalous_params:
             self.detect_anomalous_parameters(runner.outputs['loss'], runner)
+        # 將loss部分進行反向傳遞
         runner.outputs['loss'].backward()
 
         if self.grad_clip is not None:
@@ -66,6 +70,7 @@ class OptimizerHook(Hook):
                 # Add grad norm to the logger
                 runner.log_buffer.update({'grad_norm': float(grad_norm)},
                                          runner.outputs['num_samples'])
+        # 開始反向傳遞
         runner.optimizer.step()
 
     def detect_anomalous_parameters(self, loss: Tensor, runner) -> None:
