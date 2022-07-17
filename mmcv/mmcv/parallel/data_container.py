@@ -42,6 +42,16 @@ class DataContainer:
                  padding_value: int = 0,
                  cpu_only: bool = False,
                  pad_dims: int = 2):
+        """
+        :param data: 圖像的tensor格式，shape [channel, height, width]
+        :param stack: 是否進行堆疊
+        :param padding_value: padding部分使用哪個值
+        :param cpu_only:
+        :param pad_dims:
+        """
+        # 已看過
+
+        # 將傳入的值進行保存
         self._data = data
         self._cpu_only = cpu_only
         self._stack = stack

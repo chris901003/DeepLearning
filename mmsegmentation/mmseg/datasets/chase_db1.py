@@ -14,8 +14,10 @@ class ChaseDB1Dataset(CustomDataset):
     '_1stHO.png'.
     """
 
+    # CLASSES = 這個數據及當中對應index的分類名稱，這裡是預設的如果有自定義的會優先使用自定義的
     CLASSES = ('background', 'vessel')
 
+    # PALETTE = 對應的index在輸出的時候會用哪種顏色進行表示，這裡是預設的如果有自定義的會優先使用自定義的
     PALETTE = [[120, 120, 120], [6, 230, 230]]
 
     def __init__(self, **kwargs):

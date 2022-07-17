@@ -213,12 +213,17 @@ class Resize(object):
                 None is just a placeholder to be consistent with
                 :func:`random_select`.
         """
+        # 已看過，隨機生成圖像大小
 
+        # 檢查img_scale是否符合規定
         assert isinstance(img_scale, tuple) and len(img_scale) == 2
         min_ratio, max_ratio = ratio_range
         assert min_ratio <= max_ratio
+        # 隨機生成縮放比例
         ratio = np.random.random_sample() * (max_ratio - min_ratio) + min_ratio
+        # 將原始大小乘上隨機比例後就是隨機圖像大小
         scale = int(img_scale[0] * ratio), int(img_scale[1] * ratio)
+        # 將scale回傳回去
         return scale, None
 
     def _random_scale(self, results):
@@ -238,6 +243,7 @@ class Resize(object):
             dict: Two new keys 'scale` and 'scale_idx` are added into
                 ``results``, which would be used by subsequent pipelines.
         """
+        # 已看過，隨機給定調整的圖像大小
 
         if self.ratio_range is not None:
             if self.img_scale is None:
@@ -256,13 +262,17 @@ class Resize(object):
         else:
             raise NotImplementedError
 
+        # scale = 隨機給的縮放的圖像尺寸大小
         results['scale'] = scale
         results['scale_idx'] = scale_idx
 
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
+        # 已看過，resize訓練圖像
         if self.keep_ratio:
+            # 需要保持原始圖像的比例就會往這裡
             if self.min_size is not None:
+                # 有設定最小大小
                 # TODO: Now 'min_size' is an 'int' which means the minimum
                 # shape of images is (min_size, min_size, 3). 'min_size'
                 # with tuple type will be supported, i.e. the width and
@@ -279,27 +289,40 @@ class Resize(object):
                     new_h, new_w = new_short, new_short * w / h
                 results['scale'] = (new_h, new_w)
 
+            # img = ndarray [height=new_h, width=new_w, channel=3]，透過差值方式調整好的訓練圖
+            # scale_factor = float，原圖縮放比例到指定大小
             img, scale_factor = mmcv.imrescale(
                 results['img'], results['scale'], return_scale=True)
             # the w_scale and h_scale has minor difference
             # a real fix should be done in the mmcv.imrescale in the future
+            # 獲取新圖像的大小
             new_h, new_w = img.shape[:2]
+            # 舊圖像的大小
             h, w = results['img'].shape[:2]
+            # 獲取縮放比例
             w_scale = new_w / w
             h_scale = new_h / h
         else:
             img, w_scale, h_scale = mmcv.imresize(
                 results['img'], results['scale'], return_scale=True)
+        # 構建scale_factor，主要感覺是為了object detection保留的
         scale_factor = np.array([w_scale, h_scale, w_scale, h_scale],
                                 dtype=np.float32)
+        # 更新在results當中的訓練圖像，變成resize過後的
         results['img'] = img
+        # 更新訓練圖片的shape
         results['img_shape'] = img.shape
+        # 更新pad的shape
         results['pad_shape'] = img.shape  # in case that there is no padding
+        # 將scale_factor保存下來
         results['scale_factor'] = scale_factor
+        # 將keep_ratio保存下來
         results['keep_ratio'] = self.keep_ratio
 
     def _resize_seg(self, results):
         """Resize semantic segmentation map with ``results['scale']``."""
+        # 已看過，將標註圖像進行resize
+        # 遍歷標註圖像，一張訓練圖可能有多個標註圖像，所以這裡是用遍歷的方式
         for key in results.get('seg_fields', []):
             if self.keep_ratio:
                 gt_seg = mmcv.imrescale(
@@ -307,6 +330,7 @@ class Resize(object):
             else:
                 gt_seg = mmcv.imresize(
                     results[key], results['scale'], interpolation='nearest')
+            # 更新results當中的標註圖像
             results[key] = gt_seg
 
     def __call__(self, results):
@@ -320,11 +344,17 @@ class Resize(object):
             dict: Resized results, 'img_shape', 'pad_shape', 'scale_factor',
                 'keep_ratio' keys are added into result dict.
         """
+        # 已看過，主要是將圖像進行高寬調整
+        # result = 圖像的相關資訊都在裡面，因為資料已經過多所以如果要詳細內容就使用Debug下去看
 
         if 'scale' not in results:
+            # 如果沒有指定的大小尺寸就透過_random_scale隨機挑選尺寸
+            # 通過_random_scale會在results上多添加[scale, scale_idx]兩個key，scale就是要縮放到的大小
             self._random_scale(results)
+        # 將訓練圖像以及標註圖像調整到指定的大小尺寸上
         self._resize_img(results)
         self._resize_seg(results)
+        # 將results回傳
         return results
 
     def __repr__(self):
@@ -369,18 +399,21 @@ class RandomFlip(object):
             dict: Flipped results, 'flip', 'flip_direction' keys are added into
                 result dict.
         """
+        # 已看過，進行訓練圖像以及標註圖像的翻轉
 
         if 'flip' not in results:
+            # 隨機獲取是否進行翻轉
             flip = True if np.random.rand() < self.prob else False
             results['flip'] = flip
         if 'flip_direction' not in results:
+            # 記錄下翻轉的方向，左右翻轉或是上下翻轉
             results['flip_direction'] = self.direction
         if results['flip']:
-            # flip image
+            # flip image，對於訓練圖像
             results['img'] = mmcv.imflip(
                 results['img'], direction=results['flip_direction'])
 
-            # flip segs
+            # flip segs，對於標註圖像進行翻轉
             for key in results.get('seg_fields', []):
                 # use copy() to make numpy stride positive
                 results[key] = mmcv.imflip(
@@ -432,20 +465,29 @@ class Pad(object):
 
     def _pad_img(self, results):
         """Pad images according to ``self.size``."""
+        # 將訓練圖像進行padding，根據self.size決定padding後的大小
         if self.size is not None:
+            # 根據self.size進行padding，並且需要指定padding的值
+            # padded_img = 添加上padding後的訓練圖像
             padded_img = mmcv.impad(
                 results['img'], shape=self.size, pad_val=self.pad_val)
         elif self.size_divisor is not None:
             padded_img = mmcv.impad_to_multiple(
                 results['img'], self.size_divisor, pad_val=self.pad_val)
+        # 更新results當中的訓練圖像
         results['img'] = padded_img
+        # 更新padding後的圖像shape
         results['pad_shape'] = padded_img.shape
+        # 記錄下padding後指定的圖像大小，經過padding過後圖像會大於等於size
         results['pad_fixed_size'] = self.size
         results['pad_size_divisor'] = self.size_divisor
 
     def _pad_seg(self, results):
         """Pad masks according to ``results['pad_shape']``."""
+        # 已看過，將標註圖像進行padding
+        # 遍歷所有的標註圖像
         for key in results.get('seg_fields', []):
+            # 透過記錄下的pad_shape對標註圖像進行填充
             results[key] = mmcv.impad(
                 results[key],
                 shape=results['pad_shape'][:2],
@@ -460,6 +502,7 @@ class Pad(object):
         Returns:
             dict: Updated result dict.
         """
+        # 已看過，將訓練圖像以及標註圖像進行填充
 
         self._pad_img(results)
         self._pad_seg(results)
@@ -509,9 +552,12 @@ class Normalize(object):
             dict: Normalized results, 'img_norm_cfg' key is added into
                 result dict.
         """
+        # 已看過，對於訓練圖像進行均值以及方差調整
 
+        # 將圖像以及均值和方差還有是否轉成RGB傳入，將結果直接更新到result當中
         results['img'] = mmcv.imnormalize(results['img'], self.mean, self.std,
                                           self.to_rgb)
+        # 更新results當中記錄下的均值以及方差還有是否轉換成RGB格式
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
         return results
@@ -627,7 +673,7 @@ class RandomCrop(object):
     def __init__(self, crop_size, cat_max_ratio=1., ignore_index=255):
         """
         :param crop_size: 隨機剪裁後的圖像大小
-        :param cat_max_ratio:
+        :param cat_max_ratio: 裁切後正樣本比例閾值
         :param ignore_index: 哪個index是可以忽略掉的
         """
         # 已看過
@@ -642,17 +688,27 @@ class RandomCrop(object):
 
     def get_crop_bbox(self, img):
         """Randomly get a crop bounding box."""
+        # 已看過，生成隨機剪裁數據
+        # img = [height, width, channel]
+        # self.crop_size = 經過剪裁後的圖像大小
+        # margin_h與margin_w = 可以剪裁的大小
         margin_h = max(img.shape[0] - self.crop_size[0], 0)
         margin_w = max(img.shape[1] - self.crop_size[1], 0)
+        # offset_h = 從[0, margin_h]隨機選取一個整數值
         offset_h = np.random.randint(0, margin_h + 1)
+        # offset_w = 從[0, margin_w]隨機選取一個整數值
         offset_w = np.random.randint(0, margin_w + 1)
+        # crop_y1 = 上方邊界，crop_y2 = 下方邊界
         crop_y1, crop_y2 = offset_h, offset_h + self.crop_size[0]
+        # crop_x1 = 左邊邊界，crop_x2 = 右邊邊界
         crop_x1, crop_x2 = offset_w, offset_w + self.crop_size[1]
 
+        # 由crop_y1與crop_y2與crop_x1與crop_x2行成一個長方形，內部就是我們剪裁後的圖像
         return crop_y1, crop_y2, crop_x1, crop_x2
 
     def crop(self, img, crop_bbox):
         """Crop from ``img``"""
+        # 已看過，根據傳入的crop_bbox返回對應區塊的值
         crop_y1, crop_y2, crop_x1, crop_x2 = crop_bbox
         img = img[crop_y1:crop_y2, crop_x1:crop_x2, ...]
         return img
@@ -667,27 +723,40 @@ class RandomCrop(object):
             dict: Randomly cropped results, 'img_shape' key in result dict is
                 updated according to crop size.
         """
+        # 已看過，對訓練圖片以及標註圖片進行相同的隨機剪裁
 
+        # img = 訓練圖像
         img = results['img']
+        # 透過get_crop_bbox獲取隨機剪裁數據
+        # crop_bbox = list[由crop_y1與crop_y2與crop_x1與crop_x2行成一個長方形，內部就是我們剪裁後的圖像]
         crop_bbox = self.get_crop_bbox(img)
+        # cat_max_ratio = 裁切後的圖像中的正樣本比例閾值
         if self.cat_max_ratio < 1.:
             # Repeat 10 times
             for _ in range(10):
+                # seg_temp = 根據crop_bbox取出標註圖像的值，shape [crop_height, crop_width]
                 seg_temp = self.crop(results['gt_semantic_seg'], crop_bbox)
+                # np.unique = 找到seg_temp有哪些數值
+                # labels = 有哪些數值，cnt = 該數值出現多少次
                 labels, cnt = np.unique(seg_temp, return_counts=True)
+                # 將ignore的部分從cnt當中去除
                 cnt = cnt[labels != self.ignore_index]
                 if len(cnt) > 1 and np.max(cnt) / np.sum(
                         cnt) < self.cat_max_ratio:
+                    # 當正樣本比例到達閾值時就可以跳出
                     break
+                # 當正樣本比例未達閾值就會再次隨機選擇裁切範圍
                 crop_bbox = self.get_crop_bbox(img)
 
-        # crop the image
+        # crop the image，對訓練圖像進行剪裁
         img = self.crop(img, crop_bbox)
         img_shape = img.shape
+        # 更新訓練圖像
         results['img'] = img
+        # 更新訓練圖像的shape
         results['img_shape'] = img_shape
 
-        # crop semantic seg
+        # crop semantic seg，對標註圖像進行剪裁
         for key in results.get('seg_fields', []):
             results[key] = self.crop(results[key], crop_bbox)
 
@@ -944,12 +1013,16 @@ class PhotoMetricDistortion(object):
 
     def convert(self, img, alpha=1, beta=0):
         """Multiple with alpha and add beat with clip."""
+        # 已看過，將圖像乘以alpha之後加上beta
         img = img.astype(np.float32) * alpha + beta
+        # 將img的值控制在[0, 255]
         img = np.clip(img, 0, 255)
+        # 回傳圖像並且要是uint8格式
         return img.astype(np.uint8)
 
     def brightness(self, img):
         """Brightness distortion."""
+        # 已看過，對圖像進行亮度調整
         if random.randint(2):
             return self.convert(
                 img,
@@ -959,6 +1032,7 @@ class PhotoMetricDistortion(object):
 
     def contrast(self, img):
         """Contrast distortion."""
+        # 已看過，對比度調整
         if random.randint(2):
             return self.convert(
                 img,
@@ -967,6 +1041,7 @@ class PhotoMetricDistortion(object):
 
     def saturation(self, img):
         """Saturation distortion."""
+        # 已看過，飽和度調整
         if random.randint(2):
             img = mmcv.bgr2hsv(img)
             img[:, :, 1] = self.convert(
@@ -978,6 +1053,7 @@ class PhotoMetricDistortion(object):
 
     def hue(self, img):
         """Hue distortion."""
+        # 已看過，hue調整
         if random.randint(2):
             img = mmcv.bgr2hsv(img)
             img[:, :,
@@ -995,27 +1071,33 @@ class PhotoMetricDistortion(object):
         Returns:
             dict: Result dict with images distorted.
         """
+        # 已看過，對圖像進行HSV圖像增強
 
+        # 獲取訓練圖像
         img = results['img']
-        # random brightness
+        # random brightness，隨機調整圖像的亮度
         img = self.brightness(img)
 
         # mode == 0 --> do random contrast first
         # mode == 1 --> do random contrast last
+        # 不同的mode順序會有些不同
         mode = random.randint(2)
         if mode == 1:
+            # 如果mode=1就先進行對比度調整
             img = self.contrast(img)
 
-        # random saturation
+        # random saturation，飽和度調整
         img = self.saturation(img)
 
-        # random hue
+        # random hue，隨機hue調整
         img = self.hue(img)
 
         # random contrast
         if mode == 0:
+            # 如果mode=0最後再調整對比度
             img = self.contrast(img)
 
+        # 更新訓練圖像
         results['img'] = img
         return results
 

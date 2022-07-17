@@ -19,6 +19,7 @@ def to_tensor(data):
         data (torch.Tensor | numpy.ndarray | Sequence | int | float): Data to
             be converted.
     """
+    # 已看過，將輸入進來的支援格式轉成tensor格式
 
     if isinstance(data, torch.Tensor):
         return data
@@ -197,15 +198,21 @@ class DefaultFormatBundle(object):
             dict: The result dict contains the data that is formatted with
                 default bundle.
         """
+        # 已看過，整理訓練圖像以及標註圖像
 
         if 'img' in results:
+            # 將訓練圖像拿出來
             img = results['img']
             if len(img.shape) < 3:
+                # 如果沒有channel維度就在最後面加上
                 img = np.expand_dims(img, -1)
+            # img shape [height, width, channel] -> [channel, height, width]
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
+            # 透過to_tensor將img的格式從ndarray轉成tensor
+            # 實例化DataContainer，將圖像的tensor傳入
             results['img'] = DC(to_tensor(img), stack=True)
         if 'gt_semantic_seg' in results:
-            # convert to long
+            # convert to long，這裡會將標註圖像添加上channel維度在最前面
             results['gt_semantic_seg'] = DC(
                 to_tensor(results['gt_semantic_seg'][None,
                                                      ...].astype(np.int64)),
@@ -276,14 +283,22 @@ class Collect(object):
                 - keys in``self.keys``
                 - ``img_metas``
         """
+        # 已看過，這裡會是整個pipeline最後的地方，進行result統整
 
+        # data = 儲存主要資料
         data = {}
+        # img_meta = 主要是用來保存紀錄使用的
         img_meta = {}
+        # 遍歷self.meta_keys，裏面有我們想要保存的對象
         for key in self.meta_keys:
+            # 將指定對象進行保存
             img_meta[key] = results[key]
+        # 將img_meta存到data當中並且用DataContainer進行包裝
         data['img_metas'] = DC(img_meta, cpu_only=True)
+        # 遍歷keys當中有訓練圖像以及標註圖像
         for key in self.keys:
             data[key] = results[key]
+        # 將data回傳，data當中都是DataContainer實例對象
         return data
 
     def __repr__(self):

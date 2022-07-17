@@ -234,13 +234,18 @@ class CustomDataset(Dataset):
         Returns:
             dict: Annotation info of specified index.
         """
+        # 已看過，將對應到的idx的annotation回傳回去
+        # 這裡可以注意一下img_infos的架構
 
         return self.img_infos[idx]['ann']
 
     def pre_pipeline(self, results):
         """Prepare results dict for pipeline."""
+        # 已看過，準備最終輸出用的results字典
         results['seg_fields'] = []
+        # img_prefix = 圖像檔案路徑的前面部分
         results['img_prefix'] = self.img_dir
+        # seg_prefix = 標註圖像檔案路徑的前面部分
         results['seg_prefix'] = self.ann_dir
         if self.custom_classes:
             results['label_map'] = self.label_map
@@ -255,10 +260,13 @@ class CustomDataset(Dataset):
             dict: Training/test data (with annotation if `test_mode` is set
                 False).
         """
+        # 已看過，將需要的照片idx往後傳遞到整個處理流程當中，獲取需要輸入到網路的格式
 
         if self.test_mode:
+            # test模式會往這裡走，在test當中不會有正確的標註圖像
             return self.prepare_test_img(idx)
         else:
+            # train或是val會往這裡走，在train或是val中會有正確的標註圖像
             return self.prepare_train_img(idx)
 
     def prepare_train_img(self, idx):
@@ -271,11 +279,22 @@ class CustomDataset(Dataset):
             dict: Training data and annotation after pipeline with new keys
                 introduced by pipeline.
         """
+        # 已看過，獲取指定idx的圖像資訊
 
+        # self.img_infos = list[dict{
+        #   'filename': str [訓練圖像的檔案名稱],
+        #   'ann': dict{'seg_map': str [對應到的標註檔案名稱]}
+        # }, ...]
+        # list長度就會是資料集圖像的張數
+        # img_info = 指定idx的資料，主要是檔案名稱
         img_info = self.img_infos[idx]
+        # ann_info = 標註訊息，主要是檔案名稱
         ann_info = self.get_ann_info(idx)
+        # 將img_info與anno_info放到result當中
         results = dict(img_info=img_info, ann_info=ann_info)
+        # 為了之後的圖像處理流，這裡透過pre_pipeline生成一些需要的空間
         self.pre_pipeline(results)
+        # 將results放入到pipeline當中進行整個圖像處理流
         return self.pipeline(results)
 
     def prepare_test_img(self, idx):

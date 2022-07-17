@@ -233,9 +233,19 @@ def imfrombytes(content, flag='color', channel_order='bgr', backend=None):
         >>> img = mmcv.imfrombytes(img_buff, backend='cv2')
     """
 
+    """
+    :param content: Image的二進制資料 
+    :param flag: 
+    :param channel_order: 圖像通道排列順序
+    :param backend: 使用解碼的方式
+    :return: 
+    """
+    # 已看過
+
     if backend is None:
         backend = imread_backend
     if backend not in supported_backends:
+        # 如果backend不在列表當中就會直接報錯
         raise ValueError(
             f'backend: {backend} is not supported. Supported '
             "backends are 'cv2', 'turbojpeg', 'pillow', 'tifffile'")
@@ -254,11 +264,18 @@ def imfrombytes(content, flag='color', channel_order='bgr', backend=None):
             img = tifffile.imread(buff)
         return img
     else:
+        # 通常會在這裡
+        # 使用numpy讀取二進制的content並且轉換成uint8格式
         img_np = np.frombuffer(content, np.uint8)
+        # flag = 解碼的方式
         flag = imread_flags[flag] if is_str(flag) else flag
+        # 對於img_np進行解碼
+        # img = ndarray [width, height, channel]
         img = cv2.imdecode(img_np, flag)
         if flag == IMREAD_COLOR and channel_order == 'rgb':
+            # 如果有需要通道轉換就在這裡轉換，BGR->RGB
             cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)
+        # 將結果回傳
         return img
 
 

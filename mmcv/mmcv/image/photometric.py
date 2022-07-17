@@ -18,6 +18,8 @@ def imnormalize(img, mean, std, to_rgb=True):
     Returns:
         ndarray: The normalized image.
     """
+    # 已看過，對輸入的圖像進行均值以及方差的調整
+    # 拷貝一份img同時轉換成float32格式，因為uint8不支持標準化
     img = img.copy().astype(np.float32)
     return imnormalize_(img, mean, std, to_rgb)
 
@@ -34,12 +36,17 @@ def imnormalize_(img, mean, std, to_rgb=True):
     Returns:
         ndarray: The normalized image.
     """
-    # cv2 inplace normalization does not accept uint8
+    # 已看過，對輸入的圖像進行均值以及方差的調整
+    # cv2 inplace normalization does not accept uint8，因為cv2的uint8不支持標準化，所以在之前有將img轉成float32格式
+    # 如果輸入的img是uint8格式就會報錯
     assert img.dtype != np.uint8
+    # mean, stdinv shape [1, 3]
     mean = np.float64(mean.reshape(1, -1))
     stdinv = 1 / np.float64(std.reshape(1, -1))
     if to_rgb:
+        # BGR -> RGB
         cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)  # inplace
+    # 開始調整
     cv2.subtract(img, mean, img)  # inplace
     cv2.multiply(img, stdinv, img)  # inplace
     return img

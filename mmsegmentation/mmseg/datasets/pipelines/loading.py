@@ -59,32 +59,49 @@ class LoadImageFromFile(object):
         Returns:
             dict: The dict contains loaded image and meta information.
         """
+        # 已看過，從results中的資訊將圖像載入進來
+        # results = 這次要載入的圖像的詳細資訊
 
         if self.file_client is None:
             self.file_client = mmcv.FileClient(**self.file_client_args)
 
         if results.get('img_prefix') is not None:
+            # 如果有提供訓練圖像的前面路徑位置就會將前面的路徑位置添加上去
             filename = osp.join(results['img_prefix'],
                                 results['img_info']['filename'])
         else:
+            # 沒有前面路徑就直接使用相對路徑的方式
             filename = results['img_info']['filename']
+        # 將訓練圖像的檔案位置傳入，使用二進制方式讀取出來
         img_bytes = self.file_client.get(filename)
+        # 將讀取的資料以及color模式以及要使用哪種方式開啟傳入
+        # img = 讀取完成的圖像，ndarray [width, height, channel]，dtype=uint8
         img = mmcv.imfrombytes(
             img_bytes, flag=self.color_type, backend=self.imdecode_backend)
         if self.to_float32:
+            # 如果有需要轉換成float32就直接轉換
             img = img.astype(np.float32)
 
+        # 將原始訓練圖像檔案路徑保存
         results['filename'] = filename
+        # 原始訓練圖像檔案名稱
         results['ori_filename'] = results['img_info']['filename']
+        # 圖像保存
         results['img'] = img
+        # 保存當前訓練圖片的大小，高寬以及通道數
         results['img_shape'] = img.shape
+        # 保存原始圖片的大小，高寬以及通道數
         results['ori_shape'] = img.shape
         # Set initial values for default meta_keys
+        # 初始化設定pad_shape，這裡用原始圖像大小
         results['pad_shape'] = img.shape
+        # 縮放比例設定成1
         results['scale_factor'] = 1.0
         num_channels = 1 if len(img.shape) < 3 else img.shape[2]
         results['img_norm_cfg'] = dict(
+            # 將均值設定成0
             mean=np.zeros(num_channels, dtype=np.float32),
+            # 方差設定成1
             std=np.ones(num_channels, dtype=np.float32),
             to_rgb=False)
         return results
@@ -139,16 +156,22 @@ class LoadAnnotations(object):
         Returns:
             dict: The dict contains loaded semantic segmentation annotations.
         """
+        # 已看過，主要是在讀取標註訊息的資料
 
         if self.file_client is None:
             self.file_client = mmcv.FileClient(**self.file_client_args)
 
         if results.get('seg_prefix', None) is not None:
+            # 如果有給seg_prefix就將前面的路徑放到filename當中
             filename = osp.join(results['seg_prefix'],
                                 results['ann_info']['seg_map'])
         else:
+            # 如果沒有傳入前面的路徑就直接使用相對路徑
             filename = results['ann_info']['seg_map']
+        # img_byte = 標註圖像的二進制表達方式
         img_bytes = self.file_client.get(filename)
+        # 將圖像讀取出來
+        # get_semantic_seg = ndarray [width, height]，後面透過squeeze將channel維度壓縮掉
         gt_semantic_seg = mmcv.imfrombytes(
             img_bytes, flag='unchanged',
             backend=self.imdecode_backend).squeeze().astype(np.uint8)
@@ -162,7 +185,7 @@ class LoadAnnotations(object):
                 gt_semantic_seg[gt_semantic_seg_copy == old_id] = new_id
         # reduce zero_label
         if self.reduce_zero_label:
-            # avoid using underflow conversion
+            # avoid using underflow conversion，將0變成忽略的index
             gt_semantic_seg[gt_semantic_seg == 0] = 255
             gt_semantic_seg = gt_semantic_seg - 1
             gt_semantic_seg[gt_semantic_seg == 254] = 255

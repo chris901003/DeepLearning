@@ -193,10 +193,14 @@ class RepeatDataset(object):
 
     def __getitem__(self, idx):
         """Get item from original dataset."""
+        # 已看過，數據讀入的入口，從這個__getitem__函數開始
+        # pytorch的Dataloader會給出一個隨機的idx，我們使用這個index獲取對應的圖片以及標註圖像
+        # 因為給定__len__的方式與以epoch為主的有所不同，所以這裡我們要用idx模訓練集的圖像張數才會是我們真正要的
         return self.dataset[idx % self._ori_len]
 
     def __len__(self):
         """The length is multiplied by ``times``"""
+        # 已看過，這裡是以iter為主，所以我們是用times*ort_len作為__getitem__的idx會獲得的隨機數的範圍
         return self.times * self._ori_len
 
 

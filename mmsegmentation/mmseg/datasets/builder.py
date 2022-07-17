@@ -181,6 +181,7 @@ def build_dataloader(dataset,
             batch_size=batch_size,
             sampler=sampler,
             num_workers=num_workers,
+            # 這裡注意一下collate_fn使用的是collate
             collate_fn=partial(collate, samples_per_gpu=samples_per_gpu),
             pin_memory=pin_memory,
             shuffle=shuffle,

@@ -23,9 +23,12 @@ def _scale_size(size, scale):
     Returns:
         tuple[int]: scaled size.
     """
+    # 已看過，回傳乘上倍率後的高寬
     if isinstance(scale, (float, int)):
+        # 如果傳入的是單一個值就用tuple變成高寬分開
         scale = (scale, scale)
     w, h = size
+    # 將高寬乘上比例後再加上一點點值
     return int(w * float(scale[0]) + 0.5), int(h * float(scale[1]) + 0.5)
 
 
@@ -84,10 +87,24 @@ def imresize(img,
         tuple | ndarray: (`resized_img`, `w_scale`, `h_scale`) or
         `resized_img`.
     """
+    """
+    :param img: 原始圖像，ndarray [height, width, channel] 
+    :param size: 要縮放到的大小，tuple(width, height)
+    :param return_scale: 是否要將縮放比例回傳
+    :param interpolation: 差值方式
+    :param out: 要輸出到哪裡
+    :param backend: 
+    :return: 
+    """
+    # 已看過，調整圖像大小
+
+    # 獲取原始圖像的高寬
     h, w = img.shape[:2]
     if backend is None:
+        # imread_backend預設就會是cv2
         backend = imread_backend
     if backend not in ['cv2', 'pillow']:
+        # 這裡只有cv2以及pillow兩種方式來進行大小調整
         raise ValueError(f'backend: {backend} is not supported for resize.'
                          f"Supported backends are 'cv2', 'pillow'")
 
@@ -97,11 +114,16 @@ def imresize(img,
         pil_image = pil_image.resize(size, pillow_interp_codes[interpolation])
         resized_img = np.array(pil_image)
     else:
+        # 使用cv2的方式進行resize
+        # cv2_interp_codes = 是一個dict透過傳入的interpolation找到對應的cv2的差值方式
+        # resized_img = 已經調整好大小的原圖
         resized_img = cv2.resize(
             img, size, dst=out, interpolation=cv2_interp_codes[interpolation])
     if not return_scale:
+        # 不需要返回調整比例就會是這裡
         return resized_img
     else:
+        # 需要返回調整的比例會是這裡
         w_scale = size[0] / w
         h_scale = size[1] / h
         return resized_img, w_scale, h_scale
@@ -208,20 +230,29 @@ def rescale_size(old_size, scale, return_scale=False):
     Returns:
         tuple[int]: The new rescaled image size.
     """
+    # 已看過
+    # 取出舊的寬高
     w, h = old_size
     if isinstance(scale, (float, int)):
         if scale <= 0:
+            # 指定的圖像大小不可以小於0否則就會報錯
             raise ValueError(f'Invalid scale {scale}, must be positive.')
+        # 將scale給到scale_factor上
         scale_factor = scale
     elif isinstance(scale, tuple):
+        # 如果傳入的是tuple表示有特別指定高以及寬
+        # 找到較長的邊
         max_long_edge = max(scale)
         max_short_edge = min(scale)
+        # 決定要縮放的比例
         scale_factor = min(max_long_edge / max(h, w),
                            max_short_edge / min(h, w))
     else:
+        # 其他的數據類型就直接報錯
         raise TypeError(
             f'Scale must be a number or tuple of int, but got {type(scale)}')
 
+    # 將原始圖像以及縮放比例傳入獲取新的大小
     new_size = _scale_size((w, h), scale_factor)
 
     if return_scale:
@@ -251,8 +282,22 @@ def imrescale(img,
     Returns:
         ndarray: The rescaled image.
     """
+
+    """
+    :param img: 原始圖像，ndarray [height, width, channel]
+    :param scale: 希望縮放到的大小，tuple(new_height, new_width)
+    :param return_scale: 是否要回傳scale
+    :param interpolation: 縮放時要用的差值方式
+    :param backend: 預設為None
+    :return:
+    """
+    # 已看過，調整圖像大小且要保持原始圖像的比例時就會用到這個函數
+
+    # 獲取原始圖像的高寬
     h, w = img.shape[:2]
+    # new_size = 新的邊長[width, height]，scale_factor = 放大倍率
     new_size, scale_factor = rescale_size((w, h), scale, return_scale=True)
+    # rescaled_img = [height, width, channel]，原圖經過差值方式調整到指定的大小
     rescaled_img = imresize(
         img, new_size, interpolation=interpolation, backend=backend)
     if return_scale:
@@ -272,12 +317,17 @@ def imflip(img, direction='horizontal'):
     Returns:
         ndarray: The flipped image.
     """
+    # 已看過，將輸入的圖像依據direction進行翻轉
+
     assert direction in ['horizontal', 'vertical', 'diagonal']
     if direction == 'horizontal':
+        # 左右翻轉
         return np.flip(img, axis=1)
     elif direction == 'vertical':
+        # 上下翻轉
         return np.flip(img, axis=0)
     else:
+        # 左右上下翻轉
         return np.flip(img, axis=(0, 1))
 
 
@@ -488,30 +538,53 @@ def impad(img,
         ndarray: The padded image.
     """
 
+    """
+    :param img: 訓練的圖像 
+    :param shape: 經過padding後的大小
+    :param padding: 有3種情況
+    第一種：只有一個數字就是在四周添加一樣指定寬度填充
+    第二種：由兩個數字就是分別在上下以及左右依據指定寬度填充
+    第三種：由四個數字就是分別指定上下左右的填充寬度
+    :param pad_val: 指定padding的值，在padding_mode為constant起作用
+    :param padding_mode: 總共有3種模式，詳細看英文解釋，主要都是用constant
+    :return: 
+    """
+    # 已看過，對圖像進行填充
+
+    # 由於shape與padding之間只能二選一，所以在這裡會進行過濾，如果兩個都有就會報錯
     assert (shape is not None) ^ (padding is not None)
     if shape is not None:
+        # 使用shape進行padding
+        # width = 需要padding的寬度
         width = max(shape[1] - img.shape[1], 0)
+        # height = 需要padding的高度
         height = max(shape[0] - img.shape[0], 0)
+        # 將結果放入到padding當中，這樣的順序在最後會在下方以及右側進行padding
         padding = (0, 0, width, height)
 
     # check pad_val
     if isinstance(pad_val, tuple):
+        # 如果pad_val是tuple格是表示我們在不同channel上會填充不同的數值，所以需要檢查是否合法
         assert len(pad_val) == img.shape[-1]
     elif not isinstance(pad_val, numbers.Number):
+        # pad_val需要是數字
         raise TypeError('pad_val must be a int or a tuple. '
                         f'But received {type(pad_val)}')
 
     # check padding
     if isinstance(padding, tuple) and len(padding) in [2, 4]:
         if len(padding) == 2:
+            # 如果padding長度是2表示指定上下以及左右的padding大小
             padding = (padding[0], padding[1], padding[0], padding[1])
     elif isinstance(padding, numbers.Number):
+        # 如果padding是數字表示在四周padding的寬度都一樣
         padding = (padding, padding, padding, padding)
     else:
+        # 其他狀況就直接報錯
         raise ValueError('Padding must be a int or a 2, or 4 element tuple.'
                          f'But received {padding}')
 
-    # check padding mode
+    # check padding mode，檢查padding模式是否合法
     assert padding_mode in ['constant', 'edge', 'reflect', 'symmetric']
 
     border_type = {
@@ -520,6 +593,7 @@ def impad(img,
         'reflect': cv2.BORDER_REFLECT_101,
         'symmetric': cv2.BORDER_REFLECT
     }
+    # copyMakeBorder的順序為[top, bottom, left, right]
     img = cv2.copyMakeBorder(
         img,
         padding[1],
@@ -529,6 +603,7 @@ def impad(img,
         border_type[padding_mode],
         value=pad_val)
 
+    # 最後回傳padding好的訓練圖像
     return img
 
 

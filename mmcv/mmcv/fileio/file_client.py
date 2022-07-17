@@ -532,8 +532,11 @@ class HardDiskBackend(BaseStorageBackend):
         Returns:
             bytes: Expected bytes object.
         """
+        # 已看過，將要讀取的照片路徑傳入，用二進位方式進行讀取
         with open(filepath, 'rb') as f:
+            # 使用rb方式讀取，這樣讀取的就是二進制的
             value_buf = f.read()
+        # 回傳讀取的結果
         return value_buf
 
     def get_text(self,
@@ -1011,6 +1014,8 @@ class FileClient:
             bytes | memoryview: Expected bytes object or a memory view of the
             bytes object.
         """
+        # 已看過，讀取檔案使用
+        # filepath = 要讀取檔案的檔案路徑
         return self.client.get(filepath)
 
     def get_text(self, filepath: Union[str, Path], encoding='utf-8') -> str:

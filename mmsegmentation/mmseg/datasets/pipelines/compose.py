@@ -43,11 +43,21 @@ class Compose(object):
         Returns:
            dict: Transformed data.
         """
+        # 已看過，圖像處理流的call函數，透過這裡將整個pipeline跑過一次，這裡每次只會處理一張照片
+        # data = 一張圖像的資料，裡面會有要從哪裡讀取照片等等的資料
 
         for t in self.transforms:
+            # 去調用對應轉換方式的__call__函數，將data傳入同時傳出的部分會將data進行更新
             data = t(data)
             if data is None:
+                # 如果data是空的話就直接回傳None
                 return None
+        # 最後回傳data，data中的詳細內容可以用Debug模式下去看
+        # data = dict{
+        #   'img_metas': DataContainer [包含許多訓練圖像的資料],
+        #   'img': DataContainer [訓練圖像的tensor以及相關資訊],
+        #   'gt_semantic_seg': DataContainer [標註圖像的tensor以及相關資訊]
+        # }
         return data
 
     def __repr__(self):
