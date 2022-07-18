@@ -141,7 +141,7 @@ class Registry:
     def __init__(self, name, build_func=None, parent=None, scope=None):
         """
         :param name: 就是註冊器的名稱，這裡好像要取什麼都可以
-        :param build_func:
+        :param build_func: 註冊器接收到build函數時會透過哪個函數進行找到類對象並且進行實例化
         :param parent: 繼承來自其他註冊器
         :param scope:
         """
@@ -320,20 +320,28 @@ class Registry:
             f'scope {registry.scope} exists in {self.name} registry'
         self.children[registry.scope] = registry
 
+    # deprecated_api_warning是用來檢查一些變數的合法性，沒有對資料進行任何操作
     @deprecated_api_warning(name_dict=dict(module_class='module'))
     def _register_module(self, module, module_name=None, force=False):
+        # 透過裝飾器添加新的class時會進入到這裡進行保存
         if not inspect.isclass(module) and not inspect.isfunction(module):
+            # 傳入的module必須是一個class類別或是function類別，其他的就會直接報錯
             raise TypeError('module must be a class or a function, '
                             f'but got {type(module)}')
 
         if module_name is None:
+            # 如果沒有傳入指定名稱，這裡就會默認使用傳入的class的名稱
             module_name = module.__name__
         if isinstance(module_name, str):
+            # 可以多個名稱對應上同一個class或是function，所以這裡我們將module_name用list包裝
             module_name = [module_name]
+        # 遍歷所有的名稱
         for name in module_name:
             if not force and name in self._module_dict:
+                # 如果有重複的key出現就會直接報錯，除非我們使用有將force開啟也就是直接覆蓋之前已經有的value
                 raise KeyError(f'{name} is already registered '
                                f'in {self.name}')
+            # 將key與value保存下來，這樣之後就可以透過key找到對應的class或是function
             self._module_dict[name] = module
 
     def deprecated_register_module(self, cls=None, force=False):
@@ -377,11 +385,14 @@ class Registry:
                 the same name. Default: False.
             module (type): Module class or function to be registered.
         """
+        # 已看過，如果是透過呼叫函數的方式就會是到這裡
         if not isinstance(force, bool):
+            # 檢查force的型態
             raise TypeError(f'force must be a boolean, but got {type(force)}')
         # NOTE: This is a walkaround to be compatible with the old api,
         # while it may introduce unexpected bugs.
         if isinstance(name, type):
+            # 這個是已經要被淘汰的方式，就是在呼叫register_module沒有明確寫出module參數
             return self.deprecated_register_module(name, force=force)
 
         # raise the error ahead of time
@@ -392,11 +403,13 @@ class Registry:
 
         # use it as a normal method: x.register_module(module=SomeClass)
         if module is not None:
+            # 這裡最後還是會call使用裝飾器構建的函數
             self._register_module(module=module, module_name=name, force=force)
             return module
 
         # use it as a decorator: @x.register_module()
         def _register(module):
+            # 透過裝飾器方式將module添加到註冊器會先進入到這裡
             self._register_module(module=module, module_name=name, force=force)
             return module
 
