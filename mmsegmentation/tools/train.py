@@ -280,8 +280,12 @@ def main():
     # 細節部分就用Debug模式自己下去看
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
+        # 當workflow長度為2時表示有驗證集
+        # 這裡我們拷貝一份訓練集的設定資料
         val_dataset = copy.deepcopy(cfg.data.val)
+        # 將驗證集的資料處理流變成與訓練時圖片處理流相同
         val_dataset.pipeline = cfg.data.train.pipeline
+        # 透過build_dataset進行構建dataset
         datasets.append(build_dataset(val_dataset))
     if cfg.checkpoint_config is not None:
         # save mmseg version, config file content and class names in

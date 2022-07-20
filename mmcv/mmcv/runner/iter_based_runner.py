@@ -80,6 +80,7 @@ class IterBasedRunner(BaseRunner):
         #   'img': 原始圖像，裏面的data會有一個batch的圖像已經堆疊好的tensor，shape [batch_size, channel, width, height]
         #   'gt_semantic_seg': 標註圖像，裏面也是一個batch堆疊好的tensor
         # }
+        # 這裡會呼叫IterLoader類的__next__函數
         data_batch = next(data_loader)
         # 將資訊儲存起來
         self.data_batch = data_batch
@@ -111,12 +112,19 @@ class IterBasedRunner(BaseRunner):
 
     @torch.no_grad()
     def val(self, data_loader, **kwargs):
+        # 已看過，驗證模式會進入到這裡
+        # 將模型設定成驗證模式
         self.model.eval()
+        # 將當前模型狀態設定成驗證模式
         self.mode = 'val'
+        # 保存dataloader
         self.data_loader = data_loader
+        # 獲取一個batch的資訊，這裡獲取過程與train完全相同，只是dataset不同而已
         data_batch = next(data_loader)
         self.data_batch = data_batch
+        # 呼叫before_val_iter鉤子函數，這裡幾乎都沒有做任何事情
         self.call_hook('before_val_iter')
+        # 開始將資料進行向前傳遞
         outputs = self.model.val_step(data_batch, **kwargs)
         if not isinstance(outputs, dict):
             raise TypeError('model.val_step() must return a dict')

@@ -49,7 +49,7 @@ class EncoderDecoder(BaseSegmentor):
             # 將backbone的pretrained設定成跟EncoderDecoder當中的pretrained一樣
             backbone.pretrained = pretrained
         # 透過builder中的build_backbone構建backbone，同時將backbone設定資料傳入
-        # self.backbone = 構建好的backbone，這裡就是backbone的實例對象了裡面包括了encoder以及decoder
+        # self.backbone = 構建好的backbone，這裡就是backbone的實例對象了裡面包括了encoder
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             # 如果有neck結構就會進行neck結構的構建，這裡我們先不去看，因為還沒有遇到
@@ -102,6 +102,7 @@ class EncoderDecoder(BaseSegmentor):
         # 將原始tensor傳入到backbone當中進行特徵提取
         # x = list[tensor]，tensor shape [batch_size, channel, height, width]，list長度就是有多少輸出出來的特徵層
         # x的最後一個就是decoder最終的輸出
+        # 如果backbone是transformer型態x的輸出也會是2d的
         x = self.backbone(img)
         if self.with_neck:
             # 如果有neck層結構就會進入到neck當中進行正向傳播
@@ -189,8 +190,8 @@ class EncoderDecoder(BaseSegmentor):
         """
         # 已看過
 
-        # x = list[tensor]，tensor shape [batch_size, channel, height, width]，list長度就是有多少輸出出來的特徵層
-        # x最後一層的輸出就是decoder的輸出(如果沒有neck層結構的話)
+        # x = list或是tuple[tensor]，tensor shape [batch_size, channel, height, width]，list長度就是有多少輸出出來的特徵層
+        # x最後一層的輸出就是encoder的輸出(如果沒有neck層結構的話)
         x = self.extract_feat(img)
 
         # 構建losses字典，這個會是最後要回傳的損失計算值

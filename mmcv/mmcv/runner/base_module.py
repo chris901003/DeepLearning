@@ -62,7 +62,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
     def init_weights(self) -> None:
         """Initialize the weights."""
         # 已看過
-        # 初始化權重
+        # 初始化權重，繼承於BaseModule的類如果沒有重新定義init_weights就會到這裡來
 
         is_top_level_module = False
         # check if it is top-level module
@@ -111,11 +111,12 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
 
         from ..cnn import initialize
         from ..cnn.utils.weight_init import update_init_info
-        # 獲取總模型的架構名稱
+        # 獲取總模型的架構名稱，也就是最上層的名稱在segmentation當中最常見的就是EncoderDecoder
         module_name = self.__class__.__name__
         if not self._is_init:
+            # self._is_init會保存是否已經進行過初始化，如果已經初始化過就會直接跳過
             if self.init_cfg:
-                # 如果有指定的初始化方式就會從這裡進來
+                # 如果有指定的初始化方式就會從這裡進來，預訓練權重資訊會在這裡面
                 print_log(
                     f'initialize {module_name} with init_cfg {self.init_cfg}',
                     logger=logger_name)
@@ -129,7 +130,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
                         return
 
             for m in self.children():
-                # 遞歸往下去初始化下面層結構
+                # 遞歸往下去初始化下面層結構，這裡使用到pytorch的children函數，可以遍歷底下的層結構
                 if hasattr(m, 'init_weights'):
                     m.init_weights()
                     # users may overload the `init_weights`

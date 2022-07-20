@@ -175,6 +175,8 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         during val epochs. Note that the evaluation after training epochs is
         not implemented with this method, but an evaluation hook.
         """
+        # 已看過，這裡是驗證集的部分
+        # 進行向前傳遞並且將結果進行損失計算
         losses = self(**data_batch)
         loss, log_vars = self._parse_losses(losses)
 

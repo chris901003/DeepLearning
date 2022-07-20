@@ -290,7 +290,7 @@ class Resize(object):
                 results['scale'] = (new_h, new_w)
 
             # img = ndarray [height=new_h, width=new_w, channel=3]，透過差值方式調整好的訓練圖
-            # scale_factor = float，原圖縮放比例到指定大小
+            # scale_factor = float，原圖縮放比例到指定大小，如果高寬的縮放比例不同就會採取縮放比例較小的進行縮放
             img, scale_factor = mmcv.imrescale(
                 results['img'], results['scale'], return_scale=True)
             # the w_scale and h_scale has minor difference

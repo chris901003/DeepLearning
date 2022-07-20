@@ -435,8 +435,20 @@ class MultiheadAttention(BaseModule):
                  init_cfg=None,
                  batch_first=False,
                  **kwargs):
+        """ 已看過，構建自注意力模塊
+        Args:
+             embed_dims: 每一個特徵點用多少維度的向量進行表示
+             num_heads: 多頭注意力機制當中用多少頭
+             attn_drop: 在attn當中的dropout_rate
+             proj_drop: 經過proj後的dropout_rate
+             dropout_layer: dropout的設定
+             init_cfg: 初始化設定
+             batch_first: 在使用pytorch官方的注意力模塊可以設定batch_size是否在最前面的維度
+        """
+        # 初始化繼承的class
         super().__init__(init_cfg)
         if 'dropout' in kwargs:
+            # dropout參數已經被淘汰了，現在透過其他三個參數進行設定
             warnings.warn(
                 'The arguments `dropout` in MultiheadAttention '
                 'has been deprecated, now you can separately '
@@ -445,14 +457,18 @@ class MultiheadAttention(BaseModule):
             attn_drop = kwargs['dropout']
             dropout_layer['drop_prob'] = kwargs.pop('dropout')
 
+        # 保存一些參數
         self.embed_dims = embed_dims
         self.num_heads = num_heads
         self.batch_first = batch_first
 
+        # 構建自注意力模塊，這裡我們直接使用pytorch官方提供的自注意力模塊
         self.attn = nn.MultiheadAttention(embed_dims, num_heads, attn_drop,
                                           **kwargs)
 
+        # 構建dropout層
         self.proj_drop = nn.Dropout(proj_drop)
+        # 如果沒有指定dropout層就會直接用線性代替
         self.dropout_layer = build_dropout(
             dropout_layer) if dropout_layer else nn.Identity()
 
@@ -507,21 +523,33 @@ class MultiheadAttention(BaseModule):
             if self.batch_first is False, else
             [bs, num_queries embed_dims].
         """
+        # 已看過，自注意力機制的forward函數
+        # query = 圖像的tensor，shape [batch_size, num_queries, channel=embed_dims]
+        # identity = 用來給捷徑分支的
+        # query與identity的shape會相同
 
         if key is None:
+            # 當沒有指定key時就使用query
             key = query
         if value is None:
+            # 當沒有指定value時就使用key
             value = key
         if identity is None:
+            # 當沒有指定identity時就使用query
             identity = query
         if key_pos is None:
+            # 當我們沒有給定key的位置編碼時會進來
             if query_pos is not None:
+                # 如果有給query的位置編碼就會進來
                 # use query_pos if key_pos is not available
                 if query_pos.shape == key.shape:
+                    # 如果query的位置編碼shape與key相同，我們就將query_pos給key_pos
                     key_pos = query_pos
                 else:
+                    # 否則會給警告
                     warnings.warn(f'position encoding of key is'
                                   f'missing in {self.__class__.__name__}.')
+        # 如果有位置編碼就將位置編碼加上去
         if query_pos is not None:
             query = query + query_pos
         if key_pos is not None:
@@ -534,10 +562,14 @@ class MultiheadAttention(BaseModule):
         # (num_query ,batch, embed_dims), and recover ``attn_output``
         # from num_query_first to batch_first.
         if self.batch_first:
+            # 如果有指定batch_size在前的話就需要調整一下通道順序
+            # [batch_size, num_queries, channel] -> [num_queries, batch_size, channel]
             query = query.transpose(0, 1)
             key = key.transpose(0, 1)
             value = value.transpose(0, 1)
 
+        # 將各種資料傳入進行自注意力機制，這裡就是官方實現的attn，我們只需要第一個回傳值就可以了
+        # out shape [num_queries, batch_size, channel]
         out = self.attn(
             query=query,
             key=key,
@@ -546,8 +578,12 @@ class MultiheadAttention(BaseModule):
             key_padding_mask=key_padding_mask)[0]
 
         if self.batch_first:
+            # 將通道順序條回來
+            # [num_queries, batch_size, channel] -> [batch_size, num_queries, channel]
             out = out.transpose(0, 1)
 
+        # 最後通過dropout以及drop_path以及捷徑分支
+        # 回傳的shape與輸入的shape相同
         return identity + self.dropout_layer(self.proj_drop(out))
 
 
@@ -590,25 +626,46 @@ class FFN(BaseModule):
                  add_identity=True,
                  init_cfg=None,
                  **kwargs):
+        """ 已看過，FFN層結構
+        Args:
+            embed_dims: 每一個特徵點會用多少維度的向量進行表示
+            feedforward_channels: 在FFN中間層channel深度
+            num_fcs: FFN會用多少層全連接層
+            act_cfg: 激活函數的設定
+            ffn_drop: FFN的dropout率
+            dropout_layer: 當有捷徑分支時的dropout
+            add_identity: 是否使用捷徑分支
+            init_cfg: 初始化設定
+        """
         super().__init__(init_cfg)
+        # FFN至少需要兩層以上的全連接層
         assert num_fcs >= 2, 'num_fcs should be no less ' \
             f'than 2. got {num_fcs}.'
+        # 保存一些參數
         self.embed_dims = embed_dims
         self.feedforward_channels = feedforward_channels
         self.num_fcs = num_fcs
         self.act_cfg = act_cfg
+        # 構建激活函數層
         self.activate = build_activation_layer(act_cfg)
 
         layers = []
+        # 最一開始的channel就會是embed_dims
         in_channels = embed_dims
+        # 遍歷num_fcs-1次
         for _ in range(num_fcs - 1):
             layers.append(
+                # 添加全連接層以及激活函數以及失活層
                 Sequential(
                     Linear(in_channels, feedforward_channels), self.activate,
                     nn.Dropout(ffn_drop)))
+            # 更新輸入的channel
             in_channels = feedforward_channels
+        # 最後一層需要將channel變回輸入時的channel深度
         layers.append(Linear(feedforward_channels, embed_dims))
+        # 最後還有失活層
         layers.append(nn.Dropout(ffn_drop))
+        # 透過Sequential全部包裝起來
         self.layers = Sequential(*layers)
         self.dropout_layer = build_dropout(
             dropout_layer) if dropout_layer else torch.nn.Identity()
@@ -620,11 +677,18 @@ class FFN(BaseModule):
 
         The function would add x to the output tensor if residue is None.
         """
+        # 已看過，FFN的forward函數
+        # x = 圖像的tensor，shape [batch_size, num_queries, channel]
+        # identity = 用來給捷徑分支的，這裡shape與x會相同
+
+        # 通過一系列全連結層，最終shape不會改變
         out = self.layers(x)
         if not self.add_identity:
+            # 不需要捷徑分支就會走這裡
             return self.dropout_layer(out)
         if identity is None:
             identity = x
+        # 添加上捷徑分支
         return identity + self.dropout_layer(out)
 
 

@@ -69,6 +69,7 @@ def build_dataset(cfg, default_args=None):
     # 已看過
     # 構建dataset
     # cfg = 構建dataset的詳細參數，每一個dict表示一種處理的方式，cfg本身也是dict格式
+    # 如果是要構建驗證資料集在default_args裡面會多出test_mode的key且value為True
     from .dataset_wrappers import (ConcatDataset, MultiImageMixDataset,
                                    RepeatDataset)
 

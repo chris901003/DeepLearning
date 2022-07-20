@@ -57,7 +57,16 @@ class MultiScaleFlipAug(object):
                  img_ratios=None,
                  flip=False,
                  flip_direction='horizontal'):
+        """ 已看過，主要是在驗證集上面會使用到的圖像轉換流程
+        Args:
+            transforms: list[ConfigDict]，裏面包含了一系列的轉換
+            img_scale: 在進行resize時指定的大小
+            img_ratios: 在resize時的圖像高寬比，預設為None
+            flip: 是否進行翻轉
+            flip_direction: 翻轉的方向，這裡可以選擇3種不同的翻轉方式
+        """
         if flip:
+            # 當我們有使用翻轉時需要檢查，是否先經過翻轉後才進行填充
             trans_index = {
                 key['type']: index
                 for index, key in enumerate(transforms)
@@ -65,32 +74,44 @@ class MultiScaleFlipAug(object):
             if 'RandomFlip' in trans_index and 'Pad' in trans_index:
                 assert trans_index['RandomFlip'] < trans_index['Pad'], \
                     'Pad must be executed after RandomFlip when flip is True'
+        # 這裡還是使用到Compose模塊將一系列的transforms放入
         self.transforms = Compose(transforms)
         if img_ratios is not None:
+            # 如果有傳入img_ratios我們就會調整型態
             img_ratios = img_ratios if isinstance(img_ratios,
                                                   list) else [img_ratios]
+            # 檢查img_ratios格式
             assert mmcv.is_list_of(img_ratios, float)
         if img_scale is None:
+            # 沒有設定img_scale
             # mode 1: given img_scale=None and a range of image ratio
             self.img_scale = None
             assert mmcv.is_list_of(img_ratios, float)
         elif isinstance(img_scale, tuple) and mmcv.is_list_of(
                 img_ratios, float):
+            # 如果有設定img_scale且同時有設定img_ratios就會進來
             assert len(img_scale) == 2
             # mode 2: given a scale and a range of image ratio
+            # 透過img_scale與img_ratios組成最後的img_scale
             self.img_scale = [(int(img_scale[0] * ratio),
                                int(img_scale[1] * ratio))
                               for ratio in img_ratios]
         else:
             # mode 3: given multiple scales
+            # 只有傳入img_scale就直接變換格式之後保存
             self.img_scale = img_scale if isinstance(img_scale,
                                                      list) else [img_scale]
+        # img_scale要不就是tuple要不就要是None
         assert mmcv.is_list_of(self.img_scale, tuple) or self.img_scale is None
+        # 紀錄一些參數
         self.flip = flip
         self.img_ratios = img_ratios
+        # 將flip_direction轉成list格式
         self.flip_direction = flip_direction if isinstance(
             flip_direction, list) else [flip_direction]
+        # flip_direction內部需要是str格式
         assert mmcv.is_list_of(self.flip_direction, str)
+        # 一些警告表示如果沒有開啟flip那麼flip_direction裏面也不會有作用
         if not self.flip and self.flip_direction != ['horizontal']:
             warnings.warn(
                 'flip_direction has no effect when flip is set to False')

@@ -85,10 +85,13 @@ class MMDataParallel(DataParallel):
         return self.module.train_step(*inputs[0], **kwargs[0])
 
     def val_step(self, *inputs, **kwargs):
+        # 已看過，驗證模式會從這裡
         if not self.device_ids:
+            # 這部分與上面的train相同
             # We add the following line thus the module could gather and
             # convert data containers as those in GPU inference
             inputs, kwargs = self.scatter(inputs, kwargs, [-1])
+            # 將資料進行向前傳遞
             return self.module.val_step(*inputs[0], **kwargs[0])
 
         assert len(self.device_ids) == 1, \

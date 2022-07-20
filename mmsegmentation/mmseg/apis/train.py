@@ -196,7 +196,7 @@ def train_segmentor(model,
 
     # register eval hooks，創建驗證模式會需要用到的鉤子函數
     if validate:
-        # val_dataset = 驗證集的dataset，這裡與創建train_dataset相同
+        # val_dataset = 驗證集的dataset，這裡與創建train_dataset相同，這裡會將test_mode設定成True表示在印驗證模式
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
         # The specific dataloader settings
         # val_loader_cfg = 一些設定dataloader的相關參數

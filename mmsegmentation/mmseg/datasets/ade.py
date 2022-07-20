@@ -18,6 +18,9 @@ class ADE20KDataset(CustomDataset):
     The ``img_suffix`` is fixed to '.jpg' and ``seg_map_suffix`` is fixed to
     '.png'.
     """
+    # 已看過，AED20k資料集的類
+
+    # 這裡提供預設的CLASSES裏面就是資料及當中的類別名稱，長度會與分類類別數相同
     CLASSES = (
         'wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed ',
         'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth',
@@ -44,6 +47,7 @@ class ADE20KDataset(CustomDataset):
         'plate', 'monitor', 'bulletin board', 'shower', 'radiator', 'glass',
         'clock', 'flag')
 
+    # 這裡是預設的塗色，每一個類別會有獨立的顏色進行表示
     PALETTE = [[120, 120, 120], [180, 120, 120], [6, 230, 230], [80, 50, 50],
                [4, 200, 3], [120, 120, 80], [140, 140, 140], [204, 5, 255],
                [230, 230, 230], [4, 250, 7], [224, 5, 255], [235, 255, 7],
@@ -84,6 +88,8 @@ class ADE20KDataset(CustomDataset):
                [102, 255, 0], [92, 0, 255]]
 
     def __init__(self, **kwargs):
+        # 已看過，構建ADE20k的初始化函數
+        # 直接初始化繼承對象，並且將訓練圖像的後綴以及驗證圖像的後綴傳入
         super(ADE20KDataset, self).__init__(
             img_suffix='.jpg',
             seg_map_suffix='.png',

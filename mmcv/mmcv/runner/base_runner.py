@@ -382,6 +382,8 @@ class BaseRunner(metaclass=ABCMeta):
         strict: bool = False,
         revise_keys: List = [(r'^module.', '')],
     ) -> Union[Dict, OrderedDict]:
+        # 已看過，加載預訓練權重會到這裡來
+        # 透過load_checkpoint進行加載
         return load_checkpoint(
             self.model,
             filename,

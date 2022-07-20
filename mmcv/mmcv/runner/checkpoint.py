@@ -59,11 +59,19 @@ def load_state_dict(module: nn.Module,
         logger (:obj:`logging.Logger`, optional): Logger to log the error
             message. If not specified, print function will be used.
     """
+    # 已看過，主要是將模型預訓練權重加載到模型當中
+    # module = 模型本身
+    # state_dict = 預訓練權重
+    # strict = 是否嚴格加載
+    # logger = 紀錄用的
+
+    # 紀錄一些加載的狀況用的
     unexpected_keys: List[str] = []
     all_missing_keys: List[str] = []
     err_msg: List[str] = []
 
     metadata = getattr(state_dict, '_metadata', None)
+    # 拷貝一份權重
     state_dict = state_dict.copy()  # type: ignore
     if metadata is not None:
         state_dict._metadata = metadata  # type: ignore
@@ -73,16 +81,20 @@ def load_state_dict(module: nn.Module,
         # recursively check parallel module in case that the model has a
         # complicated structure, e.g., nn.Module(nn.Module(DDP))
         if is_module_wrapper(module):
+            # 如果有使用DDP的話module外面還會有一層module，所以我們會需要將外層的module去除
             module = module.module
         local_metadata = {} if metadata is None else metadata.get(
             prefix[:-1], {})
+        # 加載權重
         module._load_from_state_dict(state_dict, prefix, local_metadata, True,
                                      all_missing_keys, unexpected_keys,
                                      err_msg)
+        # 這裡透過遞迴方式將內部的層結構也進行權重加載
         for name, child in module._modules.items():
             if child is not None:
                 load(child, prefix + name + '.')
 
+    # 調用load函數
     load(module)
     # break load->load reference cycle
     load = None  # type: ignore
@@ -269,6 +281,7 @@ class CheckpointLoader:
         Returns:
             callable: checkpoint loader
         """
+        # 已看過，根據傳入的path前半部分決定要用哪種方式獲取預訓練權重資料
         for p in cls._schemes:
             # use regular match to handle some cases that where the prefix of
             # loader has a prefix. For example, both 's3://path' and
@@ -295,11 +308,15 @@ class CheckpointLoader:
         Returns:
             dict or OrderedDict: The loaded checkpoint.
         """
+        # 已看過，讀入預訓練權重同時這裡預訓練權重是給網址
 
+        # 透過_get_checkpoint_loader會根據傳入的filename的前面部分決定要用哪種方式抓取資料
         checkpoint_loader = cls._get_checkpoint_loader(filename)
+        # 這裡是做紀錄使用的
         class_name = checkpoint_loader.__name__  # type: ignore
         mmcv.print_log(
             f'load checkpoint from {class_name[10:]} path: {filename}', logger)
+        # 透過指定的方式將資料位置傳入
         return checkpoint_loader(filename, map_location)  # type: ignore
 
 
@@ -317,10 +334,14 @@ def load_from_local(
     Returns:
         dict or OrderedDict: The loaded checkpoint.
     """
+    # 已看過，從資料夾載入預訓練權重
     filename = osp.expanduser(filename)
     if not osp.isfile(filename):
+        # 檢查檔案是否存在
         raise FileNotFoundError(f'{filename} can not be found.')
+    # 使用pytorch的load將預訓練權重載入進來
     checkpoint = torch.load(filename, map_location=map_location)
+    # 回傳dict的預訓練權重資料
     return checkpoint
 
 
@@ -342,8 +363,12 @@ def load_from_http(
     Returns:
         dict or OrderedDict: The loaded checkpoint.
     """
+    # 已看過，獲取預訓練權重值
     rank, world_size = get_dist_info()
     if rank == 0:
+        # 透過load_url獲取預訓練權重內容，checkpoint就是我們的權重資料
+        # 這裡的load_url會調用的是pytorch官方實現的透過網路下載預訓練權重，並且會存起來，如果已經下載好的就會直接將值load進來
+        # checkpoint就是熟悉的dict格式，裏面的key就是對應的層結構名稱，value就是層結構的權重
         checkpoint = load_url(
             filename, model_dir=model_dir, map_location=map_location)
     if world_size > 1:
@@ -558,6 +583,10 @@ def _load_checkpoint(
            OrderedDict storing model weights or a dict containing other
            information, which depends on the checkpoint.
     """
+    # 已看過，載入預訓練權重
+    # filename = 預訓練權重網址或是檔案位置
+    # map_location = 這裡通常都設定成接下來要在哪個設備上進行訓練
+    # logger = 紀錄用的
     return CheckpointLoader.load_checkpoint(filename, map_location, logger)
 
 
@@ -624,13 +653,24 @@ def load_checkpoint(
     Returns:
         dict or OrderedDict: The loaded checkpoint.
     """
+    # 已看過，進行模型的加載，這裡可以透過網址或是點檔案路徑進行加載
+    # model = 模型本身
+    # filename = 預訓練權重位置，可以是網址或是檔案位置
+    # map_location = 這裡就是用cpu進行加載
+    # strict = 是否進行嚴格加載，這裡預設為False
+    # logger = 紀錄用的
+    # revise_key = 一些特殊用法
+
+    # 透過_load_checkpoint進行預訓練權重獲取
     checkpoint = _load_checkpoint(filename, map_location, logger)
     # OrderedDict is a subclass of dict
     if not isinstance(checkpoint, dict):
+        # 檢查checkpoint是否為dict格式，如果不是這裡就會報錯
         raise RuntimeError(
             f'No state_dict found in checkpoint file {filename}')
     # get state_dict from checkpoint
     if 'state_dict' in checkpoint:
+        # 我們只會需要checkpoint當中的state_dict資料，因為checkpoint當中還會有meta這個資料
         state_dict = checkpoint['state_dict']
     else:
         state_dict = checkpoint
