@@ -51,38 +51,55 @@ def intersect_and_union(pred_label,
          torch.Tensor: The prediction histogram on all classes.
          torch.Tensor: The ground truth histogram on all classes.
     """
+    # 已看過，主要是在測試模型時可以獲取交並比
 
     if isinstance(pred_label, str):
+        # 如果pred_label是str格式我們就將資料載入並且轉成tensor格式
         pred_label = torch.from_numpy(np.load(pred_label))
     else:
+        # 否則就轉成tensor格式
         pred_label = torch.from_numpy((pred_label))
 
     if isinstance(label, str):
+        # 如果label給的是str我們就將其載入
         label = torch.from_numpy(
             mmcv.imread(label, flag='unchanged', backend='pillow'))
     else:
+        # 這裡也會將label轉成tensor格式
         label = torch.from_numpy(label)
 
     if label_map is not None:
+        # 如果有label_map就會將舊的id改成新的id
         for old_id, new_id in label_map.items():
             label[label == old_id] = new_id
     if reduce_zero_label:
+        # 如果要將label為0的地方忽略掉就會到這裡
         label[label == 0] = 255
         label = label - 1
         label[label == 254] = 255
 
+    # mask = 將要忽略掉的index拿出來
     mask = (label != ignore_index)
+    # 將pred_label與label過濾出來
     pred_label = pred_label[mask]
     label = label[mask]
 
+    # 獲取有交集的地方，這裡就是有哪些相同就會拿出來
     intersect = pred_label[pred_label == label]
+    # 使用torch.histc計算直方圖
+    # (input=tensor, bins=分成多少類, min=最小值, max=最大值)，低於min或是大於max的都不會被計算進去
+    # 回傳的就會是每一格類別上總共有多少個，area_intersect shape [num_classes]
     area_intersect = torch.histc(
         intersect.float(), bins=(num_classes), min=0, max=num_classes - 1)
+    # 計算預測的部分
     area_pred_label = torch.histc(
         pred_label.float(), bins=(num_classes), min=0, max=num_classes - 1)
+    # 計算標註圖像的類別
     area_label = torch.histc(
         label.float(), bins=(num_classes), min=0, max=num_classes - 1)
+    # 這個部分就是有重疊的面積
     area_union = area_pred_label + area_label - area_intersect
+    # 以下這幾個指標可以去看segmentation如何判定正確率的，這裡就像是在算混淆矩陣
     return area_intersect, area_union, area_pred_label, area_label
 
 
@@ -310,18 +327,33 @@ def pre_eval_to_metrics(pre_eval_results,
         ndarray: Per category accuracy, shape (num_classes, ).
         ndarray: Per category evaluation metrics, shape (num_classes, ).
     """
+    # 已看過，計算模型的正確率
+    # pre_eval_results = 各種交並比
+    # metrics = 指定的驗證方式
+    # nan_to_num = 如果有設定值的話就會將NaN的部分轉換成數字
 
     # convert list of tuples to tuple of lists, e.g.
     # [(A_1, B_1, C_1, D_1), ...,  (A_n, B_n, C_n, D_n)] to
     # ([A_1, ..., A_n], ..., [D_1, ..., D_n])
+    # 透過轉換每一個圖像資料的相同交並比部分會整合再在一起，可以看上面的轉換過程
     pre_eval_results = tuple(zip(*pre_eval_results))
+    # 檢查pre_eval_results長度會是4
     assert len(pre_eval_results) == 4
 
+    # 將[預測圖 && 標註圖]部分全部進行相加
     total_area_intersect = sum(pre_eval_results[0])
+    # 將[預測圖 || 標註圖]部分全部進行相加
     total_area_union = sum(pre_eval_results[1])
+    # 將[預測圖]部分全部相加
     total_area_pred_label = sum(pre_eval_results[2])
+    # 將[標註圖]不分全部相加
     total_area_label = sum(pre_eval_results[3])
 
+    # ret_metrics = dict{
+    #   'aAcc' = float [總正確率],
+    #   'IoU' = ndarray shape [num_classes]，裏面有個別類別的iou值
+    #   'Acc' = ndarray shape [num_classes]，裏面有個別類鼻的正確率
+    # }
     ret_metrics = total_area_to_metrics(total_area_intersect, total_area_union,
                                         total_area_pred_label,
                                         total_area_label, metrics, nan_to_num,
@@ -354,18 +386,36 @@ def total_area_to_metrics(total_area_intersect,
         ndarray: Per category accuracy, shape (num_classes, ).
         ndarray: Per category evaluation metrics, shape (num_classes, ).
     """
+    # 已看過，主要是用來計算驗證矩陣
+    # total_area_intersect = [預測圖 && 標註圖]的部分，shape [num_classes]
+    # total_area_union = [預測圖 || 標註圖]的部分，shape [num_classes]
+    # total_area_pred_label = [預測圖]的部分，shape [num_classes]
+    # total_area_label = [標註圖]的部分，shape [num_classes]
+    # metrics = 要計算的方式
+    # nan_to_num = 如果有給定值的話就會將NaN部分換成指定的數值
+
     if isinstance(metrics, str):
+        # 如果傳入的metrics是str格式就會在外面多加上list
         metrics = [metrics]
     allowed_metrics = ['mIoU', 'mDice', 'mFscore']
     if not set(metrics).issubset(set(allowed_metrics)):
+        # 檢查我們只有支援三種驗證方式
         raise KeyError('metrics {} is not supported'.format(metrics))
 
+    # 透過預測的總數量除以交集部分就可以獲取到正確率
     all_acc = total_area_intersect.sum() / total_area_label.sum()
+    # 將資料記錄下來
     ret_metrics = OrderedDict({'aAcc': all_acc})
+    # 遍歷我們指定的驗證方式
     for metric in metrics:
         if metric == 'mIoU':
+            # 計算mIoU會到這裡
+            # iou = 透過並集除以交集就可以獲取iou值
             iou = total_area_intersect / total_area_union
+            # 正確率與上方all_acc相同
             acc = total_area_intersect / total_area_label
+            # 保存下來，這裡都會是保存個別的類別的資料
+            # iou與acc的shape [num_classes]
             ret_metrics['IoU'] = iou
             ret_metrics['Acc'] = acc
         elif metric == 'mDice':
@@ -383,6 +433,7 @@ def total_area_to_metrics(total_area_intersect,
             ret_metrics['Precision'] = precision
             ret_metrics['Recall'] = recall
 
+    # 將ret_metrics裏面的value從tensor轉成ndarray
     ret_metrics = {
         metric: value.numpy()
         for metric, value in ret_metrics.items()

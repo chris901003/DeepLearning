@@ -78,6 +78,7 @@ class ImageToTensor(object):
     """
 
     def __init__(self, keys):
+        # 已看過，將指定名稱的key的value轉成tensor格式
         self.keys = keys
 
     def __call__(self, results):
@@ -92,10 +93,15 @@ class ImageToTensor(object):
                 to :obj:`torch.Tensor` and transposed to (C, H, W) order.
         """
 
+        # 已看過，將指定的key的value轉成tensor格式
         for key in self.keys:
+            # 獲取要轉換的資料
             img = results[key]
             if len(img.shape) < 3:
+                # 如果沒有channel維度就會加上
                 img = np.expand_dims(img, -1)
+            # 轉成tensor格式同時調整通道順序，因為我們是用cv2進行圖像加載所以需要調整
+            # [height, width, channel] -> [channel, height, width]，這樣就符合我們需要的
             results[key] = to_tensor(img.transpose(2, 0, 1))
         return results
 

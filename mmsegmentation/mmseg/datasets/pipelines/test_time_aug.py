@@ -130,23 +130,38 @@ class MultiScaleFlipAug(object):
            dict[str: list]: The augmented data, where each value is wrapped
                into a list.
         """
+        # 已看過，測試時會透過這裡對圖像資料進行一系列處理
 
         aug_data = []
         if self.img_scale is None and mmcv.is_list_of(self.img_ratios, float):
+            # 沒有指定圖像大小但是有給縮放比例就會進入
+            # 獲取原始圖像的高寬
             h, w = results['img'].shape[:2]
+            # 將原始圖像乘上縮放比例獲得指定的圖像大小
             img_scale = [(int(w * ratio), int(h * ratio))
                          for ratio in self.img_ratios]
         else:
+            # 否則就直接給值
             img_scale = self.img_scale
+        # 翻轉相關的東西
         flip_aug = [False, True] if self.flip else [False]
+        # 遍歷img_scale
         for scale in img_scale:
+            # 如果沒有要翻轉就只會是[False]，如果有要翻轉就會有[False, True]兩種
             for flip in flip_aug:
+                # 遍歷翻轉的方式，同常我們只會用水平翻轉
                 for direction in self.flip_direction:
+                    # 這裡我們複製一份results
                     _results = results.copy()
+                    # 將當前遍歷到的圖像大小記錄下來
                     _results['scale'] = scale
+                    # 將當前遍歷到的是否要翻轉記錄下來
                     _results['flip'] = flip
+                    # 將當前遍歷到的翻轉方式記錄下來
                     _results['flip_direction'] = direction
+                    # 將這些資訊放到transforms進行一系列處理
                     data = self.transforms(_results)
+                    # 將當前設定的結果保存下來
                     aug_data.append(data)
         # list of dict to dict of list
         aug_data_dict = {key: [] for key in aug_data[0]}

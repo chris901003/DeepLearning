@@ -53,6 +53,7 @@ def imnormalize_(img, mean, std, to_rgb=True):
 
 
 def imdenormalize(img, mean, std, to_bgr=True):
+    # 已看過，將圖像從經過均值方差調整的再調整回去到最原始的顏色
     assert img.dtype != np.uint8
     mean = mean.reshape(1, -1).astype(np.float64)
     std = std.reshape(1, -1).astype(np.float64)

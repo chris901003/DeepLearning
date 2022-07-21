@@ -11,11 +11,14 @@ class ProgressBar:
     """A progress bar which can print the progress."""
 
     def __init__(self, task_num=0, bar_width=50, start=True, file=sys.stdout):
+        # 已看過，主要功能就是可以獲取到進度條
+        # 這裡將輸入進來的參數進行保存
         self.task_num = task_num
         self.bar_width = bar_width
         self.completed = 0
         self.file = file
         if start:
+            # 調用開始的函數
             self.start()
 
     @property
@@ -24,6 +27,7 @@ class ProgressBar:
         return width
 
     def start(self):
+        # 已看過，開始顯示進度條
         if self.task_num > 0:
             self.file.write(f'[{" " * self.bar_width}] 0/{self.task_num}, '
                             'elapsed: 0s, ETA:')

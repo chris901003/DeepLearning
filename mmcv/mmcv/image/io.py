@@ -192,17 +192,28 @@ def imread(img_or_path,
         >>> img = mmcv.imread(http_img_path, file_client_args={
         ...     'backend': 'http'})
     """
+    # 已看過，讀取照片用的
+    # img_or_path = 可以傳入圖像本身或是圖像檔案位置，如果是直接傳圖像就要是ndarray格式不可以是Image格式
+    # flag = 圖像類型，例如彩色或是灰階圖像
+    # channel_order = 圖像色彩排序
+    # backend = 使用哪個模組進行讀取
 
     if isinstance(img_or_path, Path):
+        # 如果img_or_path是Path我們就先轉成str格式
         img_or_path = str(img_or_path)
 
     if isinstance(img_or_path, np.ndarray):
+        # 如果圖像已經是ndarray格式我們就直接返回就可以了，表示已經讀取出來
         return img_or_path
     elif is_str(img_or_path):
+        # 如果傳入的是檔案位置就會到這裡
         file_client = FileClient.infer_client(file_client_args, img_or_path)
+        # 透過讀取檔案並且讀取出來的是二進制類型
         img_bytes = file_client.get(img_or_path)
+        # 將二進制圖像類型轉成ndarray
         return imfrombytes(img_bytes, flag, channel_order, backend)
     else:
+        # 其他類別就會直接報錯
         raise TypeError('"img" must be a numpy array or a str or '
                         'a pathlib.Path object')
 

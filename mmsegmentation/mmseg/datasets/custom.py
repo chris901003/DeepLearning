@@ -307,10 +307,15 @@ class CustomDataset(Dataset):
             dict: Testing data after pipeline with new keys introduced by
                 pipeline.
         """
+        # 已看過，準備測試的圖像進行一系列轉換
 
+        # 根據需要的index獲取對應的圖像資訊
         img_info = self.img_infos[idx]
+        # 構建results字典用來接下來一系列操作用的
         results = dict(img_info=img_info)
+        # 使用pre_pipeline構建一些空間
         self.pre_pipeline(results)
+        # 進入pipeline中
         return self.pipeline(results)
 
     def format_results(self, results, imgfile_prefix, indices=None, **kwargs):
@@ -319,10 +324,16 @@ class CustomDataset(Dataset):
 
     def get_gt_seg_map_by_idx(self, index):
         """Get one ground truth segmentation map for evaluation."""
+        # 已看過，透過index獲取對應的標註圖像
+
+        # 透過get_anno_info獲取標註圖像的檔案名稱
         ann_info = self.get_ann_info(index)
+        # 創建一個results空間，用來保存標註圖像相關訊息
         results = dict(ann_info=ann_info)
         self.pre_pipeline(results)
+        # 透過gt_seg_map_loader簡單獲取驗證圖像
         self.gt_seg_map_loader(results)
+        # 將資料放到results當中
         return results['gt_semantic_seg']
 
     def get_gt_seg_maps(self, efficient_test=None):
@@ -353,17 +364,33 @@ class CustomDataset(Dataset):
             list[torch.Tensor]: (area_intersect, area_union, area_prediction,
                 area_ground_truth).
         """
+        # 已看過，在進行驗證時可以先進行驗證計算
+        # preds = 預測出來的值，list[ndarray] ndarray shape [height, width]
+        # indices = 當前取出的是哪個index圖像
+
         # In order to compat with batch inference
         if not isinstance(indices, list):
+            # 如果傳入的indices不是list型態，這裡就會加上list
             indices = [indices]
         if not isinstance(preds, list):
+            # 如果傳入的preds不是list型態，這裡就會加上list
             preds = [preds]
 
+        # 要回傳的資訊保留空間
         pre_eval_results = []
 
+        # 遍歷我們預測的圖像
         for pred, index in zip(preds, indices):
+            # 透過index獲取對應的標註圖像
+            # seg_map = ndarray shape [height, width]
             seg_map = self.get_gt_seg_map_by_idx(index)
             pre_eval_results.append(
+                # 計算指標用的，透過這個就可以獲得預測好壞
+                # 以下或是pre_eval_results會回傳的東西
+                # area_intersect = 預測圖 && 標註圖
+                # area_union = 預測圖 || 標註圖
+                # area_pred_label = 預測圖
+                # area_label = 標註圖
                 intersect_and_union(
                     pred,
                     seg_map,
@@ -478,16 +505,27 @@ class CustomDataset(Dataset):
         Returns:
             dict[str, float]: Default metrics.
         """
+        # 已看過，根據我們指定的驗證內容進行計算
+        # results = 經過處理的結果，裏面有圖像的交並比資料
+        # metric = 要計算的指標
+        # logger = 紀錄用的
+        # gt_seg_maps = 預設為None
+
         if isinstance(metric, str):
+            # 如果傳入的metric是str格式就轉成list
             metric = [metric]
+        # 這裡只有支援以下三種的驗證模式
         allowed_metrics = ['mIoU', 'mDice', 'mFscore']
         if not set(metric).issubset(set(allowed_metrics)):
+            # 如果指定的驗證模式沒有在支援當中就會報錯
             raise KeyError('metric {} is not supported'.format(metric))
 
+        # 保存驗證結果的地方
         eval_results = {}
         # test a list of files
         if mmcv.is_list_of(results, np.ndarray) or mmcv.is_list_of(
                 results, str):
+            # 如果results是ndarray或是str就會到這裡來
             if gt_seg_maps is None:
                 gt_seg_maps = self.get_gt_seg_maps()
             num_classes = len(self.CLASSES)
@@ -501,6 +539,12 @@ class CustomDataset(Dataset):
                 reduce_zero_label=self.reduce_zero_label)
         # test a list of pre_eval_results
         else:
+            # 如果results是list型態就會到這裡
+            # ret_metrics = dict{
+            #   'aAcc' = float [總正確率],
+            #   'IoU' = ndarray shape [num_classes]，裏面有個別類別的iou值
+            #   'Acc' = ndarray shape [num_classes]，裏面有個別類鼻的正確率
+            # }
             ret_metrics = pre_eval_to_metrics(results, metric)
 
         # Because dataset.CLASSES is required for per-eval.
@@ -510,25 +554,31 @@ class CustomDataset(Dataset):
             class_names = self.CLASSES
 
         # summary table
+        # 遍歷整個ret_metrics計算每個部分的平均值透過nanmean
         ret_metrics_summary = OrderedDict({
             ret_metric: np.round(np.nanmean(ret_metric_value) * 100, 2)
             for ret_metric, ret_metric_value in ret_metrics.items()
         })
 
-        # each class table
+        # each class table，先將aAcc移除，因為我們這邊需要的是個別類別的相關資料
         ret_metrics.pop('aAcc', None)
+        # ret_metrics_class = 個別類別的正確率以及iou值
         ret_metrics_class = OrderedDict({
             ret_metric: np.round(ret_metric_value * 100, 2)
             for ret_metric, ret_metric_value in ret_metrics.items()
         })
         ret_metrics_class.update({'Class': class_names})
+        # 將Class這個key放到OrderedDict的最上面
         ret_metrics_class.move_to_end('Class', last=False)
 
         # for logger
+        # PrettyTable可以畫出一個漂亮的表格
         class_table_data = PrettyTable()
+        # 遍歷我們的資料並且放到表格當中
         for key, val in ret_metrics_class.items():
             class_table_data.add_column(key, val)
 
+        # 這裡也是一個表格
         summary_table_data = PrettyTable()
         for key, val in ret_metrics_summary.items():
             if key == 'aAcc':
@@ -536,6 +586,7 @@ class CustomDataset(Dataset):
             else:
                 summary_table_data.add_column('m' + key, [val])
 
+        # 將表格內容打印出來
         print_log('per class results:', logger)
         print_log('\n' + class_table_data.get_string(), logger=logger)
         print_log('Summary:', logger)

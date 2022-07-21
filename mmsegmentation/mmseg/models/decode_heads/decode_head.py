@@ -275,6 +275,8 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         Returns:
             Tensor: Output segmentation map.
         """
+        # 已看過，這裡與train不同的地方就是我們不會進行損失計算
+        # return shape [batch_size, channel, height, width]
         return self.forward(inputs)
 
     def cls_seg(self, feat):

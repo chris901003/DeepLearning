@@ -78,26 +78,40 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
                 augs (multiscale, flip, etc.) and the inner list indicates
                 images in a batch.
         """
+        # 已看過，實際測試時會進入到這裡
+        # imgs = 輸入圖像的tensor，shape [batch_size, channel, height, width]
+        # img_metas = 圖像的相關資訊
+        # kwargs = 裡面有rescale參數，這裡會是True
+
+        # 遍歷傳入資料
         for var, name in [(imgs, 'imgs'), (img_metas, 'img_metas')]:
             if not isinstance(var, list):
+                # 檢查var是否為list格式
                 raise TypeError(f'{name} must be a list, but got '
                                 f'{type(var)}')
 
+        # num_augs = 有多少個batch
         num_augs = len(imgs)
         if num_augs != len(img_metas):
+            # 如果資訊不匹配這裡就會報錯
             raise ValueError(f'num of augmentations ({len(imgs)}) != '
                              f'num of image meta ({len(img_metas)})')
         # all images in the same aug batch all of the same ori_shape and pad
         # shape
+        # 遍歷圖像資訊
         for img_meta in img_metas:
+            # 獲取圖像原始大小
             ori_shapes = [_['ori_shape'] for _ in img_meta]
             assert all(shape == ori_shapes[0] for shape in ori_shapes)
+            # 獲取當前圖像大小
             img_shapes = [_['img_shape'] for _ in img_meta]
             assert all(shape == img_shapes[0] for shape in img_shapes)
+            # 獲取padding後的圖像大小
             pad_shapes = [_['pad_shape'] for _ in img_meta]
             assert all(shape == pad_shapes[0] for shape in pad_shapes)
 
         if num_augs == 1:
+            # 如果只有一張圖像會到這裡，我們只會把list的第一個傳入就可以了
             return self.simple_test(imgs[0], img_metas[0], **kwargs)
         else:
             return self.aug_test(imgs, img_metas, **kwargs)
@@ -116,6 +130,7 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         if return_loss:
             return self.forward_train(img, img_metas, **kwargs)
         else:
+            # 在進行真正使用時我們不需要損失值，所以會往這裡
             return self.forward_test(img, img_metas, **kwargs)
 
     def train_step(self, data_batch, optimizer, **kwargs):
@@ -283,11 +298,24 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
+        # 已看過，將圖像傳入可以將mask的進行調色後加到原圖上
+        # img = 原始圖像，可以是ndarray或是圖像路徑
+        # result = 通過模型預測出來的結果
+        # palette = 著色用的
+        # win_name = 視窗的名稱
+        # wait_time = 等待的時間
+        # out_file = 將結果保存到哪裏
+        # opacity = 不透明度
+
+        # 透過mmcv.imread讀取原始圖像，img(ndarray) shape = [height, width, channel=3]
         img = mmcv.imread(img)
         img = img.copy()
+        # seg(ndarray) shape = [height, width]，這裡的高寬會與上面的img相同
         seg = result[0]
         if palette is None:
+            # 如果沒有傳入palette就會自動去找
             if self.PALETTE is None:
+                # 如果self當中沒有就會透過亂數進行調色
                 # Get random state before set seed,
                 # and restore random state later.
                 # It will prevent loss of randomness, as the palette
@@ -300,30 +328,41 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
                     0, 255, size=(len(self.CLASSES), 3))
                 np.random.set_state(state)
             else:
+                # 從self當中拿取
                 palette = self.PALETTE
+        # 將palette轉成ndarray型態
         palette = np.array(palette)
+        # 檢查一些東西
         assert palette.shape[0] == len(self.CLASSES)
         assert palette.shape[1] == 3
         assert len(palette.shape) == 2
         assert 0 < opacity <= 1.0
+        # 構建一個全為0且shape [height, width, 3]的空間
         color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
+        # 將顏色填充上去
         for label, color in enumerate(palette):
             color_seg[seg == label, :] = color
-        # convert to BGR
+        # convert to BGR，從RGB轉成BGR
         color_seg = color_seg[..., ::-1]
 
+        # 將原圖與新圖進行疊合
         img = img * (1 - opacity) + color_seg * opacity
+        # 轉成uint8格式
         img = img.astype(np.uint8)
         # if out_file specified, do not show image in window
         if out_file is not None:
+            # 如果有設定輸出檔案位置我們就不會直接show
             show = False
 
         if show:
+            # 進行展示
             mmcv.imshow(img, win_name, wait_time)
         if out_file is not None:
+            # 將圖像導出
             mmcv.imwrite(img, out_file)
 
         if not (show or out_file):
             warnings.warn('show==False and out_file is not specified, only '
                           'result image will be returned')
+            # 將結果回傳
             return img
