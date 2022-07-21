@@ -13,6 +13,10 @@ from .custom import CustomDataset
 class ADE20KDataset(CustomDataset):
     """ADE20K dataset.
 
+    這裡給一點中文的解釋，在ADE20K當中設定150種類別，不過這150種不包含背景，這裡我們透過reduce_zero_label設定成開啟
+    這樣在進行損失計算時會先將標註圖像為0的地方變成255最後全部減一之後再將254的值變成255，這樣就可以了
+    不過因為沒有背景這樣會導致在測試圖像時每一個像素都會被歸類到一個類別當中
+
     In segmentation map annotation for ADE20K, 0 stands for background, which
     is not included in 150 categories. ``reduce_zero_label`` is fixed to True.
     The ``img_suffix`` is fixed to '.jpg' and ``seg_map_suffix`` is fixed to
