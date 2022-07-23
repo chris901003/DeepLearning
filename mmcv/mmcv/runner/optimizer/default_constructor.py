@@ -100,6 +100,7 @@ class DefaultOptimizerConstructor:
                  paramwise_cfg: Optional[Dict] = None):
         # 已看過
         # optimizer_cfg = 優化器的設定，包含指定使用哪種優化器
+        # paramwise_cfg = 對於某些特定地方會有特別的權重值
 
         if not isinstance(optimizer_cfg, dict):
             # 如果optimizer_cfg不是dict就會報錯
@@ -168,11 +169,20 @@ class DefaultOptimizerConstructor:
                 submodule of DCN, `is_dcn_module` will be passed to
                 control conv_offset layer's learning rate. Defaults to None.
         """
+        # 已看過，讀出模型當中所有的參數
+        # parmas: 最後要將模型當中的參數往這裏面放
+        # module: 模型本身
+        # prefix: 模型的前綴
+        # is_dcn_module: 如果是DCN模型就會進行特殊處理
+
         # get param-wise options
+        # 獲取自定義的key值
         custom_keys = self.paramwise_cfg.get('custom_keys', {})
         # first sort with alphabet order and then sort with reversed len of str
+        # 我們先對key的英文字母進行排序，再對字串長度進行反向排序
         sorted_keys = sorted(sorted(custom_keys.keys()), key=len, reverse=True)
 
+        # 從paramwise_cfg中取出一些資訊，大部分是獲取學習率
         bias_lr_mult = self.paramwise_cfg.get('bias_lr_mult', 1.)
         bias_decay_mult = self.paramwise_cfg.get('bias_decay_mult', 1.)
         norm_decay_mult = self.paramwise_cfg.get('norm_decay_mult', 1.)
@@ -181,37 +191,51 @@ class DefaultOptimizerConstructor:
         dcn_offset_lr_mult = self.paramwise_cfg.get('dcn_offset_lr_mult', 1.)
 
         # special rules for norm layers and depth-wise conv layers
+        # 如果module傳入的是標準化層的類型這裡就會是True
         is_norm = isinstance(module,
                              (_BatchNorm, _InstanceNorm, GroupNorm, LayerNorm))
+        # 這裡如果傳入的module是DW卷積就會是True
         is_dwconv = (
             isinstance(module, torch.nn.Conv2d)
             and module.in_channels == module.groups)
 
+        # 遍歷module當中的所有層結構，這裡recurse=False表示只會遍歷一層結構，不會進行遞迴往下
         for name, param in module.named_parameters(recurse=False):
+            # 這裡會構建一個param_group的字典，key就是固定的params且value就是當前遍歷到的層結構
             param_group = {'params': [param]}
             if not param.requires_grad:
+                # 如果不是需要訓練的層結構就會到這裡來，添加到parmas當中就直接下一個
                 params.append(param_group)
                 continue
             if bypass_duplicate and self._is_in(param_group, params):
+                # 如果有遇到重複的層結構且有設定如過遇到就直接跳過就會到這裡來
+                # 這裡會給出警告表示有被跳過的部分
                 warnings.warn(f'{prefix} is duplicate. It is skipped since '
                               f'bypass_duplicate={bypass_duplicate}')
                 continue
             # if the parameter match one of the custom keys, ignore other rules
             is_custom = False
+            # 這裡我們會去遍歷所有自定義的部分，如果有對應上的我們就會捨棄其他的設定，直接套用自定義的設定
             for key in sorted_keys:
                 if key in f'{prefix}.{name}':
+                    # 如果有配對上就會到這裡來，將is_custom設定成True
                     is_custom = True
+                    # 獲取自定義指定的學習率，如果沒有找到就默認使用1
                     lr_mult = custom_keys[key].get('lr_mult', 1.)
+                    # 將學習率設定成，基礎學習率乘上自定義學習率倍率
                     param_group['lr'] = self.base_lr * lr_mult
                     if self.base_wd is not None:
+                        # 如果有設定基礎weight_decay就會到這裡來
                         decay_mult = custom_keys[key].get('decay_mult', 1.)
                         param_group['weight_decay'] = self.base_wd * decay_mult
                     break
 
             if not is_custom:
+                # 如果在自定義當中都沒有找到就會到這裡來
                 # bias_lr_mult affects all bias parameters
                 # except for norm.bias dcn.conv_offset.bias
                 if name == 'bias' and not (is_norm or is_dcn_module):
+                    # 如果是bias參數就會到這裡來
                     param_group['lr'] = self.base_lr * bias_lr_mult
 
                 if (prefix.find('conv_offset') != -1 and is_dcn_module
@@ -221,6 +245,7 @@ class DefaultOptimizerConstructor:
 
                 # apply weight decay policies
                 if self.base_wd is not None:
+                    # 設定weight_decay的部分
                     # norm decay
                     if is_norm:
                         param_group[
@@ -234,6 +259,7 @@ class DefaultOptimizerConstructor:
                         # TODO: current bias_decay_mult will have affect on DCN
                         param_group[
                             'weight_decay'] = self.base_wd * bias_decay_mult
+            # 將結果保存到params當中，如果當中沒有設定lr就表示該參數不會參與學習當中
             params.append(param_group)
 
         if check_ops_exist():
@@ -242,8 +268,11 @@ class DefaultOptimizerConstructor:
                                        (DeformConv2d, ModulatedDeformConv2d))
         else:
             is_dcn_module = False
+        # 這裡會遍歷整個module的層結構，這裡只會遍歷子模塊的迭代器
         for child_name, child_mod in module.named_children():
+            # 給模塊部分給一個前綴名
             child_prefix = f'{prefix}.{child_name}' if prefix else child_name
+            # 這裡我們透過遞迴將所有的學習參數放到params當中
             self.add_params(
                 params,
                 child_mod,
@@ -272,6 +301,8 @@ class DefaultOptimizerConstructor:
         # set param-wise lr and weight decay recursively
         params: List[Dict] = []
         self.add_params(params, model)
+        # 將從add_params獲得到的params放到優化器的config當中
         optimizer_cfg['params'] = params
 
+        # 透過config進行優化器構建
         return build_from_cfg(optimizer_cfg, OPTIMIZERS)

@@ -29,13 +29,13 @@ def parse_args():
     parser.add_argument('config', help='train config file path')
     # 訓練過程以及結果保存位置
     parser.add_argument('--work-dir', help='the dir to save logs and models')
-    # *暫時不確定*
+    # 載入預訓練權重，這裡不會載入權重以外的東西
     parser.add_argument(
         '--load-from', help='the checkpoint file to load weights from')
-    # *暫時不確定*
+    # 在入預訓練權重，這裡會載入包含權重以及優化器以及學習率等參數
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
-    # *暫時不確定*
+    # 如果設定成True就不會進行驗證
     parser.add_argument(
         '--no-validate',
         action='store_true',

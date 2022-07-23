@@ -108,14 +108,20 @@ class FCNHead(BaseDecodeHead):
             feats (Tensor): A tensor of shape (batch_size, self.channels,
                 H, W) which is feature map for last layer of decoder head.
         """
+        # 已看過，進行向前傳遞，傳入的參數看下面的forward就可以
+        # 這裡會透過transform_inputs對inputs做某些操作
         x = self._transform_inputs(inputs)
         feats = self.convs(x)
         if self.concat_input:
+            # 如果有需要進行concat會在這裡進行拼接
             feats = self.conv_cat(torch.cat([x, feats], dim=1))
         return feats
 
     def forward(self, inputs):
         """Forward function."""
+        # 已看過，這裡會是FCN的forward函數
+        # inputs = tuple[tensor]，tensor shape [batch_size, channel, width, height]，tuple長度就會是輸入的特徵圖數量
         output = self._forward_feature(inputs)
+        # 透過cls_seg會將channel調整到與num_classes相同，shape [batch_size, channel=num_classes, height, width]
         output = self.cls_seg(output)
         return output

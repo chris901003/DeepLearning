@@ -94,6 +94,7 @@ class ADE20KDataset(CustomDataset):
     def __init__(self, **kwargs):
         # 已看過，構建ADE20k的初始化函數
         # 直接初始化繼承對象，並且將訓練圖像的後綴以及驗證圖像的後綴傳入
+        # 注意一下這裡的reduce_zero_label是True
         super(ADE20KDataset, self).__init__(
             img_suffix='.jpg',
             seg_map_suffix='.png',

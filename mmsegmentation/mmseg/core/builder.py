@@ -36,7 +36,7 @@ def build_optimizer(model, cfg):
     # 如果沒有指定constructor就會使用默認的DefaultOptimizerConstructor
     constructor_type = optimizer_cfg.pop('constructor',
                                          'DefaultOptimizerConstructor')
-    # 如果沒有設定就會是None
+    # 如果沒有設定就會是None，如果有放通常會是對於某個部分會有特別的權重
     paramwise_cfg = optimizer_cfg.pop('paramwise_cfg', None)
     # optim_constructor = 一個實例對象，已經保存我們要創建的優化器
     optim_constructor = build_optimizer_constructor(

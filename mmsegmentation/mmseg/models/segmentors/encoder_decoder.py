@@ -53,6 +53,7 @@ class EncoderDecoder(BaseSegmentor):
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             # 如果有neck結構就會進行neck結構的構建，這裡我們先不去看，因為還沒有遇到
+            # neck也會是一系列層結構，主要會是在如果需要多層backbone輸出時會使用到，作為中間處理這些輸出層用的
             self.neck = builder.build_neck(neck)
         # decode_head = 解碼頭的配置參數，使用backbone特徵提取出來的特徵圖進行最後的預測
         # _init_decode_head會構建出完整解碼頭
@@ -158,18 +159,24 @@ class EncoderDecoder(BaseSegmentor):
     def _auxiliary_head_forward_train(self, x, img_metas, gt_semantic_seg):
         """Run forward function and calculate loss for auxiliary head in
         training."""
+        # 已看過，如果有輔助訓練就會到這裡來
         losses = dict()
         if isinstance(self.auxiliary_head, nn.ModuleList):
+            # 如果是ModuleList就到這裡進行遍歷
             for idx, aux_head in enumerate(self.auxiliary_head):
+                # 調用該類別的forward_train函數
+                # loss_aux = 計算出輔助訓練的loss值
                 loss_aux = aux_head.forward_train(x, img_metas,
                                                   gt_semantic_seg,
                                                   self.train_cfg)
+                # 將輔助函數的loss更新到losses當中，這裡會透過idx對key的名稱進行改變
                 losses.update(add_prefix(loss_aux, f'aux_{idx}'))
         else:
             loss_aux = self.auxiliary_head.forward_train(
                 x, img_metas, gt_semantic_seg, self.train_cfg)
             losses.update(add_prefix(loss_aux, 'aux'))
 
+        # 將最後獲得的losses進行回傳
         return losses
 
     def forward_dummy(self, img):
@@ -220,6 +227,7 @@ class EncoderDecoder(BaseSegmentor):
             # 這裡與上面的decode_head_forward_train幾乎相同，只是差在解碼的地方有些不同而以
             loss_aux = self._auxiliary_head_forward_train(
                 x, img_metas, gt_semantic_seg)
+            # 將輔助訓練部分獲得的loss字典更新上去
             losses.update(loss_aux)
 
         # 最後將整個損失計算的東西返回出去
