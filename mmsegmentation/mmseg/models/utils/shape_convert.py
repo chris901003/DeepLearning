@@ -9,10 +9,12 @@ def nlc_to_nchw(x, hw_shape):
     Returns:
         Tensor: The output tensor of shape [N, C, H, W] after conversion.
     """
+    # 已看過，進行通道調整
     H, W = hw_shape
     assert len(x.shape) == 3
     B, L, C = x.shape
     assert L == H * W, 'The seq_len doesn\'t match H, W'
+    # [batch_size, height * width, channel] -> [batch_size, channel, width, height]
     return x.transpose(1, 2).reshape(B, C, H, W)
 
 
@@ -25,7 +27,9 @@ def nchw_to_nlc(x):
     Returns:
         Tensor: The output tensor of shape [N, L, C] after conversion.
     """
+    # 已看過，進行通道調整
     assert len(x.shape) == 4
+    # [batch_size, channel, height, width] -> [batch_size, height * width, channel]
     return x.flatten(2).transpose(1, 2).contiguous()
 
 

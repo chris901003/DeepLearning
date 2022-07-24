@@ -31,10 +31,10 @@ class EncoderDecoder(BaseSegmentor):
         """
         :param backbone: 骨幹部分的配置內容，這裡還會有一層也就是會有type在裡面，type指定的就是backbone類型
         :param decode_head: 使用的解碼頭，這裡還會有一層也就是會有type在裡面，type決定要用哪種解碼頭
-        :param neck:
+        :param neck: 如果從backbone出來的特徵圖還有需要進行加工就會有這一層
         :param auxiliary_head: 輔助訓練部分，這裡還會有一層也就是會有type在裡面，type決定要用哪種輔助分類頭
-        :param train_cfg:
-        :param test_cfg:
+        :param train_cfg: 訓練的設定檔
+        :param test_cfg: 測試的設定檔，這裡會寫是要用whole模式或是slide模式進行測試
         :param pretrained: 使用的預訓練權重下載位置
         :param init_cfg: 用來控制初始化用的，預設為None
         """

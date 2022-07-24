@@ -99,16 +99,34 @@ class SegformerHead(BaseDecodeHead):
     """
 
     def __init__(self, interpolate_mode='bilinear', **kwargs):
+        """ 已看過，這裡是Segformer的解碼頭
+        Args:
+            interpolate_mode: 差值方式
+            kwargs: 裡面有以下的內容
+                in_channels: list[int]，從backbone輸出的channel深度
+                in_index: 是從哪幾個index輸入的
+                channels: 輸出的channel深度
+                dropout_ratio: dropout率
+                num_classes: 分類類別數
+                norm_cfg: 標準化層的相關資料
+                align_corners: 對特徵圖進行resize時的選項
+                loss_decode: 計算loss的方式
+        """
+
+        # 對繼承對象進行初始化，這裡我們選用multiple_select對多層輸入進行融合
         super().__init__(input_transform='multiple_select', **kwargs)
 
         self.interpolate_mode = interpolate_mode
+        # 輸入的特徵圖數量就會是in_channels的長度
         num_inputs = len(self.in_channels)
 
         assert num_inputs == len(self.in_index)
 
+        # 透過conv將所有層的channel進行調整
         self.convs = nn.ModuleList()
         for i in range(num_inputs):
             self.convs.append(
+                # 這裡會將輸入的channel調整成self.channels
                 ConvModule(
                     in_channels=self.in_channels[i],
                     out_channels=self.channels,
@@ -117,6 +135,7 @@ class SegformerHead(BaseDecodeHead):
                     norm_cfg=self.norm_cfg,
                     act_cfg=self.act_cfg))
 
+        # 將所有的特徵圖進行融合後調整channel深度變成self.channels
         self.fusion_conv = ConvModule(
             in_channels=self.channels * num_inputs,
             out_channels=self.channels,
@@ -124,21 +143,36 @@ class SegformerHead(BaseDecodeHead):
             norm_cfg=self.norm_cfg)
 
     def forward(self, inputs):
+        """ 已看過，Segformer的解碼頭
+        Args:
+            inputs: 從backbone獲取到的特徵圖，list[tensor] tensor shape [batch_size, channel, height, width]
+        """
+        # 從backbone我們會獲得4種不同大小的特徵圖，分別會是[4, 8, 16, 32]倍下採樣的特徵圖
         # Receive 4 stage backbone feature map: 1/4, 1/8, 1/16, 1/32
+        # 我們會使用_transform_inputs對inputs進行調整
         inputs = self._transform_inputs(inputs)
         outs = []
+        # 遍歷輸入的特徵圖數量
         for idx in range(len(inputs)):
+            # 獲取特徵圖
             x = inputs[idx]
+            # 獲取卷積方式
             conv = self.convs[idx]
             outs.append(
+                # 我們會先將特徵圖進行卷積調整channel同時進行特徵提取，之後再經過resize將所有特徵圖大小調整到與第一張特徵圖相同
                 resize(
                     input=conv(x),
                     size=inputs[0].shape[2:],
                     mode=self.interpolate_mode,
                     align_corners=self.align_corners))
 
+        # outs當中會有4張特徵圖且高寬以及channel深度都相同
+        # 先將所有特徵圖在channel維度上面進行拼接，shape [batch_size, channel * 4, height, width]
+        # 經過fusion_conv將特徵圖融合提取特徵同時調整channel，shape [batch_size, channel, height, width]
         out = self.fusion_conv(torch.cat(outs, dim=1))
 
+        # 進行分類，out shape [batch_size, channel=num_classes, height, width]
         out = self.cls_seg(out)
 
+        # 將最後的out進行回傳
         return out
