@@ -41,11 +41,25 @@ class SinePositionalEncoding(BaseModule):
                  eps=1e-6,
                  offset=0.,
                  init_cfg=None):
+        """ 已看過，固定的位置編碼，使用sin以及cos構建
+        Args:
+            num_feats: 一個特徵點會用多少維度的向量進行表示的一半，因為一半是sin另一半是cos
+            temperature: 指數的底數，算是超參數
+            normalize: 是否需要進行標準化
+            scale: 超參數
+            eps: 避免除法遇到0
+            offset: 偏置
+            init_cfg: 初始化方式
+        """
+
+        # 繼承於BaseModule，對繼承對象進行初始化
         super(SinePositionalEncoding, self).__init__(init_cfg)
         if normalize:
+            # 如果有需要標準化就要傳入scale
             assert isinstance(scale, (float, int)), 'when normalize is set,' \
                 'scale should be provided and in float or int type, ' \
                 f'found {type(scale)}'
+        # 保存傳入的參數
         self.num_feats = num_feats
         self.temperature = temperature
         self.normalize = normalize
@@ -67,29 +81,45 @@ class SinePositionalEncoding(BaseModule):
         """
         # For convenience of exporting to ONNX, it's required to convert
         # `masks` from bool to int.
+        # 已看過，進行位置編碼
+        # mask = tensor shape [batch_size, height, width]
+
+        # 將mask的類型轉成int
         mask = mask.to(torch.int)
+        # 將不是mask的部分拿出來，mask=1的地方是padding的部分
+        # not_mask當中=1的地方
         not_mask = 1 - mask  # logical_not
+        # y_embed = 在not_mask的第一個維度上面做累加，shape [batch_size, height, width]
         y_embed = not_mask.cumsum(1, dtype=torch.float32)
+        # x_embed = 在not_mask的第二個維度上面做累加，shape [batch_size, height, width]
         x_embed = not_mask.cumsum(2, dtype=torch.float32)
         if self.normalize:
+            # 如果有需要標準化就會進來
             y_embed = (y_embed + self.offset) / \
                       (y_embed[:, -1:, :] + self.eps) * self.scale
             x_embed = (x_embed + self.offset) / \
                       (x_embed[:, :, -1:] + self.eps) * self.scale
+        # 構建一個tensor shape [num_feats]，均勻的從0到128
         dim_t = torch.arange(
             self.num_feats, dtype=torch.float32, device=mask.device)
+        # 計算dim_t
         dim_t = self.temperature**(2 * (dim_t // 2) / self.num_feats)
+        # pos_x, pos_y shape = [batch_size, height, width, self.num_feats]
         pos_x = x_embed[:, :, :, None] / dim_t
         pos_y = y_embed[:, :, :, None] / dim_t
         # use `view` instead of `flatten` for dynamically exporting to ONNX
+        # 獲取batch_size, height, width
         B, H, W = mask.size()
+        # 透過sin與cos獲取位置編碼，shape [batch_size, height, width, self.num_feats]
         pos_x = torch.stack(
             (pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()),
             dim=4).view(B, H, W, -1)
         pos_y = torch.stack(
             (pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()),
             dim=4).view(B, H, W, -1)
+        # 將pos_x與pos_y堆疊起來並且調整通道排列順序，shape [batch_size, embed_dim, height, width]
         pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
+        # 最後回傳
         return pos
 
     def __repr__(self):

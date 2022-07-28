@@ -188,9 +188,14 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         >>> assert tuple(bbox_overlaps(nonempty, empty).shape) == (1, 0)
         >>> assert tuple(bbox_overlaps(empty, empty).shape) == (0, 0)
     """
+    # 已看過，可以計算各種iou類的值
+    # bboxes1 shape = [num_pred, 4]
+    # bboxes2 shape = [num_gt, 4]
 
+    # 支援計算下列3種的iou
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
     # Either the boxes are empty or the length of boxes' last dimension is 4
+    # 一個標註匡會有2個點4個值組成
     assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
     assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
 
@@ -199,17 +204,21 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
     batch_shape = bboxes1.shape[:-2]
 
+    # 獲取匡匡數量
     rows = bboxes1.size(-2)
     cols = bboxes2.size(-2)
     if is_aligned:
+        # 如果有is_aligned表示row與col需要相同的數量
         assert rows == cols
 
     if rows * cols == 0:
+        # 如果沒有匡就會到這裡
         if is_aligned:
             return bboxes1.new(batch_shape + (rows, ))
         else:
             return bboxes1.new(batch_shape + (rows, cols))
 
+    # 計算每個匡的面積
     area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
         bboxes1[..., 3] - bboxes1[..., 1])
     area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
@@ -230,15 +239,19 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             enclosed_lt = torch.min(bboxes1[..., :2], bboxes2[..., :2])
             enclosed_rb = torch.max(bboxes1[..., 2:], bboxes2[..., 2:])
     else:
+        # 計算有相交的部分
         lt = torch.max(bboxes1[..., :, None, :2],
                        bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
         rb = torch.min(bboxes1[..., :, None, 2:],
                        bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
 
+        # 獲取相交部分的高寬
         wh = fp16_clamp(rb - lt, min=0)
+        # 計算相交面積
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:
+            # 計算iou或是giou我們需要計算總面積
             union = area1[..., None] + area2[..., None, :] - overlap
         else:
             union = area1[..., None]
@@ -248,6 +261,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             enclosed_rb = torch.max(bboxes1[..., :, None, 2:],
                                     bboxes2[..., None, :, 2:])
 
+    # 下面就是計算giou的方式
     eps = union.new_tensor([eps])
     union = torch.max(union, eps)
     ious = overlap / union

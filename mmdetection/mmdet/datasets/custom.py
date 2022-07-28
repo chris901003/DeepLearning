@@ -67,6 +67,21 @@ class CustomDataset(Dataset):
                  test_mode=False,
                  filter_empty_gt=True,
                  file_client_args=dict(backend='disk')):
+        """ 已看過，COCO數據集的初始化
+        Args:
+            ann_file: 標註檔案的檔案位置
+            pipeline: 資料處理流
+            classes: 預設為None，如果是None就會使用上面預設的CLASSES
+            data_root: 檔案位置的root
+            img_prefix: 圖像資料的檔案位置
+            seg_prefix: segmentation才會用到
+            proposal_file: proposal才獲用到
+            test_mode: 是否啟用test模式
+            filter_empty_gt: 是否過濾掉沒有gt的圖像，預設為True
+            file_client_args: 讀取檔案的位置
+        """
+
+        # 將傳入的資料進行保存
         self.ann_file = ann_file
         self.data_root = data_root
         self.img_prefix = img_prefix
@@ -75,10 +90,12 @@ class CustomDataset(Dataset):
         self.test_mode = test_mode
         self.filter_empty_gt = filter_empty_gt
         self.file_client = mmcv.FileClient(**file_client_args)
+        # 獲取CLASSES資訊
         self.CLASSES = self.get_classes(classes)
 
         # join paths if data_root is specified
         if self.data_root is not None:
+            # 如果有設定data_root就會將root加到路徑上去
             if not osp.isabs(self.ann_file):
                 self.ann_file = osp.join(self.data_root, self.ann_file)
             if not (self.img_prefix is None or osp.isabs(self.img_prefix)):
@@ -92,6 +109,7 @@ class CustomDataset(Dataset):
         # load annotations (and proposals)
         if hasattr(self.file_client, 'get_local_path'):
             with self.file_client.get_local_path(self.ann_file) as local_path:
+                # 讀取coco數據集的圖像資料，會整合到data_infos當中，之後透過idx就可以獲取該圖像的所有相關資料
                 self.data_infos = self.load_annotations(local_path)
         else:
             warnings.warn(
@@ -102,6 +120,7 @@ class CustomDataset(Dataset):
             self.data_infos = self.load_annotations(self.ann_file)
 
         if self.proposal_file is not None:
+            # 如果有設定proposal_file就會進來進行讀取
             if hasattr(self.file_client, 'get_local_path'):
                 with self.file_client.get_local_path(
                         self.proposal_file) as local_path:
@@ -114,18 +133,23 @@ class CustomDataset(Dataset):
                     'Please use MMCV>= 1.3.16 if you meet errors.')
                 self.proposals = self.load_proposals(self.proposal_file)
         else:
+            # 沒有就是None
             self.proposals = None
 
         # filter images too small and containing no annotations
         if not test_mode:
+            # 如果不是測試模式就會進來過濾太小的標註或是完全沒有標註圖像的圖片
+            # valid_inds = 合法的圖像index
             valid_inds = self._filter_imgs()
+            # 更新data_infos，將不合法的過濾掉
             self.data_infos = [self.data_infos[i] for i in valid_inds]
             if self.proposals is not None:
+                # 如果有proposals也會需要過濾
                 self.proposals = [self.proposals[i] for i in valid_inds]
             # set group flag for the sampler
             self._set_group_flag()
 
-        # processing pipeline
+        # processing pipeline，構建圖像處理流
         self.pipeline = Compose(pipeline)
 
     def __len__(self):
@@ -166,6 +190,7 @@ class CustomDataset(Dataset):
 
     def pre_pipeline(self, results):
         """Prepare results dict for pipeline."""
+        # 已看過，創建一些存方資料的空間
         results['img_prefix'] = self.img_prefix
         results['seg_prefix'] = self.seg_prefix
         results['proposal_file'] = self.proposal_file
@@ -190,9 +215,15 @@ class CustomDataset(Dataset):
         Images with aspect ratio greater than 1 will be set as group 1,
         otherwise group 0.
         """
+        # 已看過，對圖像進行分類，根據高寬比進行分類，寬/高>1就會被分在1，否則就會是0
+
+        # 構建長度等於訓練集且全為0
         self.flag = np.zeros(len(self), dtype=np.uint8)
+        # 遍歷所有訓練圖像
         for i in range(len(self)):
+            # 獲取圖像相關資料
             img_info = self.data_infos[i]
+            # 依據寬高比進行分類
             if img_info['width'] / img_info['height'] > 1:
                 self.flag[i] = 1
 
@@ -211,14 +242,20 @@ class CustomDataset(Dataset):
             dict: Training/test data (with annotation if `test_mode` is set \
                 True).
         """
+        # 已看過，讀取一個batch的資料從這裡開始
+        # idx = 隨機的index，一個index會對應到一張圖像資料
 
         if self.test_mode:
+            # 測試模式會到這裡
             return self.prepare_test_img(idx)
         while True:
+            # data會是一張圖像的資料
             data = self.prepare_train_img(idx)
             if data is None:
+                # 如果data變成None會在隨機取一個index
                 idx = self._rand_another(idx)
                 continue
+            # 回傳圖像資料
             return data
 
     def prepare_train_img(self, idx):
@@ -231,13 +268,26 @@ class CustomDataset(Dataset):
             dict: Training data and annotation after pipeline with new keys \
                 introduced by pipeline.
         """
+        # 已看過，根據index獲取圖像資料
 
+        # 從data_infos中獲取指定idx的資料
         img_info = self.data_infos[idx]
+        # 獲取標註訊息
+        # ann_info = {
+        #   'bboxes': ndarray，shape [gt_boxes, 4]，每個匡的左上角與右下角
+        #   'labels': ndarray，shape [gt_boxes]，每個匡的類別
+        #   'bboxes_ignore': ndarray，shape [ignore_gt_boxes, 4]，被忽略掉的匡(這個匡可能會是有問題的)
+        #   'masks': list[list[list]]，存放segmentation資料的，會是很多組的(x, y)座標，匡成一個東西
+        #   'seg_map': str，segmentation的圖像名稱
+        # }
         ann_info = self.get_ann_info(idx)
+        # 將圖像訊息以及標註訊息整合到results當中
         results = dict(img_info=img_info, ann_info=ann_info)
         if self.proposals is not None:
+            # 如果需要proposals會在這裡放到results當中
             results['proposals'] = self.proposals[idx]
         self.pre_pipeline(results)
+        # 將results放到資料處理流當中
         return self.pipeline(results)
 
     def prepare_test_img(self, idx):

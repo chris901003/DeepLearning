@@ -16,15 +16,22 @@ class Compose:
     """
 
     def __init__(self, transforms):
+        # 已看過，圖像一系列處理的流
         assert isinstance(transforms, collections.abc.Sequence)
+        # 保存實例化對象
         self.transforms = []
+        # 遍歷轉換方式
         for transform in transforms:
             if isinstance(transform, dict):
+                # 透過註冊器進行實例化
                 transform = build_from_cfg(transform, PIPELINES)
+                # 將實例化對象保存下來
                 self.transforms.append(transform)
             elif callable(transform):
+                # 如果傳入的是可以直接call就保存
                 self.transforms.append(transform)
             else:
+                # 其他就跳出報錯
                 raise TypeError('transform must be callable or a dict')
 
     def __call__(self, data):

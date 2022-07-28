@@ -121,24 +121,45 @@ def train_detector(model,
                    validate=False,
                    timestamp=None,
                    meta=None):
+    """ 已看過，準備進行模型訓練，會先構建一些鉤子函數
+    Args:
+        model: 模型本身
+        dataset: 資料集
+        cfg: config文件內容
+        distributed: 是否有啟用分布式訓練
+        validate: 是否需要進行驗證
+        timestamp: 時間戳
+        meta: 保存訓練過程資訊的
+    """
 
+    # 調整config文件的兼容性，主要是對於分布式訓練以及多gpu的會需要經過調整
     cfg = compat_cfg(cfg)
+    # logger = 紀錄使用的
     logger = get_root_logger(log_level=cfg.log_level)
 
-    # prepare data loaders
+    # prepare data loaders，如果dataset不是list型態就會在外面包上list
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
 
+    # 獲取以什麼方式計算一個iter，在object detection都會以epoch作為底
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
 
+    # 構建DataLoader的基本參數
     train_dataloader_default_args = dict(
+        # samples_per_gpu = 一個gpu一次會讀入幾張圖像，就是batch_size的大小
         samples_per_gpu=2,
+        # 會用多少個進程去讀取圖像，越大的話讀取速度會越快，上限會是batch_size大小
         workers_per_gpu=2,
         # `num_gpus` will be ignored if distributed
+        # 總共有多少個gpu同時訓練
         num_gpus=len(cfg.gpu_ids),
+        # 是否使用分布式訓練
         dist=distributed,
+        # 隨機種子碼
         seed=cfg.seed,
+        # iter的基礎
         runner_type=runner_type,
+        # 是否讓workers佔住cpu資源
         persistent_workers=False)
 
     train_loader_cfg = {
@@ -146,6 +167,7 @@ def train_detector(model,
         **cfg.data.get('train_dataloader', {})
     }
 
+    # 構建DataLoader
     data_loaders = [build_dataloader(ds, **train_loader_cfg) for ds in dataset]
 
     # put model on gpus
@@ -163,9 +185,12 @@ def train_detector(model,
         model = build_dp(model, cfg.device, device_ids=cfg.gpu_ids)
 
     # build optimizer
+    # 構建學習率調整
     auto_scale_lr(cfg, distributed, logger)
+    # 構建優化器
     optimizer = build_optimizer(model, cfg.optimizer)
 
+    # 構建runner，裡面會有4個有用的api
     runner = build_runner(
         cfg.runner,
         default_args=dict(
@@ -176,6 +201,7 @@ def train_detector(model,
             meta=meta))
 
     # an ugly workaround to make .log and .log.json filenames the same
+    # 獲取時間戳，用來檔案命名的
     runner.timestamp = timestamp
 
     # fp16 setting
@@ -186,9 +212,10 @@ def train_detector(model,
     elif distributed and 'type' not in cfg.optimizer_config:
         optimizer_config = OptimizerHook(**cfg.optimizer_config)
     else:
+        # 獲取優化器的config
         optimizer_config = cfg.optimizer_config
 
-    # register hooks
+    # register hooks，將鉤子函數添加上去
     runner.register_training_hooks(
         cfg.lr_config,
         optimizer_config,
@@ -198,11 +225,13 @@ def train_detector(model,
         custom_hooks_config=cfg.get('custom_hooks', None))
 
     if distributed:
+        # 如果是分布式訓練就會需要多一個鉤子函數
         if isinstance(runner, EpochBasedRunner):
             runner.register_hook(DistSamplerSeedHook())
 
     # register eval hooks
     if validate:
+        # 如果有驗證模式，這裡會建立驗證資料的DataLoader
         val_dataloader_default_args = dict(
             samples_per_gpu=1,
             workers_per_gpu=2,
@@ -217,28 +246,37 @@ def train_detector(model,
         # Support batch_size > 1 in validation
 
         if val_dataloader_args['samples_per_gpu'] > 1:
+            # 當一個gpu的batch_size大於1就會進來
             # Replace 'ImageToTensor' to 'DefaultFormatBundle'
             cfg.data.val.pipeline = replace_ImageToTensor(
                 cfg.data.val.pipeline)
+        # 構建驗證集的dataset
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
 
+        # 構建驗證集的DataLoader
         val_dataloader = build_dataloader(val_dataset, **val_dataloader_args)
         eval_cfg = cfg.get('evaluation', {})
         eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
         eval_hook = DistEvalHook if distributed else EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+        # 添加鉤子函數
         runner.register_hook(
             eval_hook(val_dataloader, **eval_cfg), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
+        # 是否需要接續上次的訓練繼續訓練
         resume_from = find_latest_checkpoint(cfg.work_dir)
     if resume_from is not None:
+        # 是否需要接續上次的訓練繼續訓練
         cfg.resume_from = resume_from
 
     if cfg.resume_from:
+        # 接續上次的訓練，會載入優化器以及學習率
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
+        # 載入預訓練權重，不會載入優化器以及學習率
         runner.load_checkpoint(cfg.load_from)
+    # 開始進行訓練
     runner.run(data_loaders, cfg.workflow)

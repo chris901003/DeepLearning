@@ -27,8 +27,17 @@ class BBoxL1Cost:
     """
 
     def __init__(self, weight=1., box_format='xyxy'):
+        """ 已看過，計算預測匡的l1的cost
+        Args:
+            weight: 權重
+            box_format: 傳入的預測匡格式
+        """
+
+        # 保存權重
         self.weight = weight
+        # 傳入的預測匡會有兩中預測的格式
         assert box_format in ['xyxy', 'xywh']
+        # 保存預測匡的格式
         self.box_format = box_format
 
     def __call__(self, bbox_pred, gt_bboxes):
@@ -43,11 +52,15 @@ class BBoxL1Cost:
         Returns:
             torch.Tensor: bbox_cost value with weight
         """
+        # 已看過，計算標註匡的l1損失
         if self.box_format == 'xywh':
+            # 如果是xywh就進行轉換
             gt_bboxes = bbox_xyxy_to_cxcywh(gt_bboxes)
         elif self.box_format == 'xyxy':
             bbox_pred = bbox_cxcywh_to_xyxy(bbox_pred)
+        # 計算L1損失
         bbox_cost = torch.cdist(bbox_pred, gt_bboxes, p=1)
+        # 將結果乘上權重後返回
         return bbox_cost * self.weight
 
 
@@ -172,6 +185,8 @@ class ClassificationCost:
     """
 
     def __init__(self, weight=1.):
+        # 已看過，構建cost計算
+        # 這裡就將傳入的權重保存下來
         self.weight = weight
 
     def __call__(self, cls_pred, gt_labels):
@@ -188,8 +203,12 @@ class ClassificationCost:
         # NLL is used, we approximate it in 1 - cls_score[gt_label].
         # The 1 is a constant that doesn't change the matching,
         # so it can be omitted.
+        # 已看過，計算類別配對的cost
+        # 經過softmax計算概率
         cls_score = cls_pred.softmax(-1)
+        # 這裡取的會是負的因為越大cost會越小
         cls_cost = -cls_score[:, gt_labels]
+        # 乘上權重後返回
         return cls_cost * self.weight
 
 
@@ -213,7 +232,11 @@ class IoUCost:
     """
 
     def __init__(self, iou_mode='giou', weight=1.):
+        # 已看過，計算iou的cost值
+
+        # 保存權重
         self.weight = weight
+        # 保存要計算的iou模式
         self.iou_mode = iou_mode
 
     def __call__(self, bboxes, gt_bboxes):
@@ -227,11 +250,15 @@ class IoUCost:
         Returns:
             torch.Tensor: iou_cost value with weight
         """
+        # 已看過，計算iou的cost值
         # overlaps: [num_bboxes, num_gt]
+        # 計算iou，overlaps shape [num_bboxes, num_gt]
         overlaps = bbox_overlaps(
             bboxes, gt_bboxes, mode=self.iou_mode, is_aligned=False)
         # The 1 is a constant that doesn't change the matching, so omitted.
+        # 因為iou越大表示cost越小，所以會加上負號
         iou_cost = -overlaps
+        # 乘上權重後返回
         return iou_cost * self.weight
 
 

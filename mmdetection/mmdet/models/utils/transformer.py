@@ -436,6 +436,19 @@ class DetrTransformerDecoderLayer(BaseTransformerLayer):
                  norm_cfg=dict(type='LN'),
                  ffn_num_fcs=2,
                  **kwargs):
+        """ 已看過，DETR的decoder初始化函數
+        Args:
+            attn_cfgs: 自注意力模塊設定
+            feedforward_channels: 在FFN中間層的channel深度
+            ffn_dropout: 在FFN當中的dropout率
+            operation_order: 層結構的順序
+            act_cfg: 激活函數則
+            norm_cfg: 標準化參數
+            ffn_num_fcs: FFN堆疊層數
+            kwargs: 空的
+        """
+
+        # 繼承自BaseTransformerLayer，對繼承對象進行初始化
         super(DetrTransformerDecoderLayer, self).__init__(
             attn_cfgs=attn_cfgs,
             feedforward_channels=feedforward_channels,
@@ -445,7 +458,9 @@ class DetrTransformerDecoderLayer(BaseTransformerLayer):
             norm_cfg=norm_cfg,
             ffn_num_fcs=ffn_num_fcs,
             **kwargs)
+        # 層結構順序會是6層
         assert len(operation_order) == 6
+        # 檢查層結構順序是否合法
         assert set(operation_order) == set(
             ['self_attn', 'norm', 'cross_attn', 'ffn'])
 
@@ -460,11 +475,22 @@ class DetrTransformerEncoder(TransformerLayerSequence):
     """
 
     def __init__(self, *args, post_norm_cfg=dict(type='LN'), **kwargs):
+        """ 已看過，DETR當中encoder的初始化函數
+        Args:
+            args: 空的
+            post_norm_cfg: 設定一開始資料傳入時的標準化層結構
+            kwargs: encoder詳細參數
+        """
+
+        # 繼承於TransformerLayerSequence，將args與kwargs傳入進行初始化
         super(DetrTransformerEncoder, self).__init__(*args, **kwargs)
         if post_norm_cfg is not None:
+            # 如果有設定標準化層結構
+            # 構建標準化層實例對象，這裡我們只需要實例化對象就可以
             self.post_norm = build_norm_layer(
                 post_norm_cfg, self.embed_dims)[1] if self.pre_norm else None
         else:
+            # 正常來說不會到這裡，因為post_norm_cfg是有預設值的，我們透過pre_norm進行控制是否需要先經過標準化
             assert not self.pre_norm, f'Use prenorm in ' \
                                       f'{self.__class__.__name__},' \
                                       f'Please specify post_norm_cfg'
@@ -476,9 +502,13 @@ class DetrTransformerEncoder(TransformerLayerSequence):
         Returns:
             Tensor: forwarded results with shape [num_query, bs, embed_dims].
         """
+        # 已看過，encoder的forward函數
+        # 先使用繼承對象的forward函數
         x = super(DetrTransformerEncoder, self).forward(*args, **kwargs)
         if self.post_norm is not None:
+            # 如果有需要進行標準化就會進來
             x = self.post_norm(x)
+        # 將結果回傳
         return x
 
 
@@ -497,10 +527,20 @@ class DetrTransformerDecoder(TransformerLayerSequence):
                  post_norm_cfg=dict(type='LN'),
                  return_intermediate=False,
                  **kwargs):
+        """ 已看過，DETR的decoder部分
+        Args:
+            args: 空的
+            post_norm_cfg: 最開始的表準化層結構
+            return_intermediate: 是否需要將中間層的輸出放到最終輸出當中，在訓練時會是True，驗證時會是False
+            kwargs: 其他詳細資料
+        """
 
+        # 繼承自TransformerLayerSequence，將繼承對象進行初始化
         super(DetrTransformerDecoder, self).__init__(*args, **kwargs)
+        # 保存是否需要將中間層輸出放到最後輸出當中
         self.return_intermediate = return_intermediate
         if post_norm_cfg is not None:
+            # 有傳入標準化層設定就會進來，獲取標準化實例對象
             self.post_norm = build_norm_layer(post_norm_cfg,
                                               self.embed_dims)[1]
         else:
@@ -518,20 +558,28 @@ class DetrTransformerDecoder(TransformerLayerSequence):
                 return_intermediate is `False`, otherwise it has shape
                 [num_layers, num_query, bs, embed_dims].
         """
+        # 已看過，DETR當中的decoder，透過encoder的輸出以及decoder的輸入獲取結果
         if not self.return_intermediate:
+            # 如果沒有需要將中間的輸出保存就會到這裡
             x = super().forward(query, *args, **kwargs)
             if self.post_norm:
                 x = self.post_norm(x)[None]
             return x
 
+        # 需要將中間層輸出進行保存
         intermediate = []
+        # 遍歷多層結構
         for layer in self.layers:
+            # 通過自注意裡層，query shape [num_queries, batch_size, channel=embed_dim]
             query = layer(query, *args, **kwargs)
             if self.return_intermediate:
+                # 如果該層輸出需要保存就會進來
                 if self.post_norm is not None:
+                    # 看是否需要進行標準化
                     intermediate.append(self.post_norm(query))
                 else:
                     intermediate.append(query)
+        # 將結過在第一個擴圍進行stack
         return torch.stack(intermediate)
 
 
@@ -559,9 +607,20 @@ class Transformer(BaseModule):
     """
 
     def __init__(self, encoder=None, decoder=None, init_cfg=None):
+        """ 已看過，DETR的encoder與decoder的部分
+        Args:
+            encoder: encoder部分的設定
+            decoder: decoder部分的設定
+            init_cfg: 初始化設定
+        """
+
+        # 繼承於BaseModule，對繼承對象進行初始化
         super(Transformer, self).__init__(init_cfg=init_cfg)
+        # 構建encoder實例對象
         self.encoder = build_transformer_layer_sequence(encoder)
+        # 構建decoder實例對象
         self.decoder = build_transformer_layer_sequence(decoder)
+        # 獲取encoder的每個特徵點用多少維度的向量進行表示
         self.embed_dims = self.encoder.embed_dims
 
     def init_weights(self):
@@ -594,19 +653,33 @@ class Transformer(BaseModule):
                 - memory: Output results from encoder, with shape \
                       [bs, embed_dims, h, w].
         """
+        # 已看過，解碼頭會包還transformer encoder與decoder
+        # x = 從backbone的輸出，tensor shape [batch_size, channel, height, width]
+        # mask = 哪些地方是透過padding獲得，padding的部分會是True否則就會是False，shape [batch_size, height, width]
+        # query_embed = query的位置編碼，shape [num_queries, embed_dim]
+        # pos_embed = encoder的位置編碼，shape [batch_size, channel=embed_dim, height, width]
+
+        # 獲取輸入x的shape
         bs, c, h, w = x.shape
         # use `view` instead of `flatten` for dynamically exporting to ONNX
+        # 將通道進行調整使其可以輸入到transformer當中
+        # [batch_size, channel, height, width] -> [batch_size, channel, height * width] -> [h * w, bs, channel]
         x = x.view(bs, c, -1).permute(2, 0, 1)  # [bs, c, h, w] -> [h*w, bs, c]
+        # 也對encoder的位置編碼通道進行調整，shape [height * width, batch_size, channel]
         pos_embed = pos_embed.view(bs, c, -1).permute(2, 0, 1)
+        # 對query的位置編碼多加上batch維度並且調整，shape [num_queries, batch_size, channel=embed_dim]
         query_embed = query_embed.unsqueeze(1).repeat(
             1, bs, 1)  # [num_query, dim] -> [num_query, bs, dim]
+        # 調整mask通道，shape [batch_size, height * width]
         mask = mask.view(bs, -1)  # [bs, h, w] -> [bs, h*w]
+        # 進行encoder輸出的shape與輸入的會相同[height * width, batch_size, channel]
         memory = self.encoder(
             query=x,
             key=None,
             value=None,
             query_pos=pos_embed,
             query_key_padding_mask=mask)
+        # 構建query部分，一開始都是0且shape與query_embed相同[num_queries, batch_size, channel=embed_dim]
         target = torch.zeros_like(query_embed)
         # out_dec: [num_layers, num_query, bs, dim]
         out_dec = self.decoder(
@@ -616,7 +689,9 @@ class Transformer(BaseModule):
             key_pos=pos_embed,
             query_pos=query_embed,
             key_padding_mask=mask)
+        # out_dec shape = [num_layers, batch_size, num_queries, channel=embed_dim]
         out_dec = out_dec.transpose(1, 2)
+        # memory shape = [batch_size, channel, height * width] -> [batch_size, channel, height, width]
         memory = memory.permute(1, 2, 0).reshape(bs, c, h, w)
         return out_dec, memory
 

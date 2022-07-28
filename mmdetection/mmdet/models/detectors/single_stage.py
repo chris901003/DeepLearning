@@ -24,14 +24,30 @@ class SingleStageDetector(BaseDetector):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
+        """ 已看過，端到端的object detection會繼承自這裡
+        Args:
+            backbone: 設定backbone的相關資料
+            neck: 如果需要對backbone輸出進行調整就會neck
+            bbox_head: 將backbone的輸出進行加工獲得最後的預測匡位置
+            train_cfg: 訓練的相關設定
+            test_cfg: 驗證的相關設定
+            pretrained: 預訓練權重，已廢棄新版希望將預訓練權重放到init_cfg當中
+            init_cfg: 模型初始化設定
+        """
+
+        # 繼承自BaseDetector，將init_cfg給繼承對象
         super(SingleStageDetector, self).__init__(init_cfg)
         if pretrained:
+            # 如果有傳入pretrained就會跳出警告，這裡已經快要不支援這種些法
             warnings.warn('DeprecationWarning: pretrained is deprecated, '
                           'please use "init_cfg" instead')
+            # 將預訓練權重資料放到backbone當中
             backbone.pretrained = pretrained
+        # 透過build_backbone進行構建特徵提取骨幹
         self.backbone = build_backbone(backbone)
         if neck is not None:
             self.neck = build_neck(neck)
+        # 將訓練以及驗證的bbox_head相關參數放入
         bbox_head.update(train_cfg=train_cfg)
         bbox_head.update(test_cfg=test_cfg)
         self.bbox_head = build_head(bbox_head)
@@ -40,9 +56,13 @@ class SingleStageDetector(BaseDetector):
 
     def extract_feat(self, img):
         """Directly extract features from the backbone+neck."""
+        # 已看過，從backbone提取特徵
+        # x = tuple(tensor)，tensor shape [batch_size, channel, height, width]，tuple長度就會是backbone輸出的數量
         x = self.backbone(img)
         if self.with_neck:
+            # 如果有neck就會將backbone輸出放到neck當中
             x = self.neck(x)
+        # 最後將結果輸出
         return x
 
     def forward_dummy(self, img):
@@ -78,8 +98,13 @@ class SingleStageDetector(BaseDetector):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        # 已看過
+        # 這裡沒有特別對繼承對象做什麼，只是紀錄輸入網路的圖像大小
         super(SingleStageDetector, self).forward_train(img, img_metas)
+        # x = tuple(tensor)，tensor shape [batch_size, channel, height, width]，tuple長度就會是backbone的輸出層數
         x = self.extract_feat(img)
+        # 透過bbox_head進行解碼並且計算loss
+        # losses = dict，key就會是表示哪種的損失，value就會是損失值
         losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
                                               gt_labels, gt_bboxes_ignore)
         return losses

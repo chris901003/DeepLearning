@@ -19,6 +19,17 @@ class DETR(SingleStageDetector):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
+        """ 已看過，DETR的初始化
+        Args:
+            backbone: backbone的設定資料，指定要使用的backbone類型
+            bbox_head: 將backbone的輸出拿來預測匡選位置
+            train_cfg: 訓練的相關設定
+            test_cfg: 測試的相關設定
+            pretrained: 預訓練權重資料，已經廢棄新版要將預訓練權重資料放到init_cfg當中
+            init_cfg: 初始化設定資料
+        """
+
+        # 繼承至SingleStageDetector，先對繼承對象進行初始化
         super(DETR, self).__init__(backbone, None, bbox_head, train_cfg,
                                    test_cfg, pretrained, init_cfg)
 

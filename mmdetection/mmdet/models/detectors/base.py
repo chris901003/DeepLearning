@@ -169,6 +169,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
             return self.onnx_export(img[0], img_metas[0])
 
         if return_loss:
+            # 會有回傳loss的字典
             return self.forward_train(img, img_metas, **kwargs)
         else:
             return self.forward_test(img, img_metas, **kwargs)
@@ -185,6 +186,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                 which may be a weighted sum of all losses, log_vars contains \
                 all the variables to be sent to the logger.
         """
+        # 已看過，整理loss的資訊
         log_vars = OrderedDict()
         for loss_name, loss_value in losses.items():
             if isinstance(loss_value, torch.Tensor):
@@ -245,9 +247,13 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                   DDP, it means the batch size on each GPU), which is used for
                   averaging the logs.
         """
+        # 已看過，進行向前傳遞
+        # losses會是字典，表示一個loss的名稱對應上loss值
         losses = self(**data)
+        # loss就會是總損失值，log_vars紀錄用的會詳細列出各細項的損失值
         loss, log_vars = self._parse_losses(losses)
 
+        # 構建回傳的字典
         outputs = dict(
             loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
 

@@ -8,6 +8,7 @@ LINEAR_LAYERS = Registry('linear layers')
 
 def build_transformer(cfg, default_args=None):
     """Builder for Transformer."""
+    # 已看過，構建transformer區塊
     return build_from_cfg(cfg, TRANSFORMER, default_args)
 
 

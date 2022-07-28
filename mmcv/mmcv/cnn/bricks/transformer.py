@@ -37,26 +37,31 @@ except ImportError:
 
 def build_positional_encoding(cfg, default_args=None):
     """Builder for Position Encoding."""
+    # 已看過，構建位置編碼實例對象
     return build_from_cfg(cfg, POSITIONAL_ENCODING, default_args)
 
 
 def build_attention(cfg, default_args=None):
     """Builder for attention."""
+    # 已看過，構建自注意力實例對象
     return build_from_cfg(cfg, ATTENTION, default_args)
 
 
 def build_feedforward_network(cfg, default_args=None):
     """Builder for feed-forward network (FFN)."""
+    # 已看過，構建FFN實例對象
     return build_from_cfg(cfg, FEEDFORWARD_NETWORK, default_args)
 
 
 def build_transformer_layer(cfg, default_args=None):
     """Builder for transformer layer."""
+    # 已看過，構建自注意力層
     return build_from_cfg(cfg, TRANSFORMER_LAYER, default_args)
 
 
 def build_transformer_layer_sequence(cfg, default_args=None):
     """Builder for transformer encoder and transformer decoder."""
+    # 已看過，構建detr的encoder與decoder部分
     return build_from_cfg(cfg, TRANSFORMER_LAYER_SEQUENCE, default_args)
 
 
@@ -744,24 +749,42 @@ class BaseTransformerLayer(BaseModule):
                  init_cfg=None,
                  batch_first=False,
                  **kwargs):
+        """ 已看過，完整自注意力模塊(包含FFN)
+        Args:
+            attn_cfgs: 自注意力機制的配置
+            ffn_cfgs: FFN的配置
+            operation_order: 通過層結構的順序
+            norm_cfg: 標準化層設定
+            init_cfg: 初始化設定
+            batch_first: 是否將batch_size放在第一個維度
+            kwargs: 一些其他資訊
+        """
 
+        # 已棄用的參數
         deprecated_args = dict(
             feedforward_channels='feedforward_channels',
             ffn_dropout='ffn_drop',
             ffn_num_fcs='num_fcs')
+        # 遍歷已棄用的參數
         for ori_name, new_name in deprecated_args.items():
+            # 遍歷kwargs裏面的值
             if ori_name in kwargs:
+                # 如果有配對上的就會將舊的key值換成新的key值
                 warnings.warn(
                     f'The arguments `{ori_name}` in BaseTransformerLayer '
                     f'has been deprecated, now you should set `{new_name}` '
                     f'and other FFN related arguments '
                     f'to a dict named `ffn_cfgs`. ', DeprecationWarning)
+                # 並且將結果放到ffn_cfgs當中
                 ffn_cfgs[new_name] = kwargs[ori_name]
 
+        # 繼承於BaseModule，初始化繼承對象
         super().__init__(init_cfg)
 
+        # 保存是否batch_size在第一個維度
         self.batch_first = batch_first
 
+        # 檢查operation_order有沒有問題
         assert set(operation_order) & {
             'self_attn', 'norm', 'ffn', 'cross_attn'} == \
             set(operation_order), f'The operation_order of' \
@@ -769,57 +792,81 @@ class BaseTransformerLayer(BaseModule):
             f'contains all four operation type ' \
             f"{['self_attn', 'norm', 'ffn', 'cross_attn']}"
 
+        # 計算有多少個自注意力模塊
         num_attn = operation_order.count('self_attn') + operation_order.count(
             'cross_attn')
         if isinstance(attn_cfgs, dict):
+            # 將自注意力設定拷貝使用次數
             attn_cfgs = [copy.deepcopy(attn_cfgs) for _ in range(num_attn)]
         else:
+            # 檢查長度是否合法
             assert num_attn == len(attn_cfgs), f'The length ' \
                 f'of attn_cfg {num_attn} is ' \
                 f'not consistent with the number of attention' \
                 f'in operation_order {operation_order}.'
 
+        # 保存傳入的參數
         self.num_attn = num_attn
         self.operation_order = operation_order
         self.norm_cfg = norm_cfg
+        # 是否先進行標準化
         self.pre_norm = operation_order[0] == 'norm'
         self.attentions = ModuleList()
 
         index = 0
+        # 遍歷通過層結構的順序
         for operation_name in operation_order:
             if operation_name in ['self_attn', 'cross_attn']:
+                # 如果是自注意力模塊
                 if 'batch_first' in attn_cfgs[index]:
+                    # 如果有設定batch_first就檢查是否與傳入的batch_first相同值
                     assert self.batch_first == attn_cfgs[index]['batch_first']
                 else:
+                    # 如果裡面沒有就添加上去
                     attn_cfgs[index]['batch_first'] = self.batch_first
+                # 構建自注意力模塊實例對象
                 attention = build_attention(attn_cfgs[index])
                 # Some custom attentions used as `self_attn`
                 # or `cross_attn` can have different behavior.
+                # 獲取名稱
                 attention.operation_name = operation_name
+                # 將實例化對象保存下來
                 self.attentions.append(attention)
                 index += 1
 
+        # 獲取一個特徵點要用多少維度的向量進行表示
         self.embed_dims = self.attentions[0].embed_dims
 
+        # FFN結構保存
         self.ffns = ModuleList()
+        # 計算會通過多少個FFN
         num_ffns = operation_order.count('ffn')
         if isinstance(ffn_cfgs, dict):
+            # 如果是dict格式就會包裝成ConfigDict格式
             ffn_cfgs = ConfigDict(ffn_cfgs)
         if isinstance(ffn_cfgs, dict):
+            # 將config重複num_ffns次
             ffn_cfgs = [copy.deepcopy(ffn_cfgs) for _ in range(num_ffns)]
+        # 檢查長度需要相等
         assert len(ffn_cfgs) == num_ffns
+        # 遍歷FFN的堆疊次數
         for ffn_index in range(num_ffns):
+            # 如果沒有設定embed_dims就會添加上去，否則就會檢查是否一致
             if 'embed_dims' not in ffn_cfgs[ffn_index]:
                 ffn_cfgs[ffn_index]['embed_dims'] = self.embed_dims
             else:
                 assert ffn_cfgs[ffn_index]['embed_dims'] == self.embed_dims
+            # 構建FFN實例對象
             self.ffns.append(
                 build_feedforward_network(ffn_cfgs[ffn_index],
                                           dict(type='FFN')))
 
+        # 構建標準化層
         self.norms = ModuleList()
+        # 檢查需要多少個標準化層
         num_norms = operation_order.count('norm')
         for _ in range(num_norms):
+            # 根據需要的數量進行構建實例化對象
             self.norms.append(build_norm_layer(norm_cfg, self.embed_dims)[1])
 
     def forward(self,
@@ -835,20 +882,26 @@ class BaseTransformerLayer(BaseModule):
         """Forward function for `TransformerDecoderLayer`.
 
         **kwargs contains some specific arguments of attentions.
+        這裡的batch_size可以是在第一個維度會是在第二個維度，只需要調整一下或是設定batch first就可以
 
         Args:
             query (Tensor): The input query with shape
                 [num_queries, bs, embed_dims] if
                 self.batch_first is False, else
                 [bs, num_queries embed_dims].
+                自注意力當中的query，shape [batch_size, num_queries, channel=embed_dim]
             key (Tensor): The key tensor with shape [num_keys, bs,
                 embed_dims] if self.batch_first is False, else
                 [bs, num_keys, embed_dims] .
+                自注意力當中的query，shape [batch_size, num_key, channel=embed_dim]
             value (Tensor): The value tensor with same shape as `key`.
+                這裡會跟key的shape相同
             query_pos (Tensor): The positional encoding for `query`.
                 Default: None.
+                就是query的位置編碼，shape [batch_size, num_queries, channel=embed_dim]
             key_pos (Tensor): The positional encoding for `key`.
                 Default: None.
+                就是key的位置編碼，shape [batch_size, num_key, channel=embed_dim]
             attn_masks (List[Tensor] | None): 2D Tensor used in
                 calculation of corresponding attention. The length of
                 it should equal to the number of `attention` in
@@ -856,34 +909,45 @@ class BaseTransformerLayer(BaseModule):
             query_key_padding_mask (Tensor): ByteTensor for `query`, with
                 shape [bs, num_queries]. Only used in `self_attn` layer.
                 Defaults to None.
+                如果是padding的部分就會是True其他部分就會是False
             key_padding_mask (Tensor): ByteTensor for `query`, with
                 shape [bs, num_keys]. Default: None.
 
         Returns:
             Tensor: forwarded results with shape [num_queries, bs, embed_dims].
         """
+        # 已看過，自注意力模塊的forward函數
 
+        # 將一些東西設定成0，用來看要用第幾個標準化層或是自注意力層或是FFN
         norm_index = 0
         attn_index = 0
         ffn_index = 0
+        # 保留query之後用來做殘差邊的
         identity = query
         if attn_masks is None:
+            # 如果傳入的attn_masks是None，就創建一個list長度為自注意力層數且都是None
             attn_masks = [None for _ in range(self.num_attn)]
         elif isinstance(attn_masks, torch.Tensor):
+            # 否則就將attn_masks拷貝自注意力的層數並放到list當中
             attn_masks = [
                 copy.deepcopy(attn_masks) for _ in range(self.num_attn)
             ]
+            # 這裡會告知堆疊多層的attn都是用一樣的mask
             warnings.warn(f'Use same attn_mask in all attentions in '
                           f'{self.__class__.__name__} ')
         else:
+            # 其他就會到這裡來，如果想要堆疊多層的attn中每層的mask不同就可以給與堆疊層數相同數量的attn_mask
             assert len(attn_masks) == self.num_attn, f'The length of ' \
                         f'attn_masks {len(attn_masks)} must be equal ' \
                         f'to the number of attention in ' \
                         f'operation_order {self.num_attn}'
 
+        # 根據指定的通過層結構的順序進行向前傳遞
         for layer in self.operation_order:
             if layer == 'self_attn':
+                # 如果是自注意力會到這裡
                 temp_key = temp_value = query
+                # 進行自注意力
                 query = self.attentions[attn_index](
                     query,
                     temp_key,
@@ -898,10 +962,12 @@ class BaseTransformerLayer(BaseModule):
                 identity = query
 
             elif layer == 'norm':
+                # 標準化層
                 query = self.norms[norm_index](query)
                 norm_index += 1
 
             elif layer == 'cross_attn':
+                # 交叉注意力層
                 query = self.attentions[attn_index](
                     query,
                     key,
@@ -944,19 +1010,35 @@ class TransformerLayerSequence(BaseModule):
     """
 
     def __init__(self, transformerlayers=None, num_layers=None, init_cfg=None):
+        """ 已看過，transformer的encoder與decoder的基底
+        Args:
+            transformerlayers: transformer的設定
+            num_layers: 堆疊層數
+            init_cfg: 初始化設定方式
+        """
+
+        # 繼承於BaseModule，對繼承對象進行初始化
         super().__init__(init_cfg)
         if isinstance(transformerlayers, dict):
+            # transformerlayers傳入的dict格式會進入到這裡
+            # 將傳入的transformerlayers拷貝num_layers份並且保存下來
             transformerlayers = [
                 copy.deepcopy(transformerlayers) for _ in range(num_layers)
             ]
         else:
+            # 其他就要檢查長度是否符合堆疊層數
             assert isinstance(transformerlayers, list) and \
                    len(transformerlayers) == num_layers
         self.num_layers = num_layers
+        # 構建layers保存空間
         self.layers = ModuleList()
+        # 遍歷總共需要堆疊多少層
         for i in range(num_layers):
+            # 構建層結構實例對象
             self.layers.append(build_transformer_layer(transformerlayers[i]))
+        # 保存一個特徵點會用多少維度向量進行表示
         self.embed_dims = self.layers[0].embed_dims
+        # 是否會先進行標準化
         self.pre_norm = self.layers[0].pre_norm
 
     def forward(self,
@@ -994,6 +1076,8 @@ class TransformerLayerSequence(BaseModule):
         Returns:
             Tensor:  results with shape [num_queries, bs, embed_dims].
         """
+        # 已看過，進行多層自注意力層的堆疊
+        # query_key_padding_mask = 哪些部分是透過padding出來的，padding的部分會是True其他地方會是False
         for layer in self.layers:
             query = layer(
                 query,

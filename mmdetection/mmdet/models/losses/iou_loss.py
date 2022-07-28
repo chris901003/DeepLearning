@@ -358,7 +358,16 @@ class BoundedIoULoss(nn.Module):
 class GIoULoss(nn.Module):
 
     def __init__(self, eps=1e-6, reduction='mean', loss_weight=1.0):
+        """ 已看過，GIoULoss初始化
+        Args:
+            eps: 一個很小的值，避免除法時遇到0
+            reduction: 最後計算結果處理
+            loss_weight: 權重
+        """
+
+        # 繼承於nn.Module
         super(GIoULoss, self).__init__()
+        # 保存傳入資料
         self.eps = eps
         self.reduction = reduction
         self.loss_weight = loss_weight

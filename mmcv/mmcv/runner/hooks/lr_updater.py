@@ -157,14 +157,21 @@ class LrUpdaterHook(Hook):
             ]
 
     def before_train_epoch(self, runner: 'runner.BaseRunner'):
+        # 已看過，在開始訓練一個epoch前對學習率進行調整
         if self.warmup_iters is None:
+            # 如果沒有設定warmup_iters會到這裡
+            # epoch_len = 一個epoch會有幾個batch
             epoch_len = len(runner.data_loader)  # type: ignore
+            # warmup_iters = 要warmup的epoch乘上一個epoch有多少個batch
             self.warmup_iters = self.warmup_epochs * epoch_len  # type: ignore
 
         if not self.by_epoch:
+            # 如果不是以epoch計算就直接回傳
             return
 
+        # 透過get_regular_lr獲取學習率
         self.regular_lr = self.get_regular_lr(runner)
+        # 透過set_lr設定學習率
         self._set_lr(runner, self.regular_lr)
 
     def before_train_iter(self, runner: 'runner.BaseRunner'):
@@ -237,9 +244,13 @@ class StepLrUpdaterHook(LrUpdaterHook):
         super().__init__(**kwargs)
 
     def get_lr(self, runner: 'runner.BaseRunner', base_lr: float):
+        # 已看過，透過runner裏面獲取當前的iter決定當前的學習率
+
+        # 如果是以epoch為基礎就會看當前是在第幾個epoch否則就是看當前在第幾個iter
         progress = runner.epoch if self.by_epoch else runner.iter
 
         # calculate exponential term
+        # 下面透過計算獲取當前應該要是的學習率
         if isinstance(self.step, int):
             exp = progress // self.step
         else:
@@ -252,7 +263,9 @@ class StepLrUpdaterHook(LrUpdaterHook):
         lr = base_lr * (self.gamma**exp)
         if self.min_lr is not None:
             # clip to a minimum value
+            # 學習率不會低於最低學習率
             lr = max(lr, self.min_lr)
+        # 回傳當前學習率
         return lr
 
 

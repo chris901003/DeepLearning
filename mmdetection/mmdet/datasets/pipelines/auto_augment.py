@@ -88,21 +88,34 @@ class AutoAugment:
     """
 
     def __init__(self, policies):
+        # 已看過，主要是在進行圖像增強
+        # policies = 裡面會有圖像增強的方式
+
+        # 檢查policies裡面是否有值
         assert isinstance(policies, list) and len(policies) > 0, \
             'Policies must be a non-empty list.'
+        # 遍歷policies裏面的內容
         for policy in policies:
+            # 裏面還會有一層list
             assert isinstance(policy, list) and len(policy) > 0, \
                 'Each policy in policies must be a non-empty list.'
+            # 遍歷list當中的變換方式
             for augment in policy:
+                # 必須要有type才知道如何變換
                 assert isinstance(augment, dict) and 'type' in augment, \
                     'Each specific augmentation must be a dict with key' \
                     ' "type".'
 
+        # 拷貝一份
         self.policies = copy.deepcopy(policies)
+        # 透過Compose進行一系列的變換
         self.transforms = [Compose(policy) for policy in self.policies]
 
     def __call__(self, results):
+        # 已看過
+        # 透過choice隨機選擇一種方式對圖像進行處理
         transform = np.random.choice(self.transforms)
+        # 進行圖像處理
         return transform(results)
 
     def __repr__(self):

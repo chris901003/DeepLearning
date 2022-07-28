@@ -200,6 +200,11 @@ class DefaultFormatBundle:
     def __init__(self,
                  img_to_float=True,
                  pad_val=dict(img=0, masks=0, seg=255)):
+        """ 已看過，將資料整理一下
+        Args:
+            img_to_float: 是否要將資料轉成float型態
+            pad_val: 填充的值
+        """
         self.img_to_float = img_to_float
         self.pad_val = pad_val
 
@@ -215,30 +220,39 @@ class DefaultFormatBundle:
         """
 
         if 'img' in results:
+            # 獲取圖像資料
             img = results['img']
             if self.img_to_float is True and img.dtype == np.uint8:
+                # 如果需要轉成float且還沒有轉就會在這裡轉
                 # Normally, image is of uint8 type without normalization.
                 # At this time, it needs to be forced to be converted to
                 # flot32, otherwise the model training and inference
                 # will be wrong. Only used for YOLOX currently .
                 img = img.astype(np.float32)
             # add default meta keys
+            # 將meta放到results當中
             results = self._add_default_meta_keys(results)
             if len(img.shape) < 3:
+                # 如果沒有channel維度就添加上去
                 img = np.expand_dims(img, -1)
+            # 將BGR轉成RGB
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
+            # 將圖像包裝成DataContainer格式
             results['img'] = DC(
                 to_tensor(img), padding_value=self.pad_val['img'], stack=True)
         for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels']:
             if key not in results:
                 continue
+            # 把指定的key的value包裝成DataContainer格式
             results[key] = DC(to_tensor(results[key]))
         if 'gt_masks' in results:
+            # 包裝
             results['gt_masks'] = DC(
                 results['gt_masks'],
                 padding_value=self.pad_val['masks'],
                 cpu_only=True)
         if 'gt_semantic_seg' in results:
+            # 包裝
             results['gt_semantic_seg'] = DC(
                 to_tensor(results['gt_semantic_seg'][None, ...]),
                 padding_value=self.pad_val['seg'],
@@ -320,6 +334,11 @@ class Collect:
                  meta_keys=('filename', 'ori_filename', 'ori_shape',
                             'img_shape', 'pad_shape', 'scale_factor', 'flip',
                             'flip_direction', 'img_norm_cfg')):
+        """ 已看過，將pipeline的資料進行統整
+        Args:
+            keys: 我們需要的資料
+            meta_keys: 保存詳細的資料
+        """
         self.keys = keys
         self.meta_keys = meta_keys
 
@@ -336,6 +355,7 @@ class Collect:
                 - keys in``self.keys``
                 - ``img_metas``
         """
+        # 已看過，提取出我們需要的資料
 
         data = {}
         img_meta = {}

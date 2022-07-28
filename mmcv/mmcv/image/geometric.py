@@ -618,8 +618,11 @@ def impad_to_multiple(img, divisor, pad_val=0):
     Returns:
         ndarray: The padded image.
     """
+    # 已看過，會將圖像padding到大小可以被divisor整除
+    # 獲取最近可以被整除的高寬，這裡是往上取，所以不會讓圖像變小
     pad_h = int(np.ceil(img.shape[0] / divisor)) * divisor
     pad_w = int(np.ceil(img.shape[1] / divisor)) * divisor
+    # 透過impad進行padding
     return impad(img, shape=(pad_h, pad_w), pad_val=pad_val)
 
 

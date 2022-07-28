@@ -68,24 +68,39 @@ class CocoDataset(CustomDataset):
         Returns:
             list[dict]: Annotation info from COCO api.
         """
+        # 已看過，透過標註文件讀取圖像相關資訊，這樣就可以透過idx獲取該照片的詳細內容
 
+        # 使用coco工具讀取標註文件
         self.coco = COCO(ann_file)
         # The order of returned `cat_ids` will not
         # change with the order of the CLASSES
+        # 透過傳入的CLASSES會將沒有出現在CLASSES當中的過濾掉，回傳的是一個list裡面會是CLASSES[idx]會對應上原始的哪個idx
+        # 因為coco原先會是91分類，其中有些會是N/A，所以這裡我們只有曲80個，透過這種方法可以獲取我們需要的對應關係
         self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
 
+        # 構建對應表，從coco的91分類的index對應到80分類的index
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
+        # 獲取所有圖像的idx，長度就會是整個訓練集的圖像數量
         self.img_ids = self.coco.get_img_ids()
+        # 保存要會傳的資料
         data_infos = []
         total_ann_ids = []
+        # 遍歷所有的訓練圖像
         for i in self.img_ids:
+            # 獲取該index圖像的資料，會有圖像檔案名稱以及高寬等等資料
             info = self.coco.load_imgs([i])[0]
+            # 在info當中多添加一個filename的key
             info['filename'] = info['file_name']
+            # 將info保存到data_infos當中
             data_infos.append(info)
+            # 獲取該圖像的標註訊息的index，ann_ids的長度就會是該圖像當中有多少個標註匡
             ann_ids = self.coco.get_ann_ids(img_ids=[i])
+            # 將ann_ids保存到total_ann_ids
             total_ann_ids.extend(ann_ids)
+        # 檢查是否有重複的部分
         assert len(set(total_ann_ids)) == len(
             total_ann_ids), f"Annotation ids in '{ann_file}' are not unique!"
+        # 將data_infos回傳回去
         return data_infos
 
     def get_ann_info(self, idx):
@@ -97,10 +112,15 @@ class CocoDataset(CustomDataset):
         Returns:
             dict: Annotation info of specified index.
         """
+        # 已看過，獲取coco的標註訊息，會用到cocotools的東西
 
+        # 獲取圖像的index
         img_id = self.data_infos[idx]['id']
+        # 透過index獲取標註訊息的index
         ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
+        # 透過標註訊息的index獲取該index的詳細標註資料
         ann_info = self.coco.load_anns(ann_ids)
+        # 透過_parse_ann_info將資料過濾
         return self._parse_ann_info(self.data_infos[idx], ann_info)
 
     def get_cat_ids(self, idx):
@@ -120,26 +140,38 @@ class CocoDataset(CustomDataset):
 
     def _filter_imgs(self, min_size=32):
         """Filter images too small or without ground truths."""
+        # 已看過，過濾過小的標註匡，如果該圖像經過過濾後或是本身沒有標註訊息也會被過濾
+        # valid_inds = 最終合法的圖像的index
         valid_inds = []
         # obtain images that contain annotation
+        # 獲取哪些index的圖像有標註訊息
         ids_with_ann = set(_['image_id'] for _ in self.coco.anns.values())
         # obtain images that contain annotations of the required categories
         ids_in_cat = set()
+        # 獲取哪些圖像的標註有我們指定的class
         for i, class_id in enumerate(self.cat_ids):
             ids_in_cat |= set(self.coco.cat_img_map[class_id])
         # merge the image id sets of the two conditions and use the merged set
         # to filter out images if self.filter_empty_gt=True
+        # 使用AND過濾出哪些圖像才是有標註匡且標註匡是80分類的
         ids_in_cat &= ids_with_ann
 
         valid_img_ids = []
+        # 遍歷所有的訓練圖像
         for i, img_info in enumerate(self.data_infos):
+            # 獲取圖像的index
             img_id = self.img_ids[i]
+            # 如果有開啟過濾沒有標註的圖像，就會檢查該圖像是否在ids_in_cat當中，如果沒有表示該圖像沒有標註圖像
             if self.filter_empty_gt and img_id not in ids_in_cat:
+                # 直接跳過
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
+                # 如果圖像大小小於最小值就會跳過，否則就添加上去
                 valid_inds.append(i)
                 valid_img_ids.append(img_id)
+        # 更新圖像index
         self.img_ids = valid_img_ids
+        # 將合法的圖像回傳
         return valid_inds
 
     def _parse_ann_info(self, img_info, ann_info):
@@ -154,44 +186,68 @@ class CocoDataset(CustomDataset):
                 labels, masks, seg_map. "masks" are raw annotations and not \
                 decoded into binary masks.
         """
+        # 已看過，將標注資料進行處理
+
+        # 標註匡
         gt_bboxes = []
+        # 標註匡的類別
         gt_labels = []
+        # 那些是要忽略掉的標註匡
         gt_bboxes_ignore = []
+        # mask的標註訊息
         gt_masks_ann = []
+        # 遍歷本張圖像的標註訊息
         for i, ann in enumerate(ann_info):
             if ann.get('ignore', False):
+                # 如果有加上ignore標籤就會直接跳過
                 continue
+            # 獲取標註匡資訊，這裡是左上角座標以及寬高
             x1, y1, w, h = ann['bbox']
+            # 獲取有在圖像大小內的寬高
             inter_w = max(0, min(x1 + w, img_info['width']) - max(x1, 0))
             inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
             if inter_w * inter_h == 0:
+                # 如果寬高有0的會被過濾掉
                 continue
             if ann['area'] <= 0 or w < 1 or h < 1:
+                # 匡選區域過小也會被過濾掉
                 continue
             if ann['category_id'] not in self.cat_ids:
+                # 沒有標註哪個類別的也會過濾掉
                 continue
+            # 獲取左上角座標以及右下角座標
             bbox = [x1, y1, x1 + w, y1 + h]
             if ann.get('iscrowd', False):
+                # 如果有標註為iscrowd表示比較難檢測，我們會放到ignore當中
                 gt_bboxes_ignore.append(bbox)
             else:
+                # 其他就會記錄下來
                 gt_bboxes.append(bbox)
+                # 將原始的類別index轉成80分類的index
                 gt_labels.append(self.cat2label[ann['category_id']])
+                # 獲取mask的資料，這個是segmentation才會用到
                 gt_masks_ann.append(ann.get('segmentation', None))
 
         if gt_bboxes:
+            # 如果有標註匡就會到這裡
+            # 我們將資料轉成ndarray型態並且轉成指定格式
             gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
             gt_labels = np.array(gt_labels, dtype=np.int64)
         else:
+            # 如果沒有半個標註匡就會到這裡
             gt_bboxes = np.zeros((0, 4), dtype=np.float32)
             gt_labels = np.array([], dtype=np.int64)
 
         if gt_bboxes_ignore:
+            # 這裡是ignore的
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
         else:
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
 
+        # seg_map的檔案名稱，會是將原始檔案名稱的副檔名改成png
         seg_map = img_info['filename'].replace('jpg', 'png')
 
+        # 最後將結果全部包成一個dict回傳
         ann = dict(
             bboxes=gt_bboxes,
             labels=gt_labels,

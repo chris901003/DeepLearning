@@ -11,6 +11,7 @@ class PseudoSampler(BaseSampler):
     """A pseudo sampler that does not do sampling actually."""
 
     def __init__(self, **kwargs):
+        # 已看過，目前不確定作用
         pass
 
     def _sample_pos(self, **kwargs):
@@ -32,10 +33,19 @@ class PseudoSampler(BaseSampler):
         Returns:
             :obj:`SamplingResult`: sampler results
         """
+        # 已看過
+        # assign_result = 配對過後將資料放入到一個class構建的實例對象
+        # bboxes = 預測匡資料，shape [num_pred, 4]
+        # gt_bboxes = 真實匡資料，shape [num_gt, 4]
+
+        # 透過nonzero可以獲取哪些部分不是0的index
+        # pos_inds正樣本的index，表示出哪些預測匡有匡到物體
         pos_inds = torch.nonzero(
             assign_result.gt_inds > 0, as_tuple=False).squeeze(-1).unique()
+        # neg_inds負樣本的index，表示哪些匡是匡到背景
         neg_inds = torch.nonzero(
             assign_result.gt_inds == 0, as_tuple=False).squeeze(-1).unique()
+        # 構建一個shape [num_pred]且全為0的tensor
         gt_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)
         sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,
                                          assign_result, gt_flags)

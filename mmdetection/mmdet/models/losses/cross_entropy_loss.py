@@ -199,6 +199,23 @@ def mask_cross_entropy(pred,
 
 @LOSSES.register_module()
 class CrossEntropyLoss(nn.Module):
+    """CrossEntropyLoss.
+
+    Args:
+        use_sigmoid (bool, optional): Whether the prediction uses sigmoid
+            of softmax. Defaults to False.
+        use_mask (bool, optional): Whether to use mask cross entropy loss.
+            Defaults to False.
+        reduction (str, optional): . Defaults to 'mean'.
+            Options are "none", "mean" and "sum".
+        class_weight (list[float], optional): Weight of each class.
+            Defaults to None.
+        ignore_index (int | None): The label index to be ignored.
+            Defaults to None.
+        loss_weight (float, optional): Weight of the loss. Defaults to 1.0.
+        avg_non_ignore (bool): The flag decides to whether the loss is
+            only averaged over non-ignored targets. Default: False.
+    """
 
     def __init__(self,
                  use_sigmoid=False,
@@ -208,25 +225,22 @@ class CrossEntropyLoss(nn.Module):
                  ignore_index=None,
                  loss_weight=1.0,
                  avg_non_ignore=False):
-        """CrossEntropyLoss.
-
+        """ 已看過，MMCV創建的交叉熵損失函數
         Args:
-            use_sigmoid (bool, optional): Whether the prediction uses sigmoid
-                of softmax. Defaults to False.
-            use_mask (bool, optional): Whether to use mask cross entropy loss.
-                Defaults to False.
-            reduction (str, optional): . Defaults to 'mean'.
-                Options are "none", "mean" and "sum".
-            class_weight (list[float], optional): Weight of each class.
-                Defaults to None.
-            ignore_index (int | None): The label index to be ignored.
-                Defaults to None.
-            loss_weight (float, optional): Weight of the loss. Defaults to 1.0.
-            avg_non_ignore (bool): The flag decides to whether the loss is
-                only averaged over non-ignored targets. Default: False.
+            use_sigmoid: 使用sigmoid替帶softmax，在二分類時會是True
+            use_mask: 是否使用帶有遮罩的交叉熵
+            reduction: 最後的結果處理，預設是取均值
+            class_weight: 各類別的權重，長度會是分類類別數加上一個背景
+            ignore_index: 需要被忽略掉的index
+            loss_weight: loss權重
+            avg_non_ignore: 是否僅對於為忽略的index進行平均
         """
+
+        # 繼承於nn.Module，初始化繼承對象
         super(CrossEntropyLoss, self).__init__()
+        # 不可以同時使用use_sigmoid與use_mask
         assert (use_sigmoid is False) or (use_mask is False)
+        # 保存傳入的參數
         self.use_sigmoid = use_sigmoid
         self.use_mask = use_mask
         self.reduction = reduction
@@ -236,6 +250,7 @@ class CrossEntropyLoss(nn.Module):
         self.avg_non_ignore = avg_non_ignore
         if ((ignore_index is not None) and not self.avg_non_ignore
                 and self.reduction == 'mean'):
+            # 如果有設定忽略的index但計算平均時又將忽略的index計算進去，這裡會報出警告
             warnings.warn(
                 'Default ``avg_non_ignore`` is False, if you would like to '
                 'ignore the certain label and average loss over non-ignore '
@@ -243,10 +258,13 @@ class CrossEntropyLoss(nn.Module):
                 'cross_entropy, set ``avg_non_ignore=True``.')
 
         if self.use_sigmoid:
+            # 如果使用sigmoid就會是使用二值交叉熵
             self.cls_criterion = binary_cross_entropy
         elif self.use_mask:
+            # 使用mask的交叉熵
             self.cls_criterion = mask_cross_entropy
         else:
+            # 正常的交叉熵
             self.cls_criterion = cross_entropy
 
     def extra_repr(self):

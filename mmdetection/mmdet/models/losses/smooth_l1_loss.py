@@ -115,7 +115,13 @@ class L1Loss(nn.Module):
     """
 
     def __init__(self, reduction='mean', loss_weight=1.0):
+        """ 已看過，l1損失
+        Args:
+            reduction: 計算後結果處理
+            loss_weight: 損失權重
+        """
         super(L1Loss, self).__init__()
+        # 保存傳入資料
         self.reduction = reduction
         self.loss_weight = loss_weight
 

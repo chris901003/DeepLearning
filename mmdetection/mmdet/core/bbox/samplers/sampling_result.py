@@ -25,16 +25,31 @@ class SamplingResult(util_mixins.NiceRepr):
 
     def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
                  gt_flags):
+        """ 已看過
+        Args:
+            pos_inds: 預測匡中正樣本的index
+            neg_inds: 預設匡中負樣本的index
+            bboxes: 預測匡資料shape [num_pred, 4]
+            gt_bboxes: 標註匡資料shape [num_gt, 4]
+            assign_result: AssignResult的實例化對象
+        """
+
+        # 保存輸入資料
         self.pos_inds = pos_inds
         self.neg_inds = neg_inds
+        # 獲取正樣本的預測匡資訊shape [num_gt, 4]
         self.pos_bboxes = bboxes[pos_inds]
+        # 獲取副樣本的預測匡資訊shape [num_pred - num_gt, 4]
         self.neg_bboxes = bboxes[neg_inds]
         self.pos_is_gt = gt_flags[pos_inds]
 
+        # 有多少個標註匡
         self.num_gts = gt_bboxes.shape[0]
+        # 獲取預測匡對應上的gt匡的index，這裡又將1扣回來
         self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
 
         if gt_bboxes.numel() == 0:
+            # 如果沒有gt匡就會在這裡
             # hack for index error case
             assert self.pos_assigned_gt_inds.numel() == 0
             self.pos_gt_bboxes = torch.empty_like(gt_bboxes).view(-1, 4)
@@ -42,9 +57,11 @@ class SamplingResult(util_mixins.NiceRepr):
             if len(gt_bboxes.shape) < 2:
                 gt_bboxes = gt_bboxes.view(-1, 4)
 
+            # 記錄下預測匡對應上的真實匡資訊
             self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds.long(), :]
 
         if assign_result.labels is not None:
+            # 記錄下預測匡對應上的類別資訊
             self.pos_gt_labels = assign_result.labels[pos_inds]
         else:
             self.pos_gt_labels = None

@@ -39,6 +39,14 @@ class LoadImageFromFile:
                  color_type='color',
                  channel_order='bgr',
                  file_client_args=dict(backend='disk')):
+        """ 已看過，將訓練圖像載入進來
+        Args:
+            to_float32: 是否要轉成float格式
+            color_type: 載入圖像的格式
+            channel_order: 圖像channel的排序方式，cv2的會是BGR
+            file_client_args: 圖像存放設備
+        """
+        # 保存傳入的資料
         self.to_float32 = to_float32
         self.color_type = color_type
         self.channel_order = channel_order
@@ -54,28 +62,37 @@ class LoadImageFromFile:
         Returns:
             dict: The dict contains loaded image and meta information.
         """
+        # 已看過，讀取訓練圖像
 
         if self.file_client is None:
+            # 獲取讀取資料的方式
             self.file_client = mmcv.FileClient(**self.file_client_args)
 
         if results['img_prefix'] is not None:
+            # 如果有提供檔案前面的路徑就會添加上去
             filename = osp.join(results['img_prefix'],
                                 results['img_info']['filename'])
         else:
+            # 否則就直接使用
             filename = results['img_info']['filename']
 
+        # 使用file_client.get獲取圖像，這裡會用2進制的方式將圖像讀入
         img_bytes = self.file_client.get(filename)
+        # 透過imfrombytes將二進制內容讀出成ndarray，shape [height, width, channel=3(BGR)]
         img = mmcv.imfrombytes(
             img_bytes, flag=self.color_type, channel_order=self.channel_order)
+        # 如果有需要將資料型態轉成float就會在這裡轉
         if self.to_float32:
             img = img.astype(np.float32)
 
+        # 將資料保存下來
         results['filename'] = filename
         results['ori_filename'] = results['img_info']['filename']
         results['img'] = img
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape
         results['img_fields'] = ['img']
+        # 將結果回傳
         return results
 
     def __repr__(self):
@@ -233,6 +250,17 @@ class LoadAnnotations:
                  poly2mask=True,
                  denorm_bbox=False,
                  file_client_args=dict(backend='disk')):
+        """ 已看過，讀取標註訊息
+        Args:
+            with_bbox: 是否需要讀入bbox訊息
+            with_label: 是否需要讀入label訊息
+            with_mask: 是否需要讀入mask訊息
+            with_seg: 是否需要讀入segmentation訊息
+            poly2mask: 將poly格式轉成mask的格式
+            denorm_bbox: 將相對位置轉成絕對位置
+            file_client_args: 檔案存放設備
+        """
+        # 保存傳入的資料
         self.with_bbox = with_bbox
         self.with_label = with_label
         self.with_mask = with_mask
@@ -251,27 +279,35 @@ class LoadAnnotations:
         Returns:
             dict: The dict contains loaded bounding box annotations.
         """
+        # 已看過，讀取標註匡的資訊
 
+        # 獲取標註匡訊息
         ann_info = results['ann_info']
+        # 將標註匡訊息拷貝到results當中且key為gt_bboxes
         results['gt_bboxes'] = ann_info['bboxes'].copy()
 
         if self.denorm_bbox:
+            # 如果是要將相對座標轉成絕對座標就會進來
             bbox_num = results['gt_bboxes'].shape[0]
             if bbox_num != 0:
                 h, w = results['img_shape'][:2]
                 results['gt_bboxes'][:, 0::2] *= w
                 results['gt_bboxes'][:, 1::2] *= h
 
+        # 獲取gt_bboxes_ignore資料
         gt_bboxes_ignore = ann_info.get('bboxes_ignore', None)
         if gt_bboxes_ignore is not None:
+            # 如果不是None就會加到bbox_fields當中
             results['gt_bboxes_ignore'] = gt_bboxes_ignore.copy()
             results['bbox_fields'].append('gt_bboxes_ignore')
+        # 在bbox_fields當中添加上gt_bboxes
         results['bbox_fields'].append('gt_bboxes')
 
         gt_is_group_ofs = ann_info.get('gt_is_group_ofs', None)
         if gt_is_group_ofs is not None:
             results['gt_is_group_ofs'] = gt_is_group_ofs.copy()
 
+        # 回傳最新的results
         return results
 
     def _load_labels(self, results):
@@ -283,6 +319,7 @@ class LoadAnnotations:
         Returns:
             dict: The dict contains loaded label annotations.
         """
+        # 已看過，讀取標籤訊息
 
         results['gt_labels'] = results['ann_info']['labels'].copy()
         return results
@@ -387,16 +424,22 @@ class LoadAnnotations:
             dict: The dict contains loaded bounding box, label, mask and
                 semantic segmentation annotations.
         """
+        # 已看過，讀取標注內容
 
         if self.with_bbox:
+            # 獲取標註匡
             results = self._load_bboxes(results)
             if results is None:
+                # 如果results是None就直接回傳
                 return None
         if self.with_label:
+            # 如果需要讀去標註類別就會讀取
             results = self._load_labels(results)
         if self.with_mask:
+            # 如果需要mask就會讀取
             results = self._load_masks(results)
         if self.with_seg:
+            # 如果需要segmentation就會讀取
             results = self._load_semantic_seg(results)
         return results
 

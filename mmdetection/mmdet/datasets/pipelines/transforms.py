@@ -82,22 +82,42 @@ class Resize:
                  backend='cv2',
                  interpolation='bilinear',
                  override=False):
+        """ 已看過，對圖像以及標註匡以及mask進行大小調整
+        Args:
+            img_scale: 圖像可能調整到的大小，會是一個tuple或是list，裡面會有需多不同的尺度
+            multiscale_mode: 會有range以及value兩個選項，range就是給定一個範圍然後隨機選，value就會是給幾個固定的且從中選一個
+            ratio_range: 透過高寬比進行大小調整
+            keep_ratio: 在回傳時是否需要回傳比例
+            bbox_clip_border: 是否需要將圖像外的標註匡進行裁切
+            backend: 使用的模組
+            interpolation: 差值方式
+            override: 是否需要兩次resize，預設為False
+        """
         if img_scale is None:
+            # 如果沒有傳入img_scale就直接給None
             self.img_scale = None
         else:
+            # 有傳入img_scale會到這裡
             if isinstance(img_scale, list):
+                # 如果是list型態就直接保存
                 self.img_scale = img_scale
             else:
+                # 不是list就在外面加上一層list
                 self.img_scale = [img_scale]
+            # 檢查list當中的資料要是tuple格式
             assert mmcv.is_list_of(self.img_scale, tuple)
 
+        # 這裡會提供3種resize決定大小的方式
         if ratio_range is not None:
+            # 如果ratio_range不是空就會進來
             # mode 1: given a scale and a range of image ratio
             assert len(self.img_scale) == 1
         else:
             # mode 2: given multiple scales or a range of scales
+            # 如果沒有傳入ratio_range就看我們使用的模式
             assert multiscale_mode in ['value', 'range']
 
+        # 保存一些傳入的參數
         self.backend = backend
         self.multiscale_mode = multiscale_mode
         self.ratio_range = ratio_range
@@ -120,6 +140,7 @@ class Resize:
                 ``scale_idx`` is the selected index in the given candidates.
         """
 
+        # 已看過，從list當中進行雖機選取
         assert mmcv.is_list_of(img_scales, tuple)
         scale_idx = np.random.randint(len(img_scales))
         img_scale = img_scales[scale_idx]
@@ -196,8 +217,10 @@ class Resize:
             dict: Two new keys 'scale` and 'scale_idx` are added into \
                 ``results``, which would be used by subsequent pipelines.
         """
+        # 已看過，獲取隨機的resize後的圖像大小
 
         if self.ratio_range is not None:
+            # 如果設定的是縮放比例的範圍會在這裡
             scale, scale_idx = self.random_sample_ratio(
                 self.img_scale[0], self.ratio_range)
         elif len(self.img_scale) == 1:
@@ -205,17 +228,25 @@ class Resize:
         elif self.multiscale_mode == 'range':
             scale, scale_idx = self.random_sample(self.img_scale)
         elif self.multiscale_mode == 'value':
+            # 如果設定的是固定值會在這裡，會從img_scale中選擇一種尺寸
+            # 回傳選到的尺寸以及選到的index
             scale, scale_idx = self.random_select(self.img_scale)
         else:
+            # 其他情況就直接報錯
             raise NotImplementedError
 
+        # 記錄下scale以及index
         results['scale'] = scale
         results['scale_idx'] = scale_idx
 
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
+        # 已看過，對圖像進行resize
+        # 遍歷與圖像相關的資料
         for key in results.get('img_fields', ['img']):
             if self.keep_ratio:
+                # 如果有需要保存縮放比例就會到這裡
+                # 透過imrescale進行調整
                 img, scale_factor = mmcv.imrescale(
                     results[key],
                     results['scale'],
@@ -224,35 +255,49 @@ class Resize:
                     backend=self.backend)
                 # the w_scale and h_scale has minor difference
                 # a real fix should be done in the mmcv.imrescale in the future
+                # 獲取新的圖像高寬
                 new_h, new_w = img.shape[:2]
+                # 獲取原始圖像的高寬
                 h, w = results[key].shape[:2]
+                # 計算高寬縮放多少倍
                 w_scale = new_w / w
                 h_scale = new_h / h
             else:
+                # 透過imresize進行調整
                 img, w_scale, h_scale = mmcv.imresize(
                     results[key],
                     results['scale'],
                     return_scale=True,
                     interpolation=self.interpolation,
                     backend=self.backend)
+            # 更新圖像
             results[key] = img
 
+            # 縮放比例，可以給標註匡進行使用
             scale_factor = np.array([w_scale, h_scale, w_scale, h_scale],
                                     dtype=np.float32)
+            # 保存新圖像的大小
             results['img_shape'] = img.shape
             # in case that there is no padding
+            # 更新pad的大小
             results['pad_shape'] = img.shape
+            # 保存縮放大小
             results['scale_factor'] = scale_factor
+            # 使否保存ratio
             results['keep_ratio'] = self.keep_ratio
 
     def _resize_bboxes(self, results):
         """Resize bounding boxes with ``results['scale_factor']``."""
+        # 已看過，對標註匡進行調整
         for key in results.get('bbox_fields', []):
+            # 將標註匡內容乘上縮放比例
             bboxes = results[key] * results['scale_factor']
             if self.bbox_clip_border:
+                # 如果需要將超出圖像的部分去除就會在這裡去除
                 img_shape = results['img_shape']
                 bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
                 bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
+            # 更新標註匡訊息
             results[key] = bboxes
 
     def _resize_masks(self, results):
@@ -293,29 +338,45 @@ class Resize:
             dict: Resized results, 'img_shape', 'pad_shape', 'scale_factor', \
                 'keep_ratio' keys are added into result dict.
         """
+        # 已看過，對圖像進行resize
 
         if 'scale' not in results:
+            # 如果results當中沒有指定scale就會到這裡
             if 'scale_factor' in results:
+                # 如果有指定scale_factor會到這
+                # 獲取原始圖像大小
                 img_shape = results['img'].shape[:2]
+                # 獲取縮放比例
                 scale_factor = results['scale_factor']
+                # 縮放比例需要是float格式
                 assert isinstance(scale_factor, float)
+                # 獲取縮放的大小，會是原始大小乘上縮放倍率
                 results['scale'] = tuple(
                     [int(x * scale_factor) for x in img_shape][::-1])
             else:
+                # 否則就會是隨機的大小
                 self._random_scale(results)
         else:
+            # 如果已經經過一次resize會到這裡
             if not self.override:
                 assert 'scale_factor' not in results, (
                     'scale and scale_factor cannot be both set.')
             else:
+                # 如果可以重新再選擇一次resize大小會到這裡
+                # 將之前的scale去除
                 results.pop('scale')
                 if 'scale_factor' in results:
                     results.pop('scale_factor')
+                # 重新隨機獲取一個
                 self._random_scale(results)
 
+        # 將圖像進行resize
         self._resize_img(results)
+        # 將標註匡進行resize
         self._resize_bboxes(results)
+        # 將mask進行resize
         self._resize_masks(results)
+        # 將seg進行resize
         self._resize_seg(results)
         return results
 
@@ -368,29 +429,46 @@ class RandomFlip:
     """
 
     def __init__(self, flip_ratio=None, direction='horizontal'):
+        """ 已看過，隨機翻轉
+        Args:
+            flip_ratio: 隨機翻轉概率
+            direction: 翻轉方向
+        """
         if isinstance(flip_ratio, list):
+            # flip_ratio是list會進入到這裡
             assert mmcv.is_list_of(flip_ratio, float)
+            # 翻轉概率的總和不能大於1
             assert 0 <= sum(flip_ratio) <= 1
         elif isinstance(flip_ratio, float):
+            # 如果傳入的是一個值就會到這裡，會檢查該值必須在[0, 1]之間
             assert 0 <= flip_ratio <= 1
         elif flip_ratio is None:
+            # 如果沒有傳入翻轉概率就直接pass
             pass
         else:
+            # 其他狀態就是報錯
             raise ValueError('flip_ratios must be None, float, '
                              'or list of float')
+        # 保存翻轉概率
         self.flip_ratio = flip_ratio
 
+        # 可以接受3中翻轉方式
         valid_directions = ['horizontal', 'vertical', 'diagonal']
         if isinstance(direction, str):
+            # 檢查是否為合法的3種方式
             assert direction in valid_directions
         elif isinstance(direction, list):
             assert mmcv.is_list_of(direction, str)
+            # 檢查list當中的翻轉方式是否都是合法
             assert set(direction).issubset(set(valid_directions))
         else:
+            # 其他狀況就直接報錯
             raise ValueError('direction must be either str or list of str')
+        # 保存翻轉方式
         self.direction = direction
 
         if isinstance(flip_ratio, list):
+            # 翻轉概率以及翻轉方式要可以對應上
             assert len(self.flip_ratio) == len(self.direction)
 
     def bbox_flip(self, bboxes, img_shape, direction):
@@ -405,18 +483,26 @@ class RandomFlip:
         Returns:
             numpy.ndarray: Flipped bounding boxes.
         """
+        # 已看過，對標註匡進行指定方向的翻轉
 
+        # 檢查標註匡是否有問題
         assert bboxes.shape[-1] % 4 == 0
+        # 將標註匡拷貝一份
         flipped = bboxes.copy()
         if direction == 'horizontal':
+            # 如果是水平翻轉會在這裡
             w = img_shape[1]
+            # 水平翻轉只會跟x會有關係
             flipped[..., 0::4] = w - bboxes[..., 2::4]
             flipped[..., 2::4] = w - bboxes[..., 0::4]
         elif direction == 'vertical':
+            # 如果是垂直翻轉會在這裡
             h = img_shape[0]
+            # 垂直翻轉會跟y有關係
             flipped[..., 1::4] = h - bboxes[..., 3::4]
             flipped[..., 3::4] = h - bboxes[..., 1::4]
         elif direction == 'diagonal':
+            # 如果是對角線翻轉會到這裡
             w = img_shape[1]
             h = img_shape[0]
             flipped[..., 0::4] = w - bboxes[..., 2::4]
@@ -424,7 +510,9 @@ class RandomFlip:
             flipped[..., 2::4] = w - bboxes[..., 0::4]
             flipped[..., 3::4] = h - bboxes[..., 1::4]
         else:
+            # 其他類型的翻轉就會直接報錯
             raise ValueError(f"Invalid flipping direction '{direction}'")
+        # 回傳調整後的結果
         return flipped
 
     def __call__(self, results):
@@ -439,47 +527,63 @@ class RandomFlip:
                 into result dict.
         """
 
+        # 已看過，對圖像進行翻轉
         if 'flip' not in results:
+            # 如果results當中沒有flip內容就會進行構建
             if isinstance(self.direction, list):
                 # None means non-flip
+                # 如果是個list就會在最後面添加上None
                 direction_list = self.direction + [None]
             else:
                 # None means non-flip
+                # 如果不是list就轉成list並且最後面會有None
                 direction_list = [self.direction, None]
 
             if isinstance(self.flip_ratio, list):
+                # 獲取不翻轉的概率，就是1-翻轉概率
                 non_flip_ratio = 1 - sum(self.flip_ratio)
+                # 獲取翻轉概率的list
                 flip_ratio_list = self.flip_ratio + [non_flip_ratio]
             else:
+                # 獲取不翻轉的概率
                 non_flip_ratio = 1 - self.flip_ratio
                 # exclude non-flip
                 single_ratio = self.flip_ratio / (len(direction_list) - 1)
+                # 構建翻轉概率的list
                 flip_ratio_list = [single_ratio] * (len(direction_list) -
                                                     1) + [non_flip_ratio]
 
+            # choice = 從direction_list當中選出一個，flip_ratio_list就會是每一個被選中的概率
+            # cur_dir = 選出的那個，如果選到的是None表示不進行翻轉
             cur_dir = np.random.choice(direction_list, p=flip_ratio_list)
 
+            # 如果cur_dir不是None就將結果放到result當中
             results['flip'] = cur_dir is not None
         if 'flip_direction' not in results:
+            # 將翻轉的方向保留
             results['flip_direction'] = cur_dir
         if results['flip']:
-            # flip image
+            # 如果需要進行翻轉就會進來
+            # flip image，遍歷img_fields當中的內容
             for key in results.get('img_fields', ['img']):
+                # 將指定的key的value進行翻轉
                 results[key] = mmcv.imflip(
                     results[key], direction=results['flip_direction'])
-            # flip bboxes
+            # flip bboxes，遍歷bbox_fields當中的內容
             for key in results.get('bbox_fields', []):
+                # 將指定的key的value進行翻轉，這裡會是標註匡的翻轉
                 results[key] = self.bbox_flip(results[key],
                                               results['img_shape'],
                                               results['flip_direction'])
-            # flip masks
+            # flip masks，mask翻轉
             for key in results.get('mask_fields', []):
                 results[key] = results[key].flip(results['flip_direction'])
 
-            # flip segs
+            # flip segs，seg翻轉
             for key in results.get('seg_fields', []):
                 results[key] = mmcv.imflip(
                     results[key], direction=results['flip_direction'])
+        # 將調整過後的results回傳
         return results
 
     def __repr__(self):
@@ -598,30 +702,45 @@ class Pad:
                  size_divisor=None,
                  pad_to_square=False,
                  pad_val=dict(img=0, masks=0, seg=255)):
+        """ 已看過，添加padding
+        Args:
+            size: 固定的padding大小
+            size_divisor: padding size的除數
+            pad_to_square: 是否需要將圖像變成正方形
+            pad_val: padding的數值，這裡會根據對不同東西進行padding會有不同的數值
+        """
+        # 將指定的size保存
         self.size = size
         self.size_divisor = size_divisor
         if isinstance(pad_val, float) or isinstance(pad_val, int):
+            # padding的值如果是float型態會跳出警告，現在只希望是int
             warnings.warn(
                 'pad_val of float type is deprecated now, '
                 f'please use pad_val=dict(img={pad_val}, '
                 f'masks={pad_val}, seg=255) instead.', DeprecationWarning)
             pad_val = dict(img=pad_val, masks=pad_val, seg=255)
         assert isinstance(pad_val, dict)
+        # 保存資料
         self.pad_val = pad_val
         self.pad_to_square = pad_to_square
 
         if pad_to_square:
+            # 如果經過padding後希望要是正方形就會到這裡
             assert size is None and size_divisor is None, \
                 'The size and size_divisor must be None ' \
                 'when pad2square is True'
         else:
+            # size與size_divisor只能有一個是None
             assert size is not None or size_divisor is not None, \
                 'only one of size and size_divisor should be valid'
             assert size is None or size_divisor is None
 
     def _pad_img(self, results):
         """Pad images according to ``self.size``."""
+        # 已看過，對圖像進行padding
+        # 獲取padding的值
         pad_val = self.pad_val.get('img', 0)
+        # 遍歷所有的圖像
         for key in results.get('img_fields', ['img']):
             if self.pad_to_square:
                 max_size = max(results[key].shape[:2])
@@ -630,10 +749,14 @@ class Pad:
                 padded_img = mmcv.impad(
                     results[key], shape=self.size, pad_val=pad_val)
             elif self.size_divisor is not None:
+                # 使用size_divisor進行padding
                 padded_img = mmcv.impad_to_multiple(
                     results[key], self.size_divisor, pad_val=pad_val)
+            # 更新圖像
             results[key] = padded_img
+        # 更新padding後的shape
         results['pad_shape'] = padded_img.shape
+        # 保存一些參數
         results['pad_fixed_size'] = self.size
         results['pad_size_divisor'] = self.size_divisor
 
@@ -661,8 +784,13 @@ class Pad:
         Returns:
             dict: Updated result dict.
         """
+        # 已看過，對圖像進行padding
+
+        # 對圖像進行padding
         self._pad_img(results)
+        # 對masks進行padding
         self._pad_masks(results)
+        # 對segmentation進行padding
         self._pad_seg(results)
         return results
 
@@ -689,6 +817,12 @@ class Normalize:
     """
 
     def __init__(self, mean, std, to_rgb=True):
+        """ 已看過，對圖像進行均值標準化調整
+        Args:
+            mean: 均值
+            std: 方差
+            to_rgb: 是否要將圖像轉成RGB格式
+        """
         self.mean = np.array(mean, dtype=np.float32)
         self.std = np.array(std, dtype=np.float32)
         self.to_rgb = to_rgb
@@ -703,9 +837,11 @@ class Normalize:
             dict: Normalized results, 'img_norm_cfg' key is added into
                 result dict.
         """
+        # 已看過，對圖像進行均值標準差調整
         for key in results.get('img_fields', ['img']):
             results[key] = mmcv.imnormalize(results[key], self.mean, self.std,
                                             self.to_rgb)
+        # 記錄下調整方式
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
         return results
@@ -759,22 +895,36 @@ class RandomCrop:
                  allow_negative_crop=False,
                  recompute_bbox=False,
                  bbox_clip_border=True):
+        """ 已看過，隨機剪裁，會同時剪裁圖像標註匡以及mask
+        Args:
+            crop_size: 剪裁後的圖像大小或是高寬比
+            crop_type: 剪裁的方式
+            allow_negative_crop: 是否允許裁切後的圖像當中沒有任何標註匡
+            recompute_bbox: 是否需要根據裁切後的圖像進行計算標註匡數量
+            bbox_clip_border: 是否要將圖像外的標註匡裁切掉
+        """
+
+        # 檢查剪裁的方式是否合法
         if crop_type not in [
                 'relative_range', 'relative', 'absolute', 'absolute_range'
         ]:
             raise ValueError(f'Invalid crop_type {crop_type}.')
         if crop_type in ['absolute', 'absolute_range']:
+            # 如果選擇的剪裁方式是絕對座標就會需要檢查是否皆大於0
             assert crop_size[0] > 0 and crop_size[1] > 0
             assert isinstance(crop_size[0], int) and isinstance(
                 crop_size[1], int)
         else:
+            # 其他就會是比例，所以需要在[0, 1]之間
             assert 0 < crop_size[0] <= 1 and 0 < crop_size[1] <= 1
+        # 將傳入的值進行保存
         self.crop_size = crop_size
         self.crop_type = crop_type
         self.allow_negative_crop = allow_negative_crop
         self.bbox_clip_border = bbox_clip_border
         self.recompute_bbox = recompute_bbox
         # The key correspondence from bboxes to labels and masks.
+        # 建立一些對應關係
         self.bbox2label = {
             'gt_bboxes': 'gt_labels',
             'gt_bboxes_ignore': 'gt_labels_ignore'
@@ -798,42 +948,63 @@ class RandomCrop:
             dict: Randomly cropped results, 'img_shape' key in result dict is
                 updated according to crop size.
         """
+        # 已看過，對圖像進行裁切
+        # results = 圖像詳細資料
+        # crop_size = 最後圖像要裁切到的大小
+        # allow_negative_crop = 是否允許裁切後圖像不包含任何標註匡
         assert crop_size[0] > 0 and crop_size[1] > 0
+        # 遍歷所有圖像
         for key in results.get('img_fields', ['img']):
+            # 獲取圖像資料
             img = results[key]
+            # margin_h, margin_w = 需要裁掉的大小
             margin_h = max(img.shape[0] - crop_size[0], 0)
             margin_w = max(img.shape[1] - crop_size[1], 0)
+            # 獲取高寬需要偏移多少，加一是因為裁切時右邊是開
             offset_h = np.random.randint(0, margin_h + 1)
             offset_w = np.random.randint(0, margin_w + 1)
+            # 從crop_y1到crop_y2範圍內的圖像是我們要的
             crop_y1, crop_y2 = offset_h, offset_h + crop_size[0]
+            # 從crop_x1到crop_x2範圍內的圖像是我們要的
             crop_x1, crop_x2 = offset_w, offset_w + crop_size[1]
 
-            # crop the image
+            # crop the image，根據需要的範圍對圖像進行剪裁
             img = img[crop_y1:crop_y2, crop_x1:crop_x2, ...]
+            # 獲取新圖像大小
             img_shape = img.shape
+            # 更新圖像
             results[key] = img
+        # 更新圖像大小
         results['img_shape'] = img_shape
 
         # crop bboxes accordingly and clip to the image boundary
+        # 剪裁標註匡部分
         for key in results.get('bbox_fields', []):
             # e.g. gt_bboxes and gt_bboxes_ignore
+            # 獲取偏移的部分
             bbox_offset = np.array([offset_w, offset_h, offset_w, offset_h],
                                    dtype=np.float32)
+            # 對標註匡進行偏移，也就是扣掉偏移量就會對應到剪裁後的原圖上面
             bboxes = results[key] - bbox_offset
             if self.bbox_clip_border:
+                # 將超出圖像的部分變成圖像邊界上面
                 bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
                 bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
+            # 過濾出合法的標註匡，右邊界要大於左邊界同時下邊界要大於上邊界
             valid_inds = (bboxes[:, 2] > bboxes[:, 0]) & (
                 bboxes[:, 3] > bboxes[:, 1])
             # If the crop does not contain any gt-bbox area and
             # allow_negative_crop is False, skip this image.
             if (key == 'gt_bboxes' and not valid_inds.any()
                     and not allow_negative_crop):
+                # 如果不允許圖像內沒有半個標註匡時，遇到沒有半個合法的匡就直接回傳None
                 return None
+            # 將不合法的標註匡去除
             results[key] = bboxes[valid_inds, :]
-            # label fields. e.g. gt_labels and gt_labels_ignore
+            # label fields. e.g. gt_labels and gt_labels_ignore，找尋到對應的資料像是gt_box會配上一個label
             label_key = self.bbox2label.get(key)
             if label_key in results:
+                # 將分類資料也進行過濾
                 results[label_key] = results[label_key][valid_inds]
 
             # mask fields, e.g. gt_masks and gt_masks_ignore
@@ -849,6 +1020,7 @@ class RandomCrop:
         for key in results.get('seg_fields', []):
             results[key] = results[key][crop_y1:crop_y2, crop_x1:crop_x2]
 
+        # 將結果回傳
         return results
 
     def _get_crop_size(self, image_size):
@@ -861,17 +1033,24 @@ class RandomCrop:
         Returns:
             crop_size (tuple): (crop_h, crop_w) in absolute pixels.
         """
+        # 已看過，生成隨機剪裁大小
+        # 獲取圖像高寬
         h, w = image_size
         if self.crop_type == 'absolute':
-            return (min(self.crop_size[0], h), min(self.crop_size[1], w))
+            # 如果剪裁的模式是absolute就直接返回要剪裁的大小與當前圖像的大小取小的
+            return min(self.crop_size[0], h), min(self.crop_size[1], w)
         elif self.crop_type == 'absolute_range':
+            # 如果剪裁的模式是absolute_range就會到這裡
+            # 檢查裁切大小是否合法
             assert self.crop_size[0] <= self.crop_size[1]
+            # 隨機選取裁切後的高寬，範圍會是[crop_size[0], crop_size[1]]之間不過不能大於原始圖像
             crop_h = np.random.randint(
                 min(h, self.crop_size[0]),
                 min(h, self.crop_size[1]) + 1)
             crop_w = np.random.randint(
                 min(w, self.crop_size[0]),
                 min(w, self.crop_size[1]) + 1)
+            # 回傳
             return crop_h, crop_w
         elif self.crop_type == 'relative':
             crop_h, crop_w = self.crop_size
@@ -892,8 +1071,12 @@ class RandomCrop:
             dict: Randomly cropped results, 'img_shape' key in result dict is
                 updated according to crop size.
         """
+        # 已看過，進行隨機剪裁
+        # 獲取當前圖像高寬
         image_size = results['img'].shape[:2]
+        # 獲取隨機剪裁大小，crop_size會是tuple(new_h, new_w)
         crop_size = self._get_crop_size(image_size)
+        # 對圖像進行隨機剪裁
         results = self._crop_data(results, crop_size, self.allow_negative_crop)
         return results
 

@@ -41,6 +41,13 @@ class AssignResult(util_mixins.NiceRepr):
     """
 
     def __init__(self, num_gts, gt_inds, max_overlaps, labels=None):
+        """ 已看過
+        Args:
+            num_gts: 有多少個gt_box
+            gt_inds: 預測匡對應上的gt_box，這裡會是1為第一個index，0表示沒有對應上的標註匡
+            max_overlaps:
+            labels: 預測匡應該要對應上的分類類別，-1表示沒有匡到目標
+        """
         self.num_gts = num_gts
         self.gt_inds = gt_inds
         self.max_overlaps = max_overlaps
