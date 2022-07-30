@@ -220,11 +220,21 @@ class BitmapMasks(BaseInstanceMasks):
     """
 
     def __init__(self, masks, height, width):
+        """ 已看過，保存圖像且圖像是以bitmap格式儲存的
+        Args:
+            masks: mask資訊，list[ndarray] ndarray shape [height, width]，list長度就是不同縮放的標註訊息
+            height: 當前圖像高
+            width: 當前圖像寬
+        """
+
+        # 保存高寬資訊
         self.height = height
         self.width = width
         if len(masks) == 0:
+            # masks長度為0表示沒有任何尺度的縮放mask
             self.masks = np.empty((0, self.height, self.width), dtype=np.uint8)
         else:
+            # 檢查一些資訊是否合法
             assert isinstance(masks, (list, np.ndarray))
             if isinstance(masks, list):
                 assert isinstance(masks[0], np.ndarray)
@@ -232,6 +242,7 @@ class BitmapMasks(BaseInstanceMasks):
             else:
                 assert masks.ndim == 3  # (N, H, W)
 
+            # 將所有masks進行堆疊，self.masks shape [num_ratio, height, width]，且為ndarray格式
             self.masks = np.stack(masks).reshape(-1, height, width)
             assert self.masks.shape[1] == self.height
             assert self.masks.shape[2] == self.width
@@ -264,15 +275,20 @@ class BitmapMasks(BaseInstanceMasks):
 
     def rescale(self, scale, interpolation='nearest'):
         """See :func:`BaseInstanceMasks.rescale`."""
+        # 已看過，將mask進行resize調整
+        # scale = 縮放倍率，如果小於1就會將mask變小
         if len(self.masks) == 0:
             new_w, new_h = mmcv.rescale_size((self.width, self.height), scale)
             rescaled_masks = np.empty((0, new_h, new_w), dtype=np.uint8)
         else:
+            # 將mask進行縮放調整後進行堆疊，shape [layers, height, width]
             rescaled_masks = np.stack([
                 mmcv.imrescale(mask, scale, interpolation=interpolation)
                 for mask in self.masks
             ])
+        # 調整後的高寬
         height, width = rescaled_masks.shape[1:]
+        # 構建BitmapMasks實例對象
         return BitmapMasks(rescaled_masks, height, width)
 
     def resize(self, out_shape, interpolation='nearest'):
@@ -289,19 +305,24 @@ class BitmapMasks(BaseInstanceMasks):
 
     def flip(self, flip_direction='horizontal'):
         """See :func:`BaseInstanceMasks.flip`."""
+        # 已看過，對masks進行翻轉
+        # 目前只支援3中翻轉方式
         assert flip_direction in ('horizontal', 'vertical', 'diagonal')
 
         if len(self.masks) == 0:
             flipped_masks = self.masks
         else:
+            # 將mask資訊取出來進行翻轉，最後在stack一起
             flipped_masks = np.stack([
                 mmcv.imflip(mask, direction=flip_direction)
                 for mask in self.masks
             ])
+        # 將翻轉後的masks放到BitmapMasks當中構建實例對象
         return BitmapMasks(flipped_masks, self.height, self.width)
 
     def pad(self, out_shape, pad_val=0):
         """See :func:`BaseInstanceMasks.pad`."""
+        # 已看過，根據需要的大小進行padding
         if len(self.masks) == 0:
             padded_masks = np.empty((0, *out_shape), dtype=np.uint8)
         else:
@@ -313,14 +334,18 @@ class BitmapMasks(BaseInstanceMasks):
 
     def crop(self, bbox):
         """See :func:`BaseInstanceMasks.crop`."""
+        # 已看過，裁切mask
+        # bbox = [xmin, ymin, xmax, ymax]
         assert isinstance(bbox, np.ndarray)
         assert bbox.ndim == 1
 
         # clip the boundary
         bbox = bbox.copy()
+        # 控制不可以小於0
         bbox[0::2] = np.clip(bbox[0::2], 0, self.width)
         bbox[1::2] = np.clip(bbox[1::2], 0, self.height)
         x1, y1, x2, y2 = bbox
+        # 獲取裁切後的高寬
         w = np.maximum(x2 - x1, 1)
         h = np.maximum(y2 - y1, 1)
 
@@ -586,11 +611,20 @@ class PolygonMasks(BaseInstanceMasks):
     """
 
     def __init__(self, masks, height, width):
+        """ 已看過，用多邊形標註一個目標
+        Args:
+            masks: list[list[ndarray]]，第一個list長度就是圖像標註量，ndarray長度會是偶數因為一組(x,y)會佔兩個空間
+            height: 原始圖像高度
+            width: 原始圖像寬度
+        """
+        # 檢查masks需要是list格式
         assert isinstance(masks, list)
         if len(masks) > 0:
+            # masks長度大於0表示有標註訊息，就會檢查其中的格式
             assert isinstance(masks[0], list)
             assert isinstance(masks[0][0], np.ndarray)
 
+        # 保存傳入的參數
         self.height = height
         self.width = width
         self.masks = masks
@@ -643,21 +677,35 @@ class PolygonMasks(BaseInstanceMasks):
 
     def resize(self, out_shape, interpolation=None):
         """see :func:`BaseInstanceMasks.resize`"""
+        # 已看過，將mask進行大小調整
+        # out_shape = 通過resize後圖像大小
+        # interpolation = 差值方式
+
         if len(self.masks) == 0:
+            # 如果沒有目標masks就直接變成空
             resized_masks = PolygonMasks([], *out_shape)
         else:
+            # 獲取高寬的縮放比例
             h_scale = out_shape[0] / self.height
             w_scale = out_shape[1] / self.width
+            # 構建resize後圖像存放位置
             resized_masks = []
+            # 遍歷所有masks
             for poly_per_obj in self.masks:
+                # 經過resize後的多邊形
                 resized_poly = []
                 for p in poly_per_obj:
                     p = p.copy()
+                    # 將多邊形的(x,y)點乘上縮放倍率
                     p[0::2] = p[0::2] * w_scale
                     p[1::2] = p[1::2] * h_scale
+                    # 保存縮放後的點
                     resized_poly.append(p)
+                # 保存縮放好的多邊形
                 resized_masks.append(resized_poly)
+            # 將調整好的多邊形變成PolygonMasks實例對象
             resized_masks = PolygonMasks(resized_masks, *out_shape)
+        # 將縮放後的實例對象回傳
         return resized_masks
 
     def flip(self, flip_direction='horizontal'):

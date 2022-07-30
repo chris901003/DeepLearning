@@ -30,13 +30,20 @@ class PSEPostprocessor(BasePostprocessor):
                  min_kernel_area=0,
                  min_text_area=16,
                  **kwargs):
+        """ 已看過，對於PSENet的預測進行解碼，也就是後處理部分
+        Args:
+            text_repr_type: encoding的邊界
+        """
+        # 繼承自BasePostprocessor，對繼承對象初始化
         super().__init__(text_repr_type)
 
+        # 檢查一些參數有沒有問題
         assert 0 <= min_kernel_confidence <= 1
         assert 0 <= min_text_avg_confidence <= 1
         assert isinstance(min_kernel_area, int)
         assert isinstance(min_text_area, int)
 
+        # 保存傳入的參數
         self.min_kernel_confidence = min_kernel_confidence
         self.min_text_avg_confidence = min_text_avg_confidence
         self.min_kernel_area = min_kernel_area

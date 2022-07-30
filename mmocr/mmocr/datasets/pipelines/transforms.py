@@ -31,9 +31,18 @@ class RandomCropInstances:
             instance_key,
             mask_type='inx0',  # 'inx0' or 'union_all'
             positive_sample_ratio=5.0 / 8.0):
+        """ 已看過，隨機剪裁並且保證圖像當中包含文字檢測對象
+        Args:
+            target_size: tuple或是int，剪裁後圖像大小
+            instance_key:
+            mask_type: mask的方式
+            positive_sample_ratio: 剪裁後圖像正負樣本的比例
+        """
 
+        # 檢查mask_type是否合法
         assert mask_type in ['inx0', 'union_all']
 
+        # 保存傳入的參數
         self.mask_type = mask_type
         self.instance_key = instance_key
         self.positive_sample_ratio = positive_sample_ratio
@@ -41,10 +50,18 @@ class RandomCropInstances:
             target_size, tuple)) else (target_size, target_size)
 
     def sample_offset(self, img_gt, img_size):
+        """ 已看過，獲取offset
+        Args:
+            img_gt: mask的資訊，ndarray shape [height, width]
+            img_size: 當前圖像大小，tuple (height, width)
+        """
+        # 獲取當前圖像高寬
         h, w = img_size
+        # 獲取經過裁切後的高寬
         t_h, t_w = self.target_size
 
         # target size is bigger than origin size
+        # 經過裁切後圖像只會變小或是不變，不會變大
         t_h = t_h if t_h < h else h
         t_w = t_w if t_w < w else w
         if (img_gt is not None
@@ -52,17 +69,23 @@ class RandomCropInstances:
                 and np.max(img_gt) > 0):
 
             # make sure to crop the positive region
+            # 確保裁切後是取到正範圍
 
             # the minimum top left to crop positive region (h,w)
+            # 獲取圖像當中最左上角有出現標註的點之後再扣去目標高寬
             tl = np.min(np.where(img_gt > 0), axis=1) - (t_h, t_w)
+            # 如果小於0就變成0
             tl[tl < 0] = 0
             # the maximum top left to crop positive region
+            # 獲取類似最右下角點之後再扣除目標高寬
             br = np.max(np.where(img_gt > 0), axis=1) - (t_h, t_w)
+            # 如果小於0就變成0
             br[br < 0] = 0
             # if br is too big so that crop the outside region of img
+            # 控制br長度
             br[0] = min(br[0], h - t_h)
             br[1] = min(br[1], w - t_w)
-            #
+            # 在範圍內隨機挑選高寬
             h = np.random.randint(tl[0], br[0]) if tl[0] < br[0] else 0
             w = np.random.randint(tl[1], br[1]) if tl[1] < br[1] else 0
         else:
@@ -71,15 +94,19 @@ class RandomCropInstances:
             h = np.random.randint(0, h - t_h) if h - t_h > 0 else 0
             w = np.random.randint(0, w - t_w) if w - t_w > 0 else 0
 
+        # 最後回傳高寬，這個高寬估計會是左上角點，右下角點就會是(h + t_h, w + t_w)位置
         return (h, w)
 
     @staticmethod
     def crop_img(img, offset, target_size):
+        # 已看過，對圖像進行裁切
         h, w = img.shape[:2]
+        # br = 右下角點
         br = np.min(
             np.stack((np.array(offset) + np.array(target_size), np.array(
                 (h, w)))),
             axis=0)
+        # 回傳裁切好的圖像以及裁切的範圍
         return img[offset[0]:br[0], offset[1]:br[1]], np.array(
             [offset[1], offset[0], br[1], br[0]])
 
@@ -122,22 +149,28 @@ class RandomCropInstances:
         raise NotImplementedError
 
     def __call__(self, results):
+        # 已看過，進行隨機剪裁同時當中比必須要有文字
 
+        # 獲取標註資訊
         gt_mask = results[self.instance_key]
         mask = None
         if len(gt_mask.masks) > 0:
+            # 如果有gt_mask就會進來，mask就取出第一種縮放比例的mask，shape[height, width]
             mask = self.generate_mask(gt_mask, self.mask_type)
+        # 獲取crop_offset，裁切偏移量
         results['crop_offset'] = self.sample_offset(mask,
                                                     results['img'].shape[:2])
 
         # crop img. bbox = [x1,y1,x2,y2]
         img, bbox = self.crop_img(results['img'], results['crop_offset'],
                                   self.target_size)
+        # 更新圖像
         results['img'] = img
         img_shape = img.shape
+        # 更新圖像大小
         results['img_shape'] = img_shape
 
-        # crop masks
+        # crop masks，對mask進行裁切
         for key in results.get('mask_fields', []):
             results[key] = results[key].crop(bbox)
 
@@ -181,39 +214,57 @@ class RandomRotateTextDet:
     """Randomly rotate images."""
 
     def __init__(self, rotate_ratio=1.0, max_angle=10):
+        """ 已看過，對圖像進行旋轉
+        Args:
+            rotate_ratio: 旋轉機率
+            max_angle: 最大旋轉角度
+        """
         self.rotate_ratio = rotate_ratio
         self.max_angle = max_angle
 
     @staticmethod
     def sample_angle(max_angle):
+        # 已看過，從傳入的最大角度內隨機選擇一個數字
         angle = np.random.random_sample() * 2 * max_angle - max_angle
         return angle
 
     @staticmethod
     def rotate_img(img, angle):
+        # 已看過，將圖像進行指定角度旋轉
+        # 獲取當前圖像高寬
         h, w = img.shape[:2]
+        # 透過getRotationMatrix2D進行旋轉(旋轉中心, 旋轉方向, 縮放比例)
         rotation_matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+        # 透過warpAffine進行仿射變換(變換目標, 仿射矩陣, 變換後圖像大小)
         img_target = cv2.warpAffine(
             img, rotation_matrix, (w, h), flags=cv2.INTER_NEAREST)
+        # 簡單檢查
         assert img_target.shape == img.shape
         return img_target
 
     def __call__(self, results):
+        # 已看過，主要是旋轉圖像
         if np.random.random_sample() < self.rotate_ratio:
             # rotate imgs
+            # 隨機挑選旋轉角度並且記錄到rotated_angle當中
             results['rotated_angle'] = self.sample_angle(self.max_angle)
+            # 透過rotate_img將圖像進行旋轉
             img = self.rotate_img(results['img'], results['rotated_angle'])
+            # 更新圖像
             results['img'] = img
             img_shape = img.shape
+            # 更新圖像大小
             results['img_shape'] = img_shape
 
-            # rotate masks
+            # rotate masks，對mask進行旋轉變換
             for key in results.get('mask_fields', []):
                 masks = results[key].masks
                 mask_list = []
                 for m in masks:
+                    # 這裡與img旋轉相同
                     rotated_m = self.rotate_img(m, results['rotated_angle'])
                     mask_list.append(rotated_m)
+                # 最後需要用BitmapMasks進行包裝
                 results[key] = BitmapMasks(mask_list, *(img_shape[:2]))
 
         return results
@@ -229,16 +280,25 @@ class ColorJitter:
     mmdetection pipeline."""
 
     def __init__(self, **kwargs):
+        # 已看過，對圖像進行增強，kwargs增強的參數
+        # 這裡就是hue的數據增強，透過調整亮度以及飽和度以及色度以及對比度
         self.transform = transforms.ColorJitter(**kwargs)
 
     def __call__(self, results):
-        # img is bgr
+        # 已看過，調整圖像的色度等等資料
+        # img is bgr，img的圖像排列順序依舊是bgr只是shape是[channel, width, height]
         img = results['img'][..., ::-1]
+        # 透過Image將圖像讀取出來
         img = Image.fromarray(img)
+        # 使用pytorch官方實現的轉換
         img = self.transform(img)
+        # 將圖像從Image轉回成ndarray格式
         img = np.asarray(img)
+        # 將通道排列順序調整回來[height, width, channel]
         img = img[..., ::-1]
+        # 將圖像資料進行更新
         results['img'] = img
+        # 回傳results
         return results
 
     def __repr__(self):
@@ -264,17 +324,34 @@ class ScaleAspectJitter(Resize):
                  long_size_bound=None,
                  short_size_bound=None,
                  scale_range=None):
+        """ 已看過，主要是對圖像以及mask進行resize操作
+        Args:
+            img_scale: 圖像最後調整到的大小，list[tuple(width, height)]
+            multiscale_mode: 縮放模式，如果是range就會在img_scale給的範圍當中隨機挑一個數字作為輸出高寬
+                如過是value就直接使用img_scale指定的大小
+            ratio_range: 縮放比例的範圍
+            keep_ratio: 是否需要保留縮放比例
+            resize_type: resize的模式
+            aspect_ratio_range: 高寬比的範圍
+            long_size_bound: 長邊大小上限
+            short_size_bound: 短邊大小下限
+            scale_range: 縮放範圍
+        """
+        # 繼承自Resize，對繼承對象進行初始化
         super().__init__(
             img_scale=img_scale,
             multiscale_mode=multiscale_mode,
             ratio_range=ratio_range,
             keep_ratio=keep_ratio)
         assert not keep_ratio
+        # 檢查使用的resize_type是否有支援
         assert resize_type in [
             'around_min_img_scale', 'long_short_bound', 'indep_sample_in_range'
         ]
+        # 保存
         self.resize_type = resize_type
 
+        # 下面就是做一些檢查
         if resize_type == 'indep_sample_in_range':
             assert ratio_range is None
             assert aspect_ratio_range is None
@@ -291,6 +368,7 @@ class ScaleAspectJitter(Resize):
                 assert short_size_bound is not None
                 assert long_size_bound is not None
 
+        # 做一些保存動作
         self.aspect_ratio_range = aspect_ratio_range
         self.long_size_bound = long_size_bound
         self.short_size_bound = short_size_bound
@@ -298,28 +376,42 @@ class ScaleAspectJitter(Resize):
 
     @staticmethod
     def sample_from_range(range):
+        # 已看過，獲取一個範圍內的隨機值
+        # 檢查range長度會是2
         assert len(range) == 2
+        # 取出最大值以及最小值
         min_value, max_value = min(range), max(range)
+        # 透過numpy獲取隨機值
         value = np.random.random_sample() * (max_value - min_value) + min_value
 
+        # 回傳範圍內的隨機值
         return value
 
     def _random_scale(self, results):
+        # 已看過，隨機獲取縮放大小
 
         if self.resize_type == 'indep_sample_in_range':
+            # 如果縮放方式是indep_sample_in_range就會到這裡
             w = self.sample_from_range(self.scale_range)
             h = self.sample_from_range(self.scale_range)
             results['scale'] = (int(w), int(h))  # (w,h)
             results['scale_idx'] = None
             return
+        # 獲取高寬
         h, w = results['img'].shape[0:2]
         if self.resize_type == 'long_short_bound':
+            # 如過是使用long_short_bound就會到這裡來
+            # scale1 = 第一個縮放比例
             scale1 = 1
             if max(h, w) > self.long_size_bound:
+                # 如果高寬其中一邊的最大值超過指定最大值，我們會透過設定scale1將最大邊變成指定的最大大小
                 scale1 = self.long_size_bound / max(h, w)
+            # 透過sample_from_range在給定的範圍取出值
             scale2 = self.sample_from_range(self.ratio_range)
+            # 最後的縮放比例會是兩個相乘
             scale = scale1 * scale2
             if min(h, w) * scale <= self.short_size_bound:
+                # 如果將最小邊乘上縮放比例後會小於設定的最小值我們就需要調整縮放比例
                 scale = (self.short_size_bound + 10) * 1.0 / min(h, w)
         elif self.resize_type == 'around_min_img_scale':
             short_size = min(self.img_scale[0])
@@ -328,9 +420,12 @@ class ScaleAspectJitter(Resize):
         else:
             raise NotImplementedError
 
+        # 從指定的aspect_ratio範圍隨機選取一個值
         aspect = self.sample_from_range(self.aspect_ratio_range)
+        # 獲取最終高寬的縮放比例
         h_scale = scale * math.sqrt(aspect)
         w_scale = scale / math.sqrt(aspect)
+        # 更新scale，也就是透過resize後圖像的大小
         results['scale'] = (int(w * w_scale), int(h * h_scale))  # (w,h)
         results['scale_idx'] = None
 

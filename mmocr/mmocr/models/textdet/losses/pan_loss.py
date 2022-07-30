@@ -63,29 +63,41 @@ class PANLoss(nn.Module):
             list[Tensor]: The list of kernel tensors. Each element stands for
             one kernel level.
         """
+        # 已看過，將bitmasks轉成tensor格式
+
+        # 檢查格式是否正確
         assert check_argument.is_type_list(bitmasks, BitmapMasks)
         assert isinstance(target_sz, tuple)
 
+        # 獲取batch_size
         batch_size = len(bitmasks)
+        # 獲取有多少個mask
         num_masks = len(bitmasks[0])
 
         results = []
 
+        # 遍歷所有的mask
         for level_inx in range(num_masks):
             kernel = []
+            # 遍歷一個batch當中所有的圖像
             for batch_inx in range(batch_size):
+                # 將ndarray轉成tensor格式
                 mask = torch.from_numpy(bitmasks[batch_inx].masks[level_inx])
-                # hxw
+                # hxw，獲取特徵圖高寬
                 mask_sz = mask.shape
-                # left, right, top, bottom
+                # left, right, top, bottom，獲取需要padding的大小
                 pad = [
                     0, target_sz[1] - mask_sz[1], 0, target_sz[0] - mask_sz[0]
                 ]
+                # 如果需要padding就會進行padding且padding的值全為0
                 mask = F.pad(mask, pad, mode='constant', value=0)
+                # 將結果保存到kernel當中
                 kernel.append(mask)
+            # kernel shape = [batch_size, height, width]
             kernel = torch.stack(kernel)
             results.append(kernel)
 
+        # results = list[tensor]，list長度就會是有多少放大層，tensor shape [batch_size, height, width]
         return results
 
     def forward(self, preds, downsample_ratio, gt_kernels, gt_mask):
@@ -251,23 +263,38 @@ class PANLoss(nn.Module):
         return torch.stack(loss_aggrs), torch.stack(loss_discrs)
 
     def dice_loss_with_logits(self, pred, target, mask):
+        """ 已看過，計算dice損失
+        Args:
+            pred: 預測出來的圖，tensor shape [batch_size, height, width]
+            target: 標註內容，沒有文字部分會是0，有文字部分會根據處在的字團有不同數字，shape [batch_size, height, width]
+            mask: True表示我們需要的False表示不要的，shape [batch_size, height, width]
+        """
 
+        # 設定smooth參數
         smooth = 0.001
 
+        # 將預測值透過sigmoid將值控制在[0, 1]之間
         pred = torch.sigmoid(pred)
+        # 將target小於等於0.5的設定成0，不過其實target本身就只會是正數型態，所以不會有作用
         target[target <= 0.5] = 0
+        # 將大於0.5的部分全部設定成1
         target[target > 0.5] = 1
+        # 調整通道，將pred以及target以及mask的shape [batch_size, height, width] -> [batch_size, height * width]
         pred = pred.contiguous().view(pred.size()[0], -1)
         target = target.contiguous().view(target.size()[0], -1)
         mask = mask.contiguous().view(mask.size()[0], -1)
 
+        # 當mask的部分為False時pred該位置就會變成0，否則就是原始值
         pred = pred * mask
         target = target * mask
 
+        # 根據計算dice的公式獲取dice損失
+        # https://zhuanlan.zhihu.com/p/348832716
         a = torch.sum(pred * target, 1) + smooth
         b = torch.sum(pred * pred, 1) + smooth
         c = torch.sum(target * target, 1) + smooth
         d = (2 * a) / (b + c)
+        # d會是dice值，這個值越大表示契合程度越高，使用1去減就可以作為損失值
         return 1 - d
 
     def ohem_img(self, text_score, gt_text, gt_mask):
@@ -282,6 +309,12 @@ class PANLoss(nn.Module):
         Returns:
             Tensor: The sampled pixel mask of size :math:`(H, W)`.
         """
+        # 已看過，選取前k大的負樣本以及所有的正樣本
+        # text_score = text的分數，tensor shape [height, width]
+        # gt_text = 有文字的部分會是非0，其他地方為0，非0部分會依據是哪個群的文字會有不同數字，shape [height, width]
+        # gt_mask = ignore的部分，1的地方表示沒有ignore的文字，0表示被ignore部分的文字，被ignore的原因可能會是有重疊
+
+        # 檢查一些資料型態
         assert isinstance(text_score, torch.Tensor)
         assert isinstance(gt_text, torch.Tensor)
         assert isinstance(gt_mask, torch.Tensor)
@@ -289,20 +322,30 @@ class PANLoss(nn.Module):
         assert text_score.shape == gt_text.shape
         assert gt_text.shape == gt_mask.shape
 
-        pos_num = (int)(torch.sum(gt_text > 0.5).item()) - (int)(
+        # 總正樣本數量 = 有被標註的文字格數量 - 有被標註的文字格數量&&有被標註為ignore的網格數量
+        pos_num = int(torch.sum(gt_text > 0.5).item()) - int(
             torch.sum((gt_text > 0.5) * (gt_mask <= 0.5)).item())
-        neg_num = (int)(torch.sum(gt_text <= 0.5).item())
-        neg_num = (int)(min(pos_num * self.ohem_ratio, neg_num))
+        # 負樣本數量 = 沒有被標註為文字的部分
+        neg_num = int(torch.sum(gt_text <= 0.5).item())
+        # 負樣本數量會需要與正樣本成比例關係，否則會導致負樣本過多
+        neg_num = int(min(pos_num * self.ohem_ratio, neg_num))
 
         if pos_num == 0 or neg_num == 0:
+            # 如果有發生正樣本或是負樣本為0就會跳出警告
             warnings.warn('pos_num = 0 or neg_num = 0')
             return gt_mask.bool()
 
+        # 獲取沒有被標註成文字部分的text_score
         neg_score = text_score[gt_text <= 0.5]
+        # 對neg_score進行排序，這裡我們只會需要排序過後的分數，不需要知道原始index是多少，這裡會是由大到小排序
         neg_score_sorted, _ = torch.sort(neg_score, descending=True)
+        # 獲取前neg_num大的部分
         threshold = neg_score_sorted[neg_num - 1]
+        # 在tensor.bool時使用(+)表示or，使用(*)表示and
+        # 所以這裡會將(大於threshold或是有被標記為文字)且(沒有被ignore標注到的地方)設定為True，否則為False
         sampled_mask = (((text_score >= threshold) + (gt_text > 0.5)) > 0) * (
             gt_mask > 0.5)
+        # sampled_mask = tensor.bool shape [height]
         return sampled_mask
 
     def ohem_batch(self, text_scores, gt_texts, gt_mask):
@@ -316,6 +359,12 @@ class PANLoss(nn.Module):
         Returns:
             Tensor: The sampled mask of size :math:`(H, W)`.
         """
+        # 已看過，使用OHEM計算損失
+        # text_scores = 文字分數，tensor shape [batch_size, height, width]
+        # gt_text = 標註有文字的部分，tensor shape [batch_size, height, width]
+        # gt_mask = 標註哪些部分有被ignore的text，有的部分會是0其他為1
+
+        # 檢查傳入的資料有沒有型態問題
         assert isinstance(text_scores, torch.Tensor)
         assert isinstance(gt_texts, torch.Tensor)
         assert isinstance(gt_mask, torch.Tensor)
@@ -324,10 +373,14 @@ class PANLoss(nn.Module):
         assert gt_texts.shape == gt_mask.shape
 
         sampled_masks = []
+        # 遍歷batch_size
         for i in range(text_scores.shape[0]):
+            # 取出該圖像對應的資料放入到ohem_img當中
             sampled_masks.append(
                 self.ohem_img(text_scores[i], gt_texts[i], gt_mask[i]))
 
+        # 將結果進行堆疊，shape [batch_size, height, width]
+        # (大於threshold或是有被標記為文字)且(沒有被ignore標注到的地方)設定為True，否則為False
         sampled_masks = torch.stack(sampled_masks)
 
         return sampled_masks

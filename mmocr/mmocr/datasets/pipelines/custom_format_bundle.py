@@ -29,13 +29,21 @@ class CustomFormatBundle(DefaultFormatBundle):
                  keys=[],
                  call_super=True,
                  visualize=dict(flag=False, boundary_key=None)):
+        """ 已看過，將傳入的資料進行統整
+        Args:
+            keys: 要整理成DC類實例對象的資料
+            call_super:
+            visualize: 可視化設定，可以看到生成的mask用來debug用的
+        """
 
+        # 繼承自DefaultFormatBundle
         super().__init__()
         self.visualize = visualize
         self.keys = keys
         self.call_super = call_super
 
     def __call__(self, results):
+        # 已看過，將results的指定東西用DC包裝
 
         if self.visualize['flag']:
             img = results['img'].astype(np.uint8)

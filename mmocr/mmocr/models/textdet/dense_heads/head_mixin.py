@@ -16,10 +16,19 @@ class HeadMixin:
     """
 
     def __init__(self, loss, postprocessor):
+        """ 已看過，文字檢測頭的基礎類，其中飽含計算以及後處理
+        Args:
+            loss: 損失計算方式
+            postprocessor: 後處理方式
+        """
+
+        # 檢查loss與postprocessor需要是dict格式
         assert isinstance(loss, dict)
         assert isinstance(postprocessor, dict)
 
+        # 構建loss實例對象
         self.loss_module = build_loss(loss)
+        # 構建後處理實例對象
         self.postprocessor = build_postprocessor(postprocessor)
 
     def resize_boundary(self, boundaries, scale_factor):
@@ -86,6 +95,7 @@ class HeadMixin:
         Returns:
             dict: The dict for losses.
         """
+        # 已看過，計算損失，loss會有loss_text與loss_kernel兩種損失
         losses = self.loss_module(pred_maps, self.downsample_ratio, **kwargs)
 
         return losses

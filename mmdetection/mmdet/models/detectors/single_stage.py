@@ -62,7 +62,7 @@ class SingleStageDetector(BaseDetector):
         if self.with_neck:
             # 如果有neck就會將backbone輸出放到neck當中
             x = self.neck(x)
-        # 最後將結果輸出
+        # 最後將結果輸出，x shape [batch_size, channel, height, width]
         return x
 
     def forward_dummy(self, img):

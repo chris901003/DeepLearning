@@ -302,12 +302,15 @@ class Resize:
 
     def _resize_masks(self, results):
         """Resize masks with ``results['scale']``"""
+        # 已看過，對mask部分進行resize
+        # 遍歷results當中與masks有關的部分
         for key in results.get('mask_fields', []):
             if results[key] is None:
                 continue
             if self.keep_ratio:
                 results[key] = results[key].rescale(results['scale'])
             else:
+                # 使用mask實例對象當中的resize進行大小變換
                 results[key] = results[key].resize(results['img_shape'][:2])
 
     def _resize_seg(self, results):
@@ -579,7 +582,7 @@ class RandomFlip:
             for key in results.get('mask_fields', []):
                 results[key] = results[key].flip(results['flip_direction'])
 
-            # flip segs，seg翻轉
+            # flip seg，seg翻轉
             for key in results.get('seg_fields', []):
                 results[key] = mmcv.imflip(
                     results[key], direction=results['flip_direction'])
@@ -762,9 +765,13 @@ class Pad:
 
     def _pad_masks(self, results):
         """Pad masks according to ``results['pad_shape']``."""
+        # 已看過，對mask進行padding
+        # padding後的圖像大小
         pad_shape = results['pad_shape'][:2]
+        # padding的值
         pad_val = self.pad_val.get('masks', 0)
         for key in results.get('mask_fields', []):
+            # 透過pad進行padding
             results[key] = results[key].pad(pad_shape, pad_val=pad_val)
 
     def _pad_seg(self, results):

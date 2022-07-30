@@ -29,7 +29,19 @@ class PSEHead(PANHead):
                  test_cfg=None,
                  init_cfg=None,
                  **kwargs):
+        """ 已看過，PSENet的預測頭
+        Args:
+            in_channels: 輸入的channel深度，會是list且list長度就會是輸入的特徵圖數量
+            out_channels: 輸出的channel深度
+            downsample_ratio: 下採樣倍率
+            loss: 損失函數的設定
+            postprocessor: 預處理方式
+            train_cfg: train的設定
+            test_cfg: test的設定
+            init_cfg: 初始化方式
+        """
 
+        # 繼承自PANHead，將繼承對象進行初始化
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,

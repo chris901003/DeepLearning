@@ -17,6 +17,17 @@ class SingleStageTextDetector(SingleStageDetector):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
+        """ 已看過，文字檢測
+        Args:
+            backbone: backbone的設定資料
+            neck: 將backbone的輸出進行加工，不一定會有
+            bbox_head: 將提取出來的特徵進行預測，也就是預測頭
+            train_cfg: train相關的設定
+            test_cfg: test相關的設定
+            pretrained: 預訓練權重相關資料
+            init_cfg: 初始化設定方式
+        """
+        # 繼承自SingleStageDetector，對繼承對象進行初始化
         SingleStageDetector.__init__(self, backbone, neck, bbox_head,
                                      train_cfg, test_cfg, pretrained, init_cfg)
 
@@ -33,8 +44,16 @@ class SingleStageTextDetector(SingleStageDetector):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        # 已看過，向前傳遞流程
+        # img = 圖像的tensor格式，shape [batch_size, channel, height, width]
+        # img_metas = 圖像的詳細資訊
+        # kwargs = 其他額外資訊，可能會有標註圖像資訊
+
+        # 透過extract_feat進行特徵提取，x shape [batch_size, channel, height, width]
         x = self.extract_feat(img)
+        # preds shape = [batch_size, channel, height, width]
         preds = self.bbox_head(x)
+        # 計算損失，loss會有loss_text與loss_kernel兩種
         losses = self.bbox_head.loss(preds, **kwargs)
         return losses
 

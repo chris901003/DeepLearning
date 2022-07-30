@@ -140,7 +140,9 @@ def build_activation_layer(cfg):
 
 def build_detector(cfg, train_cfg=None, test_cfg=None):
     """Build detector."""
+    # 已看過，構建文字檢測模型
     if train_cfg is not None or test_cfg is not None:
+        # 新版本的需要將train_cfg與test_cfg改到cfg當中
         warnings.warn(
             'train_cfg and test_cfg is deprecated, '
             'please specify them in model', UserWarning)
@@ -148,5 +150,6 @@ def build_detector(cfg, train_cfg=None, test_cfg=None):
         'train_cfg specified in both outer field and model field '
     assert cfg.get('test_cfg') is None or test_cfg is None, \
         'test_cfg specified in both outer field and model field '
+    # 回傳的文字檢測模型實例對象
     return DETECTORS.build(
         cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))

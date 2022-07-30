@@ -14,6 +14,8 @@ class TextDetectorMixin:
     """
 
     def __init__(self, show_score):
+        # 已看過
+        # 保存show_score
         self.show_score = show_score
 
     def show_result(self,

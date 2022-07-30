@@ -15,6 +15,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
     """Base class for detectors."""
 
     def __init__(self, init_cfg=None):
+        # 已看過，文字偵測的底層類
+        # 繼承自最底層的BaseModule
         super(BaseDetector, self).__init__(init_cfg)
         self.fp16_enabled = False
 

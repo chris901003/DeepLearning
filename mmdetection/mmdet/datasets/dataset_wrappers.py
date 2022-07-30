@@ -28,11 +28,20 @@ class ConcatDataset(_ConcatDataset):
     """
 
     def __init__(self, datasets, separate_eval=True):
+        """ 已看過，Concatenated的包裝
+        Args:
+            datasets: list[Dataset]，list長度就會是要拼接的資料集數量
+            separate_eval: 是否要對結果進行評估
+        """
+        # 繼承自_ConcatDataset，對繼承對象進行初始化，這個是pytorch官方實現的拼接多個資料集
         super(ConcatDataset, self).__init__(datasets)
+        # 在訓練時不管哪個資料集的CLASSES內容都會相同，所以我們直接取締一個的就可以了
         self.CLASSES = datasets[0].CLASSES
+        # 獲取PALETTE資料
         self.PALETTE = getattr(datasets[0], 'PALETTE', None)
         self.separate_eval = separate_eval
         if not separate_eval:
+            # 如果separate_eval是False就會到這裡，不過都沒有實作對象所以是不可用的
             if any([isinstance(ds, CocoDataset) for ds in datasets]):
                 raise NotImplementedError(
                     'Evaluating concatenated CocoDataset as a whole is not'
@@ -42,6 +51,7 @@ class ConcatDataset(_ConcatDataset):
                     'All the datasets should have same types')
 
         if hasattr(datasets[0], 'flag'):
+            # 拼接所有的flag
             flags = []
             for i in range(0, len(datasets)):
                 flags.append(datasets[i].flag)
