@@ -42,6 +42,7 @@ class MMDataParallel(DataParallel):
         The main difference lies in the CPU inference where the data in
         :class:`DataContainers` will still be gathered.
         """
+        # 已看過，MMDataParallel的forward函數
         if not self.device_ids:
             # We add the following line thus the module could gather and
             # convert data containers as those in GPU inference

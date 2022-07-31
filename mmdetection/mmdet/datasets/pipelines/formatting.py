@@ -89,10 +89,15 @@ class ImageToTensor:
             dict: The result dict contains the image converted
                 to :obj:`torch.Tensor` and transposed to (C, H, W) order.
         """
+        # 已看過，將指定的數據從numpy轉成tensor格式
+        # 遍歷所有指定的key
         for key in self.keys:
+            # 讀取出來
             img = results[key]
             if len(img.shape) < 3:
+                # 如果缺少channel通道就添加上去
                 img = np.expand_dims(img, -1)
+            # 先從BGR轉成RGB再轉成tensor格式
             results[key] = (to_tensor(img.transpose(2, 0, 1))).contiguous()
         return results
 

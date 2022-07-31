@@ -65,12 +65,28 @@ def single_gpu_test(model,
                     out_dir=None,
                     is_kie=False,
                     show_score_thr=0.3):
+    """ 已看過，進行單gpu或是cpu的驗證
+    Args:
+        model: 模型本身
+        data_loader: 驗證集的DataLoader
+        show: 是否需要將中間過程展示出來
+        out_dir: 預測結果輸出檔案位置
+        is_kie:
+        show_score_thr: 設定閾值，當預測值大於閾值才會是有效預測
+    """
+    # 將模型調整層驗證模式
     model.eval()
+    # 結果列表
     results = []
+    # 從DataLoader當中獲取dataset
     dataset = data_loader.dataset
+    # 創建進度條實例對象，傳入的會是dataset的長度，表示驗證圖像有多少張
     prog_bar = mmcv.ProgressBar(len(dataset))
     for data in data_loader:
+        # data = 一個batch的訓練資料
+        # 將模型的反向傳遞關閉
         with torch.no_grad():
+            # 進行向前傳播預測
             result = model(return_loss=False, rescale=True, **data)
 
         batch_size = len(result)

@@ -191,11 +191,18 @@ class CustomDataset(Dataset):
     def pre_pipeline(self, results):
         """Prepare results dict for pipeline."""
         # 已看過，創建一些存方資料的空間
+
+        # 圖像前面檔案位置
         results['img_prefix'] = self.img_prefix
+        # seg前面檔案位置
         results['seg_prefix'] = self.seg_prefix
+        # proposal前面檔案位置
         results['proposal_file'] = self.proposal_file
+        # 可以知道哪些資料與bbox有關
         results['bbox_fields'] = []
+        # 可以知道哪些資料與mask有關
         results['mask_fields'] = []
+        # 可以知道哪些資料與seg有關
         results['seg_fields'] = []
 
     def _filter_imgs(self, min_size=32):
@@ -301,11 +308,16 @@ class CustomDataset(Dataset):
                 pipeline.
         """
 
+        # 已看過，傳入需要讀取的圖像index，會透過傳入圖像index獲取圖像
+        # 獲取指定index圖像資訊
         img_info = self.data_infos[idx]
+        # 將其放入到dict當中
         results = dict(img_info=img_info)
         if self.proposals is not None:
             results['proposals'] = self.proposals[idx]
+        # 構建等等會用到的空間
         self.pre_pipeline(results)
+        # 進行一系列處理
         return self.pipeline(results)
 
     @classmethod
