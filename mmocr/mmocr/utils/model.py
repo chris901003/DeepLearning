@@ -30,6 +30,9 @@ def revert_sync_batchnorm(module):
     Returns:
         module_output: The converted module with `BatchNormXd` layers.
     """
+    # 已看過，將模型Sync BN的部分換成BN模塊
+
+    # 將模型放到module_output上
     module_output = module
     if isinstance(module, torch.nn.modules.batchnorm.SyncBatchNorm):
         module_output = _BatchNormXd(module.num_features, module.eps,

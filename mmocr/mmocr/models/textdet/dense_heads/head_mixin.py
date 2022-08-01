@@ -42,17 +42,30 @@ class HeadMixin:
         Returns:
             list[list[float]]: The scaled boundaries.
         """
+        # 已看過，將boundary進行resize調整
+        # boundaries = 文字匡選範圍，list[list]第一個list長度會是匡選數量，第二個list會是一個匡選匡的資訊
+        # scale_factor = 縮放比例，ndarray shape [4]，表示高寬需要縮放的大小 (height, width, height, width)
+
+        # 檢查boundaries是否為list[list]格式
         assert check_argument.is_2dlist(boundaries)
+        # 檢查scale_factor是否為ndarray格式
         assert isinstance(scale_factor, np.ndarray)
+        # 檢查scale_factor是否為[4]
         assert scale_factor.shape[0] == 4
 
+        # 遍歷所有的boundaries
         for b in boundaries:
+            # 獲取一個標注匡有多少個資訊
             sz = len(b)
+            # 檢查boundary是否合法，後面的True表示我們有加上置信度
             check_argument.valid_boundary(b, True)
+            # 最後一個會是置信度，所以不會取到最後一個值
+            # 這裡會用到tile將scale_factor調整到可以與b相乘
             b[:sz -
               1] = (np.array(b[:sz - 1]) *
                     (np.tile(scale_factor[:2], int(
                         (sz - 1) / 2)).reshape(1, sz - 1))).flatten().tolist()
+        # 將調整好的boundaries回傳
         return boundaries
 
     def get_boundary(self, score_maps, img_metas, rescale):
@@ -68,21 +81,32 @@ class HeadMixin:
             dict: A dict where boundary results are stored in
             ``boundary_result``.
         """
+        # 已看過，計算文字匡選邊界位置，透過後處理
+        # score_maps = 預測出來的結果，tensor shape [channel, batch_size, height]
+        # img_metas = 當前圖像的詳細資訊
+        # rescale = 是否需要進行rescale
 
+        # 檢查輸入的img_metas是否為dict格式
         assert check_argument.is_type_list(img_metas, dict)
+        # rescale需要是bool型態
         assert isinstance(rescale, bool)
 
+        # 將score_maps當中維度為1的部分進行壓縮
         score_maps = score_maps.squeeze()
+        # boundaries = list[list]，第一個list長度就會是有多少個匡，第二個list就會是匡的細節內容
         boundaries = self.postprocessor(score_maps)
 
         if rescale:
+            # 如果有需要rescale就會到這裡
             boundaries = self.resize_boundary(
                 boundaries,
                 1.0 / self.downsample_ratio / img_metas[0]['scale_factor'])
 
+        # 將最終調整好的boundaries與filename包裝成dict進行回傳
         results = dict(
             boundary_result=boundaries, filename=img_metas[0]['filename'])
 
+        # 最後將整個results回傳
         return results
 
     def loss(self, pred_maps, **kwargs):

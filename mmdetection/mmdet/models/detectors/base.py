@@ -121,30 +121,44 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                 augs (multiscale, flip, etc.) and the inner list indicates
                 images in a batch.
         """
+        # 已看過，驗證使用的forward函數
+        # imgs = 一個batch的圖像資料，list[tensor] tensor shape [batch_size, channel, height, width]
+        # img_metas = 一個batch圖像的詳細資料
+        # kwargs = 一些其他資料，例如是否rescale
+
+        # 檢查一些資料是否有問題
         for var, name in [(imgs, 'imgs'), (img_metas, 'img_metas')]:
             if not isinstance(var, list):
                 raise TypeError(f'{name} must be a list, but got {type(var)}')
 
+        # 查看有多少不同size的圖像
         num_augs = len(imgs)
         if num_augs != len(img_metas):
+            # 如果傳入的資料數量有不同就會報錯
             raise ValueError(f'num of augmentations ({len(imgs)}) '
                              f'!= num of image meta ({len(img_metas)})')
 
         # NOTE the batched image size information may be useful, e.g.
         # in DETR, this is needed for the construction of masks, which is
         # then used for the transformer_head.
+        # 同時遍歷圖像tensor以及詳細資料
         for img, img_meta in zip(imgs, img_metas):
+            # 獲取batch_size
             batch_size = len(img_meta)
+            # 遍歷一個batch當中所有的圖像
             for img_id in range(batch_size):
+                # 記錄下傳入到網路當中的圖形大小
                 img_meta[img_id]['batch_input_shape'] = tuple(img.size()[-2:])
 
         if num_augs == 1:
+            # 如果num_augs只有1就會到這裡
             # proposals (List[List[Tensor]]): the outer list indicates
             # test-time augs (multiscale, flip, etc.) and the inner list
             # indicates images in a batch.
             # The Tensor should have a shape Px4, where P is the number of
             # proposals.
             if 'proposals' in kwargs:
+                # 如果有設定proposals就會到這裡
                 kwargs['proposals'] = kwargs['proposals'][0]
             return self.simple_test(imgs[0], img_metas[0], **kwargs)
         else:

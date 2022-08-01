@@ -173,30 +173,63 @@ def imshow_pred_boundary(img,
         out_file (str or None): The filename of the output.
         show_score (bool): Whether to show text instance score.
     """
+    # 已看過，將預測結果進行展示
+    # img = 原始圖像讀入時的ndarray shape [height, width, channel]
+    # boundaries_with_scores = 預測匡資料，並且每個最後會是標註匡的置信度
+    # label = 標註類別
+    # score_thr = 置信度閾值，需要大於該值的才會顯示出來
+    # boundary_color = 標註匡的顏色
+    # text_color = 文字顏色
+    # thickness = 粗細度
+    # font_scale = 文字大小
+    # show = 是否直接展示圖像
+    # win_name = 視窗名稱
+    # wait_time = 等待時間
+    # out_file = 輸出圖像保存位置
+    # show_score = 是否需要展示置信度
+
+    # 檢查傳入的img需要是str或是ndarray格式
     assert isinstance(img, (str, np.ndarray))
+    # 檢查boundaries_with_scores是否為list[list]型態
     assert utils.is_2dlist(boundaries_with_scores)
+    # 檢查labels當中資料是否為int
     assert utils.is_type_list(labels, int)
+    # 檢查兩個資料長度是否相同
     assert utils.equal_len(boundaries_with_scores, labels)
     if len(boundaries_with_scores) == 0:
+        # 如果該圖像當中沒有任合標註匡就會到這裡，報出警告
         warnings.warn('0 text found in ' + out_file)
+        # 回傳None
         return None
 
+    # 檢查boundaries_with_scores格式是否合法
     utils.valid_boundary(boundaries_with_scores[0])
+    # 透過imread進行圖像讀取，如果傳入的是ndarray就會直接返回
     img = mmcv.imread(img)
 
+    # 獲取所有預測匡的置信度分數
     scores = np.array([b[-1] for b in boundaries_with_scores])
+    # 置信度大於閾值的部分會是True，其他部分會是False
     inds = scores > score_thr
+    # 獲取為True的標註匡訊息，這裡就不會將置信度分數取出
     boundaries = [boundaries_with_scores[i][:-1] for i in np.where(inds)[0]]
+    # 取出置信度分數
     scores = [scores[i] for i in np.where(inds)[0]]
+    # 取出類別
     labels = [labels[i] for i in np.where(inds)[0]]
 
+    # 獲取指定的顏色，回傳會是(b, g, r)
     boundary_color = mmcv.color_val(boundary_color)
     text_color = mmcv.color_val(text_color)
+    # 文字大小
     font_scale = 0.5
 
+    # 遍歷標註座標以及置信度
     for boundary, score in zip(boundaries, scores):
+        # 將標註座標轉成int格式
         boundary_int = np.array(boundary).astype(np.int32)
 
+        # 使用polylines進行畫圖，將圖像以及座標以及該座標是否最前與最後需要連線以及連線顏色以及粗細度
         cv2.polylines(
             img, [boundary_int.reshape(-1, 1, 2)],
             True,
@@ -204,13 +237,17 @@ def imshow_pred_boundary(img,
             thickness=thickness)
 
         if show_score:
+            # 如果需要將置信度寫到圖片上就會到這裡寫上
             label_text = f'{score:.02f}'
+            # 使用putText將文字放上去，傳入圖像以及文字以及座標(x,y)以及文字類型以及大小以及顏色
             cv2.putText(img, label_text,
                         (boundary_int[0], boundary_int[1] - 2),
                         cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
     if show:
+        # 如果需要直接展示就會到這裡
         mmcv.imshow(img, win_name, wait_time)
     if out_file is not None:
+        # 如果有指定的輸出檔案位置就會到這裡
         mmcv.imwrite(img, out_file)
 
     return img

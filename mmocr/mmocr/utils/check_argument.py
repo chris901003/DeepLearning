@@ -29,11 +29,15 @@ def is_2dlist(x):
         some arguments from gt annotation file or model prediction
         may be empty, but usually, it should be 2d-list.
     """
+    # 已看過，檢查是否為list[list]格式
     if not isinstance(x, list):
+        # 如果一開始就不是list就會回傳False
         return False
     if len(x) == 0:
+        # 如果當中為空就回傳True
         return True
 
+    # 檢查第一層list當中資料是否全為list，如果是就會回傳True，否則就會是False
     return all(isinstance(item, list) for item in x)
 
 
@@ -61,12 +65,19 @@ def equal_len(*argv):
 
 
 def valid_boundary(x, with_score=True):
+    # 已看過，檢查boundary資訊是否正確
+
+    # 獲取長度
     num = len(x)
     if num < 8:
+        # 如果長度小於8就是不合法
         return False
     if num % 2 == 0 and (not with_score):
+        # 如果剛好是偶數with_score就會需要是False，因為這樣才會剛好湊齊(x, y)
         return True
     if num % 2 == 1 and with_score:
+        # 如果是奇數with_score就會需要是True，這樣扣除置信度就會是偶數
         return True
 
+    # 其他就是False
     return False

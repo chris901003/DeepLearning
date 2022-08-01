@@ -58,7 +58,15 @@ class SingleStageTextDetector(SingleStageDetector):
         return losses
 
     def simple_test(self, img, img_metas, rescale=False):
+        """ 已看過，驗證模式下的簡單向前傳遞
+        Args:
+            img: 圖像的tensor資料shape [batch_size, channel, height, width]
+            img_metas: 一個batch的圖像詳細資料
+            rescale: 是否需要進行rescale
+        """
+        # 進行特徵提取，img shape [batch_size, channel, height, width]
         x = self.extract_feat(img)
+        # 經過bbox_head進行匡選預測，outs shape [batch_size, channel, height, width]
         outs = self.bbox_head(x)
 
         # early return to avoid post processing
@@ -73,8 +81,14 @@ class SingleStageTextDetector(SingleStageDetector):
             ]
 
         else:
+            # 透過bbox_head當中get_boundary獲取匡選位置
             boundaries = [
                 self.bbox_head.get_boundary(*outs, img_metas, rescale)
             ]
 
+        # boundaries = list[dict]，list長度就會是一個batch的圖像數量
+        # dict = {
+        #   'filename': 檔案名稱
+        #   'boundary_result': list[list]，第一個list長度就會是有多少個匡，第二個list就是匡的詳細資訊
+        # }
         return boundaries

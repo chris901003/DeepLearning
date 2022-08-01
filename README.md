@@ -37,12 +37,26 @@
 ### mmcv
 [官方Github](https://github.com/open-mmlab/mmcv) \
 [官方文檔](https://mmcv.readthedocs.io/zh_CN/latest/understand_mmcv/registry.html) \
-MMCV官方原始碼，目前是直接在官方原始碼上進行標注
+MMCV官方原始碼，目前是直接在官方原始碼上進行標注 \
+MM系列的主要底層通用結構
 
 ### mmsegmentation
 [官方Github](https://github.com/open-mmlab/mmsegmentation) \
 [官方文檔](https://mmsegmentation.readthedocs.io/zh_CN/latest/tutorials/config.html) \
-MMSegmentation官方原始碼，目前是直接在官方原始碼上進行標注
+MMSegmentation官方原始碼，目前是直接在官方原始碼上進行標注 \
+主要是處理分割項目
+
+### mmdetection
+[官方Github](https://github.com/open-mmlab/mmdetection) \
+[官方文檔](https://mmdetection.readthedocs.io/zh_CN/stable/) \
+MMDetection官方原始碼，目前是直接在官方原始碼上進行標注 \
+主要是目標檢測
+
+### mmocr
+[官方Github](https://github.com/open-mmlab/mmocr) \
+[官方文檔](https://mmocr.readthedocs.io/zh_CN/latest/demo.html) \
+MMDetection官方原始碼，目前是直接在官方原始碼上進行標注 \
+主要是文字方面處理
 
 ### learn_mmcv
 學習mmcv官方原始碼，將需要的部分擷取出來，同時學習mmcv框架\

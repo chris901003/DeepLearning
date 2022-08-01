@@ -56,19 +56,28 @@ def replace_ImageToTensor(pipelines):
         ...    ]
         >>> assert expected_pipelines == replace_ImageToTensor(pipelines)
     """
+    # 已看過，將pipeline當中的ImageToTensor改成DefaultFormatBundle
+    # pipelines = 圖像處理流程
+
+    # 拷貝一份傳入的pipelines
     pipelines = copy.deepcopy(pipelines)
+    # 遍歷pipelines當中內容
     for i, pipeline in enumerate(pipelines):
         if pipeline['type'] == 'MultiScaleFlipAug':
+            # 如果是遇到MultiScaleFlipAug就會到這裡
             assert 'transforms' in pipeline
+            # 將當中transforms進行遞歸檢查
             pipeline['transforms'] = replace_ImageToTensor(
                 pipeline['transforms'])
         elif pipeline['type'] == 'ImageToTensor':
+            # 如果檢查到ImageToTensor就會到這裡，並且跳出警告說明將其轉換成DefaultFormatBundle
             warnings.warn(
                 '"ImageToTensor" pipeline is replaced by '
                 '"DefaultFormatBundle" for batch inference. It is '
                 'recommended to manually replace it in the test '
                 'data pipeline in your config file.', UserWarning)
             pipelines[i] = {'type': 'DefaultFormatBundle'}
+    # 將轉換好的pipelines回傳
     return pipelines
 
 

@@ -141,16 +141,23 @@ class LoadImageFromNdarray(LoadImageFromFile):
         Returns:
             dict: The dict contains loaded image and meta information.
         """
+        # 已看過，從ndarray當中讀取圖像
+        # 檢查圖像是否為uint8格式，如果不是就會報錯
         assert results['img'].dtype == 'uint8'
 
+        # 將img資料讀取出來
         img = results['img']
         if self.color_type == 'grayscale' and img.shape[2] == 3:
+            # 如果需要轉成灰階圖像就會到這裡，這裡是將彩色圖像轉成灰階所以會先檢查是否為RGB圖像
             img = mmcv.bgr2gray(img, keepdim=True)
         if self.color_type == 'color' and img.shape[2] == 1:
+            # 如果需要轉成RGB圖像會到這裡，這裡是將灰階圖像轉成RGB圖像所以會先檢查是否為灰階圖像
             img = mmcv.gray2bgr(img)
         if self.to_float32:
+            # 如果需要轉成float32格式就會在這裡轉換
             img = img.astype(np.float32)
 
+        # 更新results當中資料
         results['filename'] = None
         results['ori_filename'] = None
         results['img'] = img
