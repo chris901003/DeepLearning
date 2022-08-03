@@ -11,3 +11,6 @@ setInterval(ClickConnect, 60000)
 !apt install psmisc
 !sudo fuser /dev/nvidia*
 !kill -9 [pid]
+
+
+刪除所有正在執行的python：sudo pkill python

@@ -27,13 +27,34 @@ class BasicBlock(BaseModule):
                  dcn=None,
                  plugins=None,
                  init_cfg=None):
+        """ 已看過，resnet的basic block初始化部分
+        Args:
+            inplanes: 輸入的channel深度
+            planes: 輸出的channel深度
+            stride: 第一層卷積的步距
+            dilation: 膨脹係數
+            downsample: 捷徑分支的下採樣方式
+            style: 撰寫風格
+            with_cp: 是否啟用checkpoint
+            conv_cfg: 卷積設定資料
+            norm_cfg: 標準化攝鄧
+            dcn: 是否使用dcn卷積
+            plugins: 是否需要中間添加其他層結構
+            init_cfg: 初始化方式
+        """
+
+        # 繼承於BaseModule，對繼承對象進行初始化
         super(BasicBlock, self).__init__(init_cfg)
+        # 如果有啟用dcn會報錯，目前沒有dcn的實作內容
         assert dcn is None, 'Not implemented yet.'
+        # 如果有添加額外層也會報錯，目前沒有相關實作
         assert plugins is None, 'Not implemented yet.'
 
+        # 構建標準化實例對象同時也獲取名稱
         self.norm1_name, norm1 = build_norm_layer(norm_cfg, planes, postfix=1)
         self.norm2_name, norm2 = build_norm_layer(norm_cfg, planes, postfix=2)
 
+        # 構建卷積層
         self.conv1 = build_conv_layer(
             conv_cfg,
             inplanes,
@@ -43,13 +64,19 @@ class BasicBlock(BaseModule):
             padding=dilation,
             dilation=dilation,
             bias=False)
+        # 將標準化層加到self當中
         self.add_module(self.norm1_name, norm1)
+        # 構建卷積層
         self.conv2 = build_conv_layer(
             conv_cfg, planes, planes, 3, padding=1, bias=False)
+        # 將標準化層加到self當中
         self.add_module(self.norm2_name, norm2)
 
+        # 構建激活函數實例對象
         self.relu = nn.ReLU(inplace=True)
+        # 保存捷徑分支的下採樣方式
         self.downsample = downsample
+        # 保存一些資料
         self.stride = stride
         self.dilation = dilation
         self.with_cp = with_cp

@@ -414,8 +414,12 @@ class ScaleAspectJitter(Resize):
                 # 如果將最小邊乘上縮放比例後會小於設定的最小值我們就需要調整縮放比例
                 scale = (self.short_size_bound + 10) * 1.0 / min(h, w)
         elif self.resize_type == 'around_min_img_scale':
+            # 如果設定的resize_type是around_min_img_scale會到這裡
+            # 找出短編長度
             short_size = min(self.img_scale[0])
+            # 從指定的縮放範圍隨機挑出一個值
             ratio = self.sample_from_range(self.ratio_range)
+            # 縮放比例就會是隨機縮放比例乘上最短邊最後在除以原始邊
             scale = (ratio * short_size) / min(h, w)
         else:
             raise NotImplementedError

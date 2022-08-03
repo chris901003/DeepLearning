@@ -29,8 +29,18 @@ class PANPostprocessor(BasePostprocessor):
                  min_text_avg_confidence=0.85,
                  min_text_area=16,
                  **kwargs):
+        """ 已看過，PAN模型的後處理部分
+        Args:
+            text_repr_type: 匡選的方式，可以是矩形或是多邊形
+            min_text_confidence: 最小的識別文字的置信度
+            min_kernel_confidence: 最小kernel的置信度
+            min_text_avg_confidence: 一個連通文字區塊的平均智信度
+            min_text_area: 最小的匡選面積大小
+        """
+        # 繼承自BasePostprocessor，對繼承對象進行初始化
         super().__init__(text_repr_type)
 
+        # 保存傳入的參數
         self.min_text_confidence = min_text_confidence
         self.min_kernel_confidence = min_kernel_confidence
         self.min_text_avg_confidence = min_text_avg_confidence
