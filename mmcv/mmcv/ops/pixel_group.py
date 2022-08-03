@@ -40,6 +40,16 @@ def pixel_group(
         element consists of averaged confidence, pixel number, and coordinates
         (x_i, y_i for all pixels) in order.
     """
+    # 已看過，透過文字團中間線往外擴張，最終將預測為文字的地方分配一個文字團
+    # score = 預測為文字的置信度，shape [height, width]
+    # mask = 當預測置信度小於閾值的地方會是False，否則就會是True，shape [height, width]
+    # embedding = 相似度向量，shape [height, width, channel=4]
+    # kernel_label = 文字團中心團，每一個文字團會有自己的index，不在中心團當中的會是0，shape [height, width]
+    # kernel_contour = 文字中心團的外圍邊匡，只有外圍邊匡會是255其他部分會是0，shape [height, width]
+    # kernel_region_num = 總共有多少個文字團，int
+    # distance_threshold = 距離的閾值，float
+
+    # 檢查傳入的資料是否有型態上面的錯誤
     assert isinstance(score, (torch.Tensor, np.ndarray))
     assert isinstance(mask, (torch.Tensor, np.ndarray))
     assert isinstance(embedding, (torch.Tensor, np.ndarray))
@@ -48,6 +58,7 @@ def pixel_group(
     assert isinstance(kernel_region_num, int)
     assert isinstance(distance_threshold, float)
 
+    # 如果傳入的是ndarray就轉成tensor格式
     if isinstance(score, np.ndarray):
         score = torch.from_numpy(score)
     if isinstance(mask, np.ndarray):
@@ -60,6 +71,7 @@ def pixel_group(
         kernel_contour = torch.from_numpy(kernel_contour)
 
     if torch.__version__ == 'parrots':
+        # 如果是用mmcv開發的底層就會到這裡
         label = ext_module.pixel_group(
             score,
             mask,
@@ -79,8 +91,10 @@ def pixel_group(
                     dtype=np.float))
             list_index = list_index + int(label[x])
     else:
+        # 以pytorch為底層就會到這裡，這裡依舊使用了c++已經寫好的東西
         pixel_assignment = ext_module.pixel_group(score, mask, embedding,
                                                   kernel_label, kernel_contour,
                                                   kernel_region_num,
                                                   distance_threshold)
+    # pixel_assignment = list[list]，第一個list會是總共有多少個文字團，第二個list會是一個文字團有哪些座標點
     return pixel_assignment
