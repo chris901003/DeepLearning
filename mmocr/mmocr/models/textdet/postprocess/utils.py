@@ -41,12 +41,22 @@ def unclip(box, unclip_ratio=1.5):
 
 
 def fill_hole(input_mask):
+    # 已看過，獲取fill_hole
+    # input_mask = 輸入是mask也就是裏面會是True或是False，tensor shape [height, width]
+
+    # 獲取傳入的tensor的高寬
     h, w = input_mask.shape
+    # canvas = 畫布功能
+    # 構建canvas大小會是(高+2, 寬+2)且全為0
     canvas = np.zeros((h + 2, w + 2), np.uint8)
+    # 將input_mask放到canvas當中，會從index=1往後開始放
     canvas[1:h + 1, 1:w + 1] = input_mask.copy()
 
+    # 構建全為0的tensor且shape [h + 4, w + 4]
     mask = np.zeros((h + 4, w + 4), np.uint8)
 
+    # floodFill中mask的高寬需要是canvas的高寬+2，第三個參數會是採樣點，第四個參數就是要變換的值
+    # floodFill就是像油漆桶的功能，根據採樣點的位置倒下油漆桶且設值放在第四個參數
     cv2.floodFill(canvas, mask, (0, 0), 1)
     canvas = canvas[1:h + 1, 1:w + 1].astype(np.bool)
 
@@ -59,19 +69,42 @@ def centralize(points_yx,
                radius,
                contour_mask,
                step_ratio=0.03):
+    """ 已看過，進行集中處理
+    Args:
+        points_yx: 文字中心mask所提取出來的骨架部分，這裡會是給哪些座標是該文字中心的骨架，ndarray shape [points,2]
+        normal_sin: 骨架點的預測sin值，ndarray shape [points, 1]
+        normal_cos: 骨架點的預測cos值，ndarray shape [points, 1]
+        radius: 骨架點的預測radius值，ndarray shape [points, 1]
+        contour_mask: 如果是文本中心位置的地方會是1，其他部分會是0，ndarray shape [height, width]
+        step_ratio:
+    """
 
+    # 獲取傳入圖像的高寬
     h, w = contour_mask.shape
+    # 構建top_yx與bot_yx預先都是points_yx
     top_yx = bot_yx = points_yx
+    # 構建step_flags且全為True，shape [points, 1]
     step_flags = np.ones((len(points_yx), 1), dtype=np.bool)
+    # hastack([normal_sin, normal_cos]) = ndarray shape [points, 2]，sin會作為[0]，cos會作為[1]
+    # 之後會在radius與stack後相同index的位置直接相乘，最後step shape ndarray = [points, 2]
     step = step_ratio * radius * np.hstack([normal_sin, normal_cos])
+    # 當step_flags當中有一個是True就會繼續執行，找到最後的頂部的座標
+    # 根據當前骨架一直往上加step直到所有的骨架點都到合法的最上限時會停止
     while np.any(step_flags):
         next_yx = np.array(top_yx + step, dtype=np.int32)
+        # 將y與x分離出來
         next_y, next_x = next_yx[:, 0], next_yx[:, 1]
+        # 獲取next_y是在[0, h-1]且next_x是在[0, w-1]且contour_mask在指定(next_y, next_x)為True的部分
+        # step_flags = ndarray shape [points]
         step_flags = (next_y >= 0) & (next_y < h) & (next_x > 0) & (
             next_x < w) & contour_mask[np.clip(next_y, 0, h - 1),
                                        np.clip(next_x, 0, w - 1)]
+        # 更新top_yx
         top_yx = top_yx + step_flags.reshape((-1, 1)) * step
+    # 將step_flags重新全部設定成True
     step_flags = np.ones((len(points_yx), 1), dtype=np.bool)
+    # 當step_flags當中有一個是True時就會繼續執行，最終找到最下方的座標
+    # 根據當前骨架一直往下減step直到所有骨架點到合法的最下限就會是停止
     while np.any(step_flags):
         next_yx = np.array(bot_yx - step, dtype=np.int32)
         next_y, next_x = next_yx[:, 0], next_yx[:, 1]
@@ -79,35 +112,64 @@ def centralize(points_yx,
             next_x < w) & contour_mask[np.clip(next_y, 0, h - 1),
                                        np.clip(next_x, 0, w - 1)]
         bot_yx = bot_yx - step_flags.reshape((-1, 1)) * step
+    # 最後的中心就會是最上方座標與最下方座標取均值，ndarray shape [points, 2]
+    # top_yx = 所有骨架點頂到最上限的點
+    # bot_yx = 所有骨架點頂到最下限的點
     centers = np.array((top_yx + bot_yx) * 0.5, dtype=np.int32)
+    # 最後回傳中心值，ndarray shape [points, 2]
     return centers
 
 
 def merge_disks(disks, disk_overlap_thr):
+    """ 已看過，將disks融合，會將一些比較接近的disk合成為一個disk，這樣在標記的時候才不會一堆圓圈
+    Args:
+        disks: 圓盤資訊，ndarray shape [points, 4]
+        disk_overlap_thr: 閾值
+    """
+
+    # 獲取(x, y)資訊，ndarray shape [points, 2]
     xy = disks[:, 0:2]
+    # 獲取radius資訊，ndarray shape [points]
     radius = disks[:, 2]
+    # 獲取scores資訊，ndarray shape [points]
     scores = disks[:, 3]
+    # 獲取scores由大到小的index順序
     order = scores.argsort()[::-1]
 
+    # 最終回傳結果保存
     merged_disks = []
+    # 當order當中還有東西就會持續執行
     while order.size > 0:
         if order.size == 1:
+            # 如果已經是最後一個就直接將disks當中指定的index放入到merged_disks當中
             merged_disks.append(disks[order])
             break
+        # 獲取當前最大置信度的index
         i = order[0]
+        # 計算當前選擇的點到剩下所有點的距離，ndarray shape [len(order) - 1]
         d = norm(xy[i] - xy[order[1:]], axis=1)
+        # 獲取當前的radius
         ri = radius[i]
+        # 獲取其餘沒用到的radius，ndarray shape [len(order) - 1]
         r = radius[order[1:]]
+        # 計算距離的閾值，ndarray shape [len(order) - 1]
         d_thr = (ri + r) * disk_overlap_thr
 
+        # 獲取哪幾個index的距離小於等於閾值，這裡會將得到得index再加上1，因為0號index是當前的點
         merge_inds = np.where(d <= d_thr)[0] + 1
         if merge_inds.size > 0:
+            # 如果merge_inds當中有東西就會到這裡
+            # merge_order就會是當前的index與小於閾值的index
             merge_order = np.hstack([i, order[merge_inds]])
+            # 最後就是在這些點取均值就會是我們需要的
             merged_disks.append(np.mean(disks[merge_order], axis=0))
         else:
+            # 如果沒有半個小於閾值就直接是當前的這個點
             merged_disks.append(disks[i])
 
+        # 會將已經處理好的disk跳過，這裡會更新order當中的內容
         inds = np.where(d > d_thr)[0] + 1
+        # 將False的地方過濾掉
         order = order[inds]
     merged_disks = np.vstack(merged_disks)
 
