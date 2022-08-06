@@ -1,5 +1,5 @@
 dataset_type = 'IcdarDataset'
-data_root = 'data/ctw1500'
+data_root = '/Users/huanghongyan/Documents/DeepLearning/mmocr/data/ctw1500'
 
 train = dict(
     type=dataset_type,

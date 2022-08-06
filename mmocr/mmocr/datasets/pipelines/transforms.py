@@ -478,27 +478,52 @@ class RandomCropPolyInstances:
                  instance_key='gt_masks',
                  crop_ratio=5.0 / 8.0,
                  min_side_ratio=0.4):
+        """ 已看過，隨機剪裁但是會確保剪裁後圖像當中至少包含一個標註匡
+        Args:
+            instance_key: 主要對象名稱
+            crop_ratio: 裁切比例
+            min_side_ratio: 最小某一邊的比例
+        """
         super().__init__()
+        # 將傳入的參數保存
         self.instance_key = instance_key
         self.crop_ratio = crop_ratio
         self.min_side_ratio = min_side_ratio
 
     def sample_valid_start_end(self, valid_array, min_len, max_start, min_end):
+        """ 已看過
+        Args:
+            valid_array: 在圖像當中該行或列都沒有標註圖像會是1，否則就會是0，ndarray shape [w or h]
+            min_len: 最小長度
+            max_start: 隨機選取一個標註對象的最小x或是最小y
+            min_end: 隨機選取一個標註對象的最大x或是最大y
+        """
 
+        # 檢查傳入的資料是否合法
         assert isinstance(min_len, int)
         assert len(valid_array) > min_len
 
+        # 將valid_array拷貝一份
         start_array = valid_array.copy()
+        # 獲取最大起點，這裡會是min(總長度-最小長度, 標註對象最小x或是最小y)，這樣最左端一定會小於等於標註圖像最左端
         max_start = min(len(start_array) - min_len, max_start)
+        # 從max_start後將start_array的地方都設定成0
         start_array[max_start:] = 0
+        # 將最頭的start_array直接設定成1
         start_array[0] = 1
+        # 這裡的hstack沒有特別作用，就是在start_array前面多一個0與start_array後面多一個0在對應index進行相減，shape [h+1 or w+1]
         diff_array = np.hstack([0, start_array]) - np.hstack([start_array, 0])
+        # 找到在diff_array小於0的index
         region_starts = np.where(diff_array < 0)[0]
+        # 找到在diff_array大於0的index
         region_ends = np.where(diff_array > 0)[0]
+        # 隨機選取region_starts當中的一個index
         region_ind = np.random.randint(0, len(region_starts))
+        # start會是從region_starts的指定index到region_ends中隨機選一個值
         start = np.random.randint(region_starts[region_ind],
                                   region_ends[region_ind])
 
+        # 與選則start類似
         end_array = valid_array.copy()
         min_end = max(start + min_len, min_end)
         end_array[:min_end] = 0
@@ -509,6 +534,7 @@ class RandomCropPolyInstances:
         region_ind = np.random.randint(0, len(region_starts))
         end = np.random.randint(region_starts[region_ind],
                                 region_ends[region_ind])
+        # 最後回傳start與end，透過以上方式一定會取到最一開始隨機選則的標註
         return start, end
 
     def sample_crop_box(self, img_size, results):
@@ -518,93 +544,151 @@ class RandomCropPolyInstances:
             img_size (tuple(int)): The image size (h, w).
             results (dict): The results dict.
         """
+        # 已看過，生成剪裁的匡，並且確保不會剪裁到標註匡資料
+        # img_size = 輸入圖像的圖像大小
+        # results = 輸入圖像詳細資料
 
+        # 檢查img_size是否符合tuple
         assert isinstance(img_size, tuple)
+        # 獲取圖像高寬
         h, w = img_size[:2]
 
+        # 獲取標註匡資訊，這裡會是list[list]，第一個list會是該圖像有多少個標註匡，第二個list會是該標註匡的(x, y)資訊
         key_masks = results[self.instance_key].masks
+        # 構建全為1且長度為w的ndarray
         x_valid_array = np.ones(w, dtype=np.int32)
+        # 構建全為1且長度為h的ndarray
         y_valid_array = np.ones(h, dtype=np.int32)
 
+        # 從標註匡當中隨機選取一個標註匡
         selected_mask = key_masks[np.random.randint(0, len(key_masks))]
+        # 將資料排成ndarray shape [points, 2]
         selected_mask = selected_mask[0].reshape((-1, 2)).astype(np.int32)
+        # 找到該標註匡最小x，這裡會在最小x後再減2
         max_x_start = max(np.min(selected_mask[:, 0]) - 2, 0)
+        # 找到該標註匡最大x，這裡會在最大x後再加3
         min_x_end = min(np.max(selected_mask[:, 0]) + 3, w - 1)
+        # 找到該標註匡最小y，這裡會在最小y後再減2
         max_y_start = max(np.min(selected_mask[:, 1]) - 2, 0)
+        # 找到該標註匡最大y，這裡會在最大y後再加3
         min_y_end = min(np.max(selected_mask[:, 1]) + 3, h - 1)
 
+        # 遍歷所有與mask相關的資料
         for key in results.get('mask_fields', []):
             if len(results[key].masks) == 0:
+                # 如果當中沒有任何標註訊息就直接continue
                 continue
+            # 獲取當中mask資料
             masks = results[key].masks
+            # 遍歷所有的mask
             for mask in masks:
+                # 這裡長度需要為1
                 assert len(mask) == 1
+                # 將通道重新排列，ndarray shape [points, 2]
                 mask = mask[0].reshape((-1, 2)).astype(np.int32)
+                # 分別獲取標註匡的x與y座標並且限制不會超過高寬，clip_x與clip_y的shape [points]
                 clip_x = np.clip(mask[:, 0], 0, w - 1)
                 clip_y = np.clip(mask[:, 1], 0, h - 1)
+                # 透過clip_x與clip_y獲取標註匡的最小x以及最大x以及最小y以及最大y
                 min_x, max_x = np.min(clip_x), np.max(clip_x)
                 min_y, max_y = np.min(clip_y), np.max(clip_y)
 
+                # 將x_valid_array在xmin-2到xmax+2之間設定成0，表示這裡是我們需要的
                 x_valid_array[min_x - 2:max_x + 3] = 0
+                # 將y_valid_array在ymin-2到yma+2之間設定成0，表示這裡是我們需要的
                 y_valid_array[min_y - 2:max_y + 3] = 0
 
+        # 獲取最小高寬，會是原始高寬乘上min_side_ratio
         min_w = int(w * self.min_side_ratio)
         min_h = int(h * self.min_side_ratio)
 
+        # 將x_valid_array以及min_w以及隨機挑的一個標註匡中最小x以及最大x傳入
         x1, x2 = self.sample_valid_start_end(x_valid_array, min_w, max_x_start,
                                              min_x_end)
+        # 將y_valid_array以及min_h以及隨機挑的一個標註匡中最小y以及最大y傳入
         y1, y2 = self.sample_valid_start_end(y_valid_array, min_h, max_y_start,
                                              min_y_end)
 
+        # 最後回傳x1,y1,x2,y2，圍成的矩形就是我們要的範圍
         return np.array([x1, y1, x2, y2])
 
     def crop_img(self, img, bbox):
+        """ 已看過，對輸入圖像進行指定剪裁
+        Args:
+            img: 輸入圖像，ndarray shape [height, width, channel]
+            bbox: 指定的剪裁範圍
+        """
         assert img.ndim == 3
         h, w, _ = img.shape
         assert 0 <= bbox[1] < bbox[3] <= h
         assert 0 <= bbox[0] < bbox[2] <= w
+        # 用切片方式進行剪裁
         return img[bbox[1]:bbox[3], bbox[0]:bbox[2]]
 
     def __call__(self, results):
+        # 已看過，進行隨機剪裁，剪裁後的圖像當中一定會包含至少一個標註匡
         if len(results[self.instance_key].masks) < 1:
+            # 如果本身圖像當中就沒有標註匡就會直接回傳
             return results
         if np.random.random_sample() < self.crop_ratio:
+            # 如果進來就表示會進行剪裁，這裡進來是有機率的
+            # 透過sample_crop_box獲取剪裁範圍，ndarray [x1, y1, x2, y2]
             crop_box = self.sample_crop_box(results['img'].shape, results)
+            # 保存裁切範圍
             results['crop_region'] = crop_box
+            # 使用crop_img對圖像進行剪裁
             img = self.crop_img(results['img'], crop_box)
+            # 更新圖像資料
             results['img'] = img
             results['img_shape'] = img.shape
 
             # crop and filter masks
+            # 將剪裁的(x1, y1, x2, y2)提取出來
             x1, y1, x2, y2 = crop_box
+            # 獲取新的圖像高寬
             w = max(x2 - x1, 1)
             h = max(y2 - y1, 1)
+            # 獲取每個標註匡對應的labels資訊
             labels = results['gt_labels']
             valid_labels = []
+            # 遍歷所有與mask相關的資訊
             for key in results.get('mask_fields', []):
                 if len(results[key].masks) == 0:
+                    # 如果當中沒有標註資料就直接跳過
                     continue
+                # 透過crop進行剪裁，這裡會將標註訊息根據平移進行調整
                 results[key] = results[key].crop(crop_box)
-                # filter out polygons beyond crop box.
+                # filter out polygons beyond crop box，獲取剪裁過後的多邊形標註資料
                 masks = results[key].masks
+                # 當中可能有些因為剪裁後變成不合法的，所以這裡會有保存合法的標註訊息的list
                 valid_masks_list = []
 
+                # 遍歷所有的標註訊息
                 for ind, mask in enumerate(masks):
+                    # mask的shape是list[list]
                     assert len(mask) == 1
+                    # 將mask的shape調整一下變成[points, 2]
                     polygon = mask[0].reshape((-1, 2))
                     if (polygon[:, 0] >
                             -4).all() and (polygon[:, 0] < w + 4).all() and (
                                 polygon[:, 1] > -4).all() and (polygon[:, 1] <
                                                                h + 4).all():
+                        # 如果x座標的範圍在[-3, w + 3]且y座標的範圍在[-3, h + 3]之間就會進來
+                        # 將x座標限定在[0, w)且y座標限定在[0, h)之間
                         mask[0][::2] = np.clip(mask[0][::2], 0, w)
                         mask[0][1::2] = np.clip(mask[0][1::2], 0, h)
                         if key == self.instance_key:
+                            # 如果當前的key是gt_masks就會將該index的labels保存
                             valid_labels.append(labels[ind])
+                        # 保存調整後的mask放到valid_masks_list當中
                         valid_masks_list.append(mask)
 
+                # 最後將裁切後還在圖像當中的標註訊息放入PolygonMaks實例化對象當中
                 results[key] = PolygonMasks(valid_masks_list, h, w)
+            # 更新labels資訊
             results['gt_labels'] = np.array(valid_labels)
 
+        # 最後回傳更新好的results
         return results
 
     def __repr__(self):
@@ -630,18 +714,35 @@ class RandomRotatePolyInstances:
                be padded onto cropped image.
             pad_value (tuple(int)): The color value for padding rotated image.
         """
+        # 已看過，主要是對圖像以及標註的多邊形mask進行旋轉
+        # rotate_ratio = 隨機旋轉的機率
+        # max_angle = 最大選轉角度
+        # pad_with_fixed_color = 旋轉後是否需要填充一個固定值讓圖像大小不變
+        # pad_value = 填充的值
+
+        # 保存傳入的參數
         self.rotate_ratio = rotate_ratio
         self.max_angle = max_angle
         self.pad_with_fixed_color = pad_with_fixed_color
         self.pad_value = pad_value
 
     def rotate(self, center, points, theta, center_shift=(0, 0)):
+        """ 已看過，將mask部分進行旋轉
+        Args:
+            center: 旋轉中心位置
+            points: 標註點，ndarray shape [points, 2]
+            theta: 旋轉角度
+            center_shift: 中心偏移量
+        """
         # rotate points.
+        # 獲取旋轉中心點
         (center_x, center_y) = center
         center_y = -center_y
+        # 將x與y分開
         x, y = points[::2], points[1::2]
         y = -y
 
+        # 以下就開始將點進行相對應得旋轉
         theta = theta / 180 * math.pi
         cos = math.cos(theta)
         sin = math.sin(theta)
@@ -656,81 +757,129 @@ class RandomRotatePolyInstances:
         return points
 
     def cal_canvas_size(self, ori_size, degree):
+        # 已看過，獲取經過旋轉後圖像的大小
+        # ori_size = 原始圖像的高寬
         assert isinstance(ori_size, tuple)
+        # 獲取旋轉角度
         angle = degree * math.pi / 180.0
+        # 獲取圖像高寬
         h, w = ori_size[:2]
 
         cos = math.cos(angle)
         sin = math.sin(angle)
+        # 計算最後旋轉後的高寬
         canvas_h = int(w * math.fabs(sin) + h * math.fabs(cos))
         canvas_w = int(w * math.fabs(cos) + h * math.fabs(sin))
 
+        # 打包成tuple(height, width)
         canvas_size = (canvas_h, canvas_w)
         return canvas_size
 
     def sample_angle(self, max_angle):
+        # 已看過，獲取隨機旋轉角度
+        # max_angle = 最大旋轉角度
         angle = np.random.random_sample() * 2 * max_angle - max_angle
+        # 回傳隨機選取的角度
         return angle
 
     def rotate_img(self, img, angle, canvas_size):
+        """ 已看過，將圖像進行旋轉
+        Args:
+            img: 當前圖像資料，ndarray shape [height, width, channel]
+            angle: 旋轉角度
+            canvas_size: 旋轉後圖像的高寬，tuple(height, width)
+        """
+        # 獲取圖像高寬
         h, w = img.shape[:2]
+        # 透過getRotationMatrix2D進行旋轉的實例對象，傳入的參數為(圖像中心, 旋轉角度, 縮放比例)
+        # rotation_matrix = 仿射變換矩陣
         rotation_matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+        # 在指定位置加上值
         rotation_matrix[0, 2] += int((canvas_size[1] - w) / 2)
         rotation_matrix[1, 2] += int((canvas_size[0] - h) / 2)
 
         if self.pad_with_fixed_color:
+            # 如果有指定padding時要用哪個固定的顏色會到這裡
+            # warpAffine傳入的參數為(要旋轉的圖像, 仿射變換矩陣, 最後輸出圖像大小)
+            # flags = 差值方法的組合，borderValue = 邊界填充值
             target_img = cv2.warpAffine(
                 img,
                 rotation_matrix, (canvas_size[1], canvas_size[0]),
                 flags=cv2.INTER_NEAREST,
                 borderValue=self.pad_value)
         else:
+            # 沒有指定會到這裡
+            # 構建一個shape與img相同且全為0的mask
             mask = np.zeros_like(img)
+            # 隨機獲取h_ind與w_ind的值
             (h_ind, w_ind) = (np.random.randint(0, h * 7 // 8),
                               np.random.randint(0, w * 7 // 8))
+            # 擷取一部分的原始圖像
             img_cut = img[h_ind:(h_ind + h // 9), w_ind:(w_ind + w // 9)]
+            # 將擷取的資料透過resize將大小縮放到canvas_size
             img_cut = mmcv.imresize(img_cut, (canvas_size[1], canvas_size[0]))
+            # 將mask進行旋轉並且padding部分填充為[1, 1, 1]
             mask = cv2.warpAffine(
                 mask,
                 rotation_matrix, (canvas_size[1], canvas_size[0]),
                 borderValue=[1, 1, 1])
+            # 將原始圖像進行旋轉，填充為[0, 0, 0]
             target_img = cv2.warpAffine(
                 img,
                 rotation_matrix, (canvas_size[1], canvas_size[0]),
                 borderValue=[0, 0, 0])
+            # 最後將原圖加上經過mask的img_cut
             target_img = target_img + img_cut * mask
 
         return target_img
 
     def __call__(self, results):
+        # 已看過，將圖像以及mask進行旋轉
         if np.random.random_sample() < self.rotate_ratio:
+            # 這裡會是有機率的對圖像進行旋轉
+            # 獲取當前圖像
             img = results['img']
+            # 獲取圖像的高寬資料
             h, w = img.shape[:2]
+            # 使用sample_angle獲取旋轉角度
             angle = self.sample_angle(self.max_angle)
+            # 獲取旋轉後圖像大小，canvas_size = tuple(height, width)
             canvas_size = self.cal_canvas_size((h, w), angle)
+            # 計算中心偏移量，會是減少的長度的一半
             center_shift = (int(
                 (canvas_size[1] - w) / 2), int((canvas_size[0] - h) / 2))
 
             # rotate image
+            # 保存旋轉的角度
             results['rotated_poly_angle'] = angle
+            # 將圖像進行旋轉
             img = self.rotate_img(img, angle, canvas_size)
+            # 更新圖像資訊
             results['img'] = img
             img_shape = img.shape
             results['img_shape'] = img_shape
 
-            # rotate polygons
+            # rotate polygons，將與mask有關係部分進行旋轉
             for key in results.get('mask_fields', []):
                 if len(results[key].masks) == 0:
+                    # 如果標註當中沒有內容就直接continue
                     continue
+                # 獲取mask資訊
                 masks = results[key].masks
+                # 旋轉後的點會暫時存放在這裡
                 rotated_masks = []
+                # 遍歷所有點
                 for mask in masks:
+                    # 使用RandomRotatePolyInstances當中的rotate方法
                     rotated_mask = self.rotate((w / 2, h / 2), mask[0], angle,
                                                center_shift)
+                    # 將結果傳入
                     rotated_masks.append([rotated_mask])
 
+                # 最後將結果傳入到PolygonMasks建構實例對象
                 results[key] = PolygonMasks(rotated_masks, *(img_shape[:2]))
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):
@@ -755,78 +904,129 @@ class SquareResizePad:
                be padded onto cropped image.
             pad_value (tuple(int)): The color value for padding rotated image.
         """
+        # 已看過，主要是透過resize或是padding將圖像變成正方形
+        # target_size = 輸出時圖像的大小，會是一個int
+        # pad_with_fixed_color = 在padding時是否用固定的顏色
+        # pad_value = 在pad時填充的顏色
+
+        # 檢查傳入參數是否正確
         assert isinstance(target_size, int)
         assert isinstance(pad_ratio, float)
         assert isinstance(pad_with_fixed_color, bool)
         assert isinstance(pad_value, tuple)
 
+        # 保存傳入參數
         self.target_size = target_size
         self.pad_ratio = pad_ratio
         self.pad_with_fixed_color = pad_with_fixed_color
         self.pad_value = pad_value
 
     def resize_img(self, img, keep_ratio=True):
+        """ 已看過，將圖像進行resize
+        Args:
+            img: 當前圖像資料，ndarray shape [height, width, channel]
+            keep_ratio: 是否需要保持高寬比
+        """
+        # 獲取當前圖像高寬
         h, w, _ = img.shape
         if keep_ratio:
+            # 如果需要保持高寬比會在這裡，我們會將較長邊設定成target_size
             t_h = self.target_size if h >= w else int(h * self.target_size / w)
             t_w = self.target_size if h <= w else int(w * self.target_size / h)
         else:
+            # 否則就強制最後高寬都是target_size
             t_h = t_w = self.target_size
+        # 使用imresize進行resize
         img = mmcv.imresize(img, (t_w, t_h))
+        # 回傳最後圖像以及高寬
         return img, (t_h, t_w)
 
     def square_pad(self, img):
+        # 已看過，主要是將圖像padding成正方形的
+        # img = 當前圖像資訊，ndarray shape [height, width, channel]
+
+        # 獲取當前的高寬
         h, w = img.shape[:2]
         if h == w:
+            # 如果高寬已經相同就代表已經是正方形，直接回傳
             return img, (0, 0)
+        # padding後的大小會是當前圖像高寬較大的一邊
         pad_size = max(h, w)
         if self.pad_with_fixed_color:
+            # 如果有指定padding的數值就會到這裡
+            # 構建expand_img的ndarray shape [pad_size, pad_size, 3]且全為1
             expand_img = np.ones((pad_size, pad_size, 3), dtype=np.uint8)
+            # 將expand_img當中的值全部改成指定的padding值
             expand_img[:] = self.pad_value
         else:
+            # 如果沒有指定padding的數值就會到這裡
             (h_ind, w_ind) = (np.random.randint(0, h * 7 // 8),
                               np.random.randint(0, w * 7 // 8))
+            # 切下原圖指定的範圍
             img_cut = img[h_ind:(h_ind + h // 9), w_ind:(w_ind + w // 9)]
+            # 將img_cut擴展到pad_size大小
             expand_img = mmcv.imresize(img_cut, (pad_size, pad_size))
+        # 依據高寬哪個是長邊會是上下需要padding，或是左右需要padding
         if h > w:
             y0, x0 = 0, (h - w) // 2
         else:
             y0, x0 = (w - h) // 2, 0
         expand_img[y0:y0 + h, x0:x0 + w] = img
+        # 回傳圖像偏移量，好讓mask以及bbox進行調整
         offset = (x0, y0)
 
+        # 回傳
         return expand_img, offset
 
     def square_pad_mask(self, points, offset):
+        # 已看過，將標註點根據偏移量調整
+        # 獲取偏移量
         x0, y0 = offset
         pad_points = points.copy()
+        # 將標註點進行偏移調整
         pad_points[::2] = pad_points[::2] + x0
         pad_points[1::2] = pad_points[1::2] + y0
         return pad_points
 
     def __call__(self, results):
+        # 已看過，主要是將圖像經過resize或是padding變成正方形
+        # 獲取圖像資料
         img = results['img']
 
-        if np.random.random_sample() < self.pad_ratio:
+        # 這裡是有機率使用padding將圖像變成正方形或是使用resize方式變成正方形
+        if np.random.random_sample() < self.pad_ratio or True:
+            # 這裡是透過padding變成正方形
+            # img = resize後的圖像，out_size = 經過resize後圖像的高寬
             img, out_size = self.resize_img(img, keep_ratio=True)
+            # img = 經過padding後的圖像，offset = padding的長寬
             img, offset = self.square_pad(img)
         else:
+            # 如果直接透過resize，就將保持原始高寬比關閉強制resize
             img, out_size = self.resize_img(img, keep_ratio=False)
+            # 這裡的offset就會是(0, 0)
             offset = (0, 0)
 
+        # 更新圖像資訊
         results['img'] = img
         results['img_shape'] = img.shape
 
+        # 遍歷所有與mask相關的資料
         for key in results.get('mask_fields', []):
             if len(results[key].masks) == 0:
+                # 如果當中沒有資料就會直接continue
                 continue
+            # 進行resize
             results[key] = results[key].resize(out_size)
+            # 獲取mask資料
             masks = results[key].masks
             processed_masks = []
+            # 遍歷所有標註點
             for mask in masks:
                 square_pad_mask = self.square_pad_mask(mask[0], offset)
+                # 將調整過後的標註點保存
                 processed_masks.append([square_pad_mask])
 
+            # 將點放入到PolygonMasks當中
             results[key] = PolygonMasks(processed_masks, *(img.shape[:2]))
 
         return results

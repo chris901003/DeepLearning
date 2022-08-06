@@ -35,8 +35,19 @@ class TextSnakePostprocessor(BasePostprocessor):
                  disk_overlap_thr=0.03,
                  radius_shrink_ratio=1.03,
                  **kwargs):
+        """ 已看過，TextSnake的後處理初始化函數
+        Args:
+            text_repr_type: 輸出匡選匡的方式，這裡預設會是多邊形
+            min_text_region_confidence: 一個文字團的平均置信度閾值
+            min_center_region_confidence: 一個文字團中心地區的平均置信度閾值
+            min_center_area: 一個文字團的中心地區最小面積
+            disk_overlap_thr: 圓盤重疊的閾值
+            radius_shrink_ratio: 半徑縮小率
+        """
+        # 繼承自BasePostprocessor，對繼承對象進行初始化
         super().__init__(text_repr_type)
         assert text_repr_type == 'poly'
+        # 保存傳入的參數
         self.min_text_region_confidence = min_text_region_confidence
         self.min_center_region_confidence = min_center_region_confidence
         self.min_center_area = min_center_area

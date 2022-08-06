@@ -4,9 +4,15 @@
 class BasePostprocessor:
 
     def __init__(self, text_repr_type='poly'):
+        """ 已看過，在OCR當中的後處理最基礎類
+        Args:
+            text_repr_type: 最終標註匡的表達方式，如果是poly就是多邊形，如果是quad就是矩形
+        """
+        # 檢查輸入的text_repr_type是否合法
         assert text_repr_type in ['poly', 'quad'
                                   ], f'Invalid text repr type {text_repr_type}'
 
+        # 保存下來
         self.text_repr_type = text_repr_type
 
     def is_valid_instance(self, area, confidence, area_thresh,

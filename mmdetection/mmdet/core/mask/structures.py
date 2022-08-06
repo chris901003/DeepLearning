@@ -734,31 +734,49 @@ class PolygonMasks(BaseInstanceMasks):
 
     def crop(self, bbox):
         """see :func:`BaseInstanceMasks.crop`"""
+        # 已看過，PolygonMasks類的剪裁函數
+        # bbox = 剪裁的範圍(xmin, ymin, xmax, ymax)
+
+        # 檢查傳入的bbox是否為ndarray
         assert isinstance(bbox, np.ndarray)
         assert bbox.ndim == 1
 
         # clip the boundary
+        # 拷貝一份bbox資料
         bbox = bbox.copy()
+        # 將剪裁的範圍控制在原圖的高寬當中，這裡正常來說不會改變bbox的值
         bbox[0::2] = np.clip(bbox[0::2], 0, self.width)
         bbox[1::2] = np.clip(bbox[1::2], 0, self.height)
+        # 提取bbox當中資料
         x1, y1, x2, y2 = bbox
+        # 獲取裁剪後的高寬
         w = np.maximum(x2 - x1, 1)
         h = np.maximum(y2 - y1, 1)
 
         if len(self.masks) == 0:
+            # 如果當前裏面沒有masks資料就直接回傳空的PolygonMasks實例對象
             cropped_masks = PolygonMasks([], h, w)
         else:
+            # 最終要回傳的資料
             cropped_masks = []
+            # 遍歷所有的masks資料
             for poly_per_obj in self.masks:
                 cropped_poly_per_obj = []
+                # 遍歷一個標註訊息當中的所有座標點
                 for p in poly_per_obj:
                     # pycocotools will clip the boundary
                     p = p.copy()
+                    # 將x減去xmin
                     p[0::2] = p[0::2] - bbox[0]
+                    # 將y減去ymin
                     p[1::2] = p[1::2] - bbox[1]
+                    # 放到cropped_poly_per_obj當中保存
                     cropped_poly_per_obj.append(p)
+                # 一個標註匡的資料保存
                 cropped_masks.append(cropped_poly_per_obj)
+            # 最後實例化成PolygonMasks資料
             cropped_masks = PolygonMasks(cropped_masks, h, w)
+        # 回傳PolygonMasks實例化對象
         return cropped_masks
 
     def pad(self, out_shape, pad_val=0):
