@@ -15,6 +15,8 @@ class BaseRecognizer(BaseModule, metaclass=ABCMeta):
     """Base class for text recognition."""
 
     def __init__(self, init_cfg=None):
+        # 已看過，文字判讀部分的基底
+        # init_cfg = 初始化方式
         super().__init__(init_cfg=init_cfg)
         self.fp16_enabled = False
 

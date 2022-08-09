@@ -30,27 +30,46 @@ class CTCConvertor(BaseConvertor):
                  with_unknown=True,
                  lower=False,
                  **kwargs):
+        """ 已看過，CTC初始化部分
+        Args:
+            dict_type: 使用的資料集格式，這裡只會有DICT90或是DICT36兩種選項
+            dict_file: 對單一英文字的資料集格式，這裡的優先級會大於dict_type
+            dict_list: 文字的list，這裡的優先級會大於dict_file
+            with_unknown: 是否會有unknown這個值
+            lower: 將原始的字串變成小寫格式
+        """
+        # 繼承自BaseConverter，對繼承對象進行初始化
         super().__init__(dict_type, dict_file, dict_list)
+        # 檢查with_unknown以及lower的型態
         assert isinstance(with_unknown, bool)
         assert isinstance(lower, bool)
 
+        # 保存傳入資料
         self.with_unknown = with_unknown
         self.lower = lower
+        # 主要是將<BLK>與<UKN>標籤放到轉換表當中
         self.update_dict()
 
     def update_dict(self):
         # CTC-blank
+        # 已看過，將BLK以及UKN標籤放入到轉換表當中
+
+        # 構建blank的token
         blank_token = '<BLK>'
+        # 保存blank_idx的index
         self.blank_idx = 0
+        # 將<BLK>標籤放到index對應到char的第0個index
         self.idx2char.insert(0, blank_token)
 
-        # unknown
+        # unknown，設定unknown標籤
         self.unknown_idx = None
         if self.with_unknown:
+            # 如果有需要unknown標籤就會到這裡，將<UKN>標籤放到index轉char的最後一個index上
             self.idx2char.append('<UKN>')
+            # 更新unknown在的index值
             self.unknown_idx = len(self.idx2char) - 1
 
-        # update char2idx
+        # update char2idx，重新構建char轉到index的dict
         self.char2idx = {}
         for idx, char in enumerate(self.idx2char):
             self.char2idx[char] = idx
@@ -67,16 +86,28 @@ class CTCConvertor(BaseConvertor):
                 flatten_targets (tensor): torch.Tensor([1,2,3,3,4,5,4,6,3,7]).
                 target_lengths (tensor): torch.IntTensot([5,5]).
         """
+        # 已看過，將標註的字串轉成對應的index後再轉成tensor格式
+        # string = list[str]，list長度就會是batch_size且資料會是str，str當中就是該圖像對應的標註訊息
+        # 檢查string當中是否為list且當中資料是否為str
         assert utils.is_type_list(strings, str)
 
+        # 最後轉成tensor格式的標註訊息
         tensors = []
+        # 透過str2idx將strings資料轉成對應的index
+        # list[list[int]]，第一個list長度就會是batch_size，第二個會是對應圖像的文字長度，int就會是對應上的index
         indexes = self.str2idx(strings)
+        # 遍歷整個batch的index資訊
         for index in indexes:
+            # 將index資訊轉成tensor格式
             tensor = torch.IntTensor(index)
+            # 將tensor資料保存下來
             tensors.append(tensor)
+        # target_lengths = 在計算CTC損失時需要的資料，需要知道每張圖像的標註文字長度
         target_lengths = torch.IntTensor([len(t) for t in tensors])
+        # 將標註訊息進行展平，也就是shape [一個batch的圖像中總共有多少文字]
         flatten_target = torch.cat(tensors)
 
+        # 將原始標註的tensors以及攤平後的標註tensors以及每一個有多少長度文字打包成dict進行回傳
         return {
             'targets': tensors,
             'flatten_targets': flatten_target,

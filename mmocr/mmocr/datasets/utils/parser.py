@@ -22,14 +22,23 @@ class LineStrParser:
                  keys_idx=[0, 1],
                  separator=' ',
                  **kwargs):
+        """ 已看過，將annotation文件當中的每一行轉成dcit格式
+        Args:
+            keys: 在dict當中的key值
+            keys_idx: 上面每個鍵的子字符串列表中的值索引
+            separator: 將一個string透過separator分成多個子字串
+        """
+        # 檢查傳入的資料是否合法
         assert isinstance(keys, list)
         assert isinstance(keys_idx, list)
         assert isinstance(separator, str)
         assert len(keys) > 0
         assert len(keys) == len(keys_idx)
+        # 保存傳入資料
         self.keys = keys
         self.keys_idx = keys_idx
         self.separator = separator
+        # 構建StringStrip實例對象，這裡會是將字串前後進行調整
         self.strip_cls = StringStrip(**kwargs)
 
     def get_item(self, data_ret, index):

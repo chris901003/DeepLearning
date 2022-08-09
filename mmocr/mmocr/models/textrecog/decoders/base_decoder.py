@@ -23,8 +23,10 @@ class BaseDecoder(BaseModule):
                 targets_dict=None,
                 img_metas=None,
                 train_mode=True):
+        # 已看過，decoder部分的forward函數
         self.train_mode = train_mode
         if train_mode:
+            # 如果當前是訓練模式就會到這裡
             return self.forward_train(feat, out_enc, targets_dict, img_metas)
 
         return self.forward_test(feat, out_enc, img_metas)

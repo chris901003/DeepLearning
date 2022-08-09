@@ -31,6 +31,7 @@ def list_from_file(filename, encoding='utf-8'):
     Returns:
         list[str]: A list of strings.
     """
+    # 已看過，簡單的對檔案進行除逐行讀取ㄅㄅ
     item_list = []
     with open(filename, 'r', encoding=encoding) as f:
         for line in f:

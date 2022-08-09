@@ -35,6 +35,15 @@ class AnnFileLoader:
                  file_storage_backend='disk',
                  file_format='txt',
                  **kwargs):
+        """ 已看過，從標註檔案當中讀取標註資料並且將讀入的資料轉成dict格式儲存
+        Args:
+            ann_file: 標註資料檔案位置
+            parser: 解析器相關參數
+            repeat: dataset重複次數
+            file_storage_backend: 標註資料檔案的存放設備
+            file_format: 標註檔案的副檔名
+        """
+        # 檢查傳入的資料是否符合規定
         assert isinstance(ann_file, str)
         assert isinstance(repeat, (int, float))
         assert isinstance(parser, dict)
@@ -46,10 +55,14 @@ class AnnFileLoader:
             raise ValueError('We only support using LineJsonParser '
                              'to parse lmdb file. Please use LineJsonParser '
                              'in the dataset config')
+        # 構建解析器實例對象
         self.parser = build_parser(parser)
+        # 保存repeat次數
         self.repeat = repeat
+        # 構建backend實例對象
         self.ann_file_backend = self._backends[file_storage_backend](
             file_format, **kwargs)
+        # 讀取ann_file當中資料
         self.ori_data_infos = self._load(ann_file)
 
     def __len__(self):
@@ -57,6 +70,7 @@ class AnnFileLoader:
 
     def _load(self, ann_file):
         """Load annotation file."""
+        # 已看過，讀取標註檔案資訊，這裡會根據標註檔案存放的設備呼叫不同的方式讀取
 
         return self.ann_file_backend(ann_file)
 

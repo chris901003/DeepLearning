@@ -44,18 +44,35 @@ class ResizeOCR:
                  img_pad_value=0,
                  width_downsample_ratio=1.0 / 16,
                  backend=None):
+        """ 已看過，OCR的resizing與padding部分
+        Args:
+            height: 經過resize與padding後的圖像高度
+            min_width: 經過resize與padding後最短寬度
+            max_width: 經過resize與padding後最長寬度
+            keep_aspect_ratio: 是否維持高寬比
+            img_pad_value: padding時的value
+            width_downsample_ratio: 從輸入圖像到輸出特徵的水平方向下採樣率
+            backend: resize時用到的模組
+        """
+        # 檢查傳入的資料是否合法
+        # 高度資料需要是int或是tuple型態
         assert isinstance(height, (int, tuple))
+        # min_width與max_width要不是None就要是int或是tuple
         assert utils.is_none_or_type(min_width, (int, tuple))
         assert utils.is_none_or_type(max_width, (int, tuple))
         if not keep_aspect_ratio:
+            # 如果不需要維持高寬比時就會需要設定最大寬度
             assert max_width is not None, ('"max_width" must assigned '
                                            'if "keep_aspect_ratio" is False')
+        # 檢查img_pad_value是否為int格式
         assert isinstance(img_pad_value, int)
         if isinstance(height, tuple):
+            # 如果傳入的height是tuple就會到這裡，檢查width相關的也會需要是tuple，這樣才可以對上
             assert isinstance(min_width, tuple)
             assert isinstance(max_width, tuple)
             assert len(height) == len(min_width) == len(max_width)
 
+        # 保存傳入參數
         self.height = height
         self.min_width = min_width
         self.max_width = max_width
@@ -65,27 +82,36 @@ class ResizeOCR:
         self.backend = backend
 
     def __call__(self, results):
+        # 已看過，對OCR資料進行resize以及padding操作
+        # get_dist_info = 是跟分布式學習有關的東西
         rank, _ = get_dist_info()
         if isinstance(self.height, int):
+            # 如果設定的height是int格式就會到這裡
+            # 將height與min_width與max_width資料提取出來
             dst_height = self.height
             dst_min_width = self.min_width
             dst_max_width = self.max_width
         else:
             # Multi-scale resize used in distributed training.
             # Choose one (height, width) pair for one rank id.
+            # 否則就會是有提供多種height與min_width與max_width
+            # 根據rank的id分配不同的高寬大小
 
             idx = rank % len(self.height)
             dst_height = self.height[idx]
             dst_min_width = self.min_width[idx]
             dst_max_width = self.max_width[idx]
 
+        # 獲取當前圖像的高寬資訊
         img_shape = results['img_shape']
+        # 將高寬提取出來
         ori_height, ori_width = img_shape[:2]
         valid_ratio = 1.0
         resize_shape = list(img_shape)
         pad_shape = list(img_shape)
 
         if self.keep_aspect_ratio:
+            # 如果需要保持高寬比就會到這裡
             new_width = math.ceil(float(dst_height) / ori_height * ori_width)
             width_divisor = int(1 / self.width_downsample_ratio)
             # make sure new_width is an integral multiple of width_divisor.
@@ -108,18 +134,22 @@ class ResizeOCR:
                         pad_val=self.img_pad_value)
                     pad_shape = img_resize.shape
             else:
+                # 如果不需要保持高寬比就會到這裡
                 img_resize = mmcv.imresize(
                     results['img'], (new_width, dst_height),
                     backend=self.backend)
                 resize_shape = img_resize.shape
                 pad_shape = img_resize.shape
         else:
+            # 這裡透過imresize進行大小調整，會將最大寬度以及最終高度傳入，最終會直接調整到指定的大小
             img_resize = mmcv.imresize(
                 results['img'], (dst_max_width, dst_height),
                 backend=self.backend)
+            # 獲取resize後圖像的大小，因為這裡是不管原始比例的所以可以暴力調整到指定大小
             resize_shape = img_resize.shape
             pad_shape = img_resize.shape
 
+        # 更新results當中相關資料
         results['img'] = img_resize
         results['img_shape'] = resize_shape
         results['resize_shape'] = resize_shape

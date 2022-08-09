@@ -60,14 +60,27 @@ class BaseDataset(Dataset):
                  pipeline,
                  img_prefix='',
                  test_mode=False):
+        """ 已看過，最基礎的Dataset初始化函數
+        Args:
+            ann_file: 標註訊息檔案路徑位置
+            loader: 讀取資料的設定資料
+            pipeline: 讀入圖像的處理流
+            img_prefix: 圖像資料存放位置的前面路徑位置
+            test_mode: 是否是測試模式
+        """
+        # 繼承自torch的Dataset
         super().__init__()
+        # 保存傳入資料
         self.test_mode = test_mode
         self.img_prefix = img_prefix
         self.ann_file = ann_file
         # load annotations
+        # 在loader當中添加標註資料的檔案位置
         loader.update(ann_file=ann_file)
+        # 構建loader實例化對象
         self.data_infos = build_loader(loader)
         # processing pipeline
+        # 構建圖像資料處理流
         self.pipeline = Compose(pipeline)
         # set group flag and class, no meaning
         # for text detect and recognize
@@ -95,9 +108,14 @@ class BaseDataset(Dataset):
             dict: Training data and annotation after pipeline with new keys
                 introduced by pipeline.
         """
+        # 已看過，根據傳入的index獲取訓練時需要的資料
+        # 先從data_infos獲取圖像檔案位置的資料
         img_info = self.data_infos[index]
+        # 將資料放到dict當中
         results = dict(img_info=img_info)
+        # 先構建一些資料需要的空間
         self.pre_pipeline(results)
+        # 最透透過一系列流程獲取需要的訓練資料
         return self.pipeline(results)
 
     def prepare_test_img(self, img_info):
@@ -137,11 +155,14 @@ class BaseDataset(Dataset):
         Returns:
             dict: Training/test data.
         """
+        # 已看過，根據傳入的指定index獲取該index的圖像資料
         if self.test_mode:
+            # 如果是測試模式會到這裡
             return self.prepare_test_img(index)
 
         while True:
             try:
+                # 根據index獲取訓練的資料
                 data = self.prepare_train_img(index)
                 if data is None:
                     raise Exception('prepared train data empty')
@@ -149,6 +170,7 @@ class BaseDataset(Dataset):
             except Exception as e:
                 print_log(f'prepare index {index} with error {e}')
                 index = self._get_next_index(index)
+        # 將處理好的資料進行回傳
         return data
 
     def format_results(self, results, **kwargs):
