@@ -480,8 +480,10 @@ class MMOCR:
                 recog_ckpt = 'https://download.openmmlab.com/mmocr/' + \
                     'textrecog/' + textrecog_models[self.tr]['ckpt']
 
+            # 構建文字判讀模型
             self.recog_model = init_detector(
                 recog_config, recog_ckpt, device=self.device)
+            # 將Sync BN換成BN，這樣才能在cpu或是單gpu下運行
             self.recog_model = revert_sync_batchnorm(self.recog_model)
 
         self.kie_model = None
@@ -657,8 +659,11 @@ class MMOCR:
         # and call post-processing functions for the output
         if self.detect_model and self.recog_model:
             # 如果同時有設定文字匡選以及文字判讀模型就會到這裡
+            # 會將文字匡選以及文字判讀模型放入同時也會有關鍵字提取的模型
+            # det_recog_result = list[dict]格式，list長度就會是圖像數量，dict就會是預測結果資料
             det_recog_result = self.det_recog_kie_inference(
                 self.detect_model, self.recog_model, kie_model=self.kie_model)
+            # 透過det_recog_pp進行後處理
             pp_result = self.det_recog_pp(det_recog_result)
         else:
             # 其他情況，這裡就會使用文字匡選或是文字判讀其中一個
@@ -676,7 +681,10 @@ class MMOCR:
 
     # Post processing function for end2end ocr
     def det_recog_pp(self, result):
+        # 已看過，將文本匡選同時進行文本判讀部分合併的後處理部分
+        # 最終結果保存的地方
         final_results = []
+        # 獲取args設定
         args = self.args
         for arr, output, export, det_recog_result in zip(
                 args.arrays, args.output, args.export, result):
@@ -781,49 +789,73 @@ class MMOCR:
 
     # End2end ocr inference pipeline
     def det_recog_kie_inference(self, det_model, recog_model, kie_model=None):
+        """ 已看過，端到端的文本檢測，會先將文字匡選出來之後進行文字判讀，如果有需要可以進行關鍵字提取
+        Args:
+            det_model: 文本匡選模型
+            recog_model: 文本判讀模型
+            kie_model: 文本關鍵字提取模型
+        """
+        # 最終結果保存的地方
         end2end_res = []
         # Find bounding boxes in the images (text detection)
+        # 獲取當前圖像的文字標註匡範圍，這裡就會是匡選的結果資料
         det_result = self.single_inference(det_model, self.args.arrays,
                                            self.args.batch_mode,
                                            self.args.det_batch_size)
+        # 將匡選資料提取出來，bboxes_list = list[list[list]]，第一個list是batch_size，第二個list該圖像有多少文字匡，第三個list是座標
         bboxes_list = [res['boundary_result'] for res in det_result]
 
         if kie_model:
+            # 如果有關鍵文字偵測就會到這裡
             kie_dataset = KIEDataset(
                 dict_file=kie_model.cfg.data.test.dict_file)
 
         # For each bounding box, the image is cropped and
         # sent to the recognition model either one by one
         # or all together depending on the batch_mode
+        # 這裡會遍歷(原始圖像檔案名稱, 圖像ndarray, 文本匡選座標, 標註後圖像輸出的檔案路徑)
         for filename, arr, bboxes, out_file in zip(self.args.filenames,
                                                    self.args.arrays,
                                                    bboxes_list,
                                                    self.args.output):
+            # 保存資料的部分
             img_e2e_res = {}
             img_e2e_res['filename'] = filename
             img_e2e_res['result'] = []
+            # 保存文本匡資訊
             box_imgs = []
             for bbox in bboxes:
                 box_res = {}
+                # 這裡會將座標部分拿出來
                 box_res['box'] = [round(x) for x in bbox[:-1]]
+                # bbox當中最後一個值是匡選區域平均置信度分數
                 box_res['box_score'] = float(bbox[-1])
+                # 如果輸出的標註方式是矩形就只會有8個數值，這裡就直接取出來
                 box = bbox[:8]
                 if len(bbox) > 9:
+                    # 如果輸出的使多邊形就會超過8個值
+                    # 這裡會找到所有點當中的(xmin, ymin, xmax, ymax)
                     min_x = min(bbox[0:-1:2])
                     min_y = min(bbox[1:-1:2])
                     max_x = max(bbox[0:-1:2])
                     max_y = max(bbox[1:-1:2])
+                    # 最終更新box資訊
                     box = [
                         min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y
                     ]
+                # 將指定地方的圖像進行裁切
                 box_img = crop_img(arr, box)
                 if self.args.batch_mode:
+                    # 如果有設定batch模式就會先保存起來，最後再一次進行推理
                     box_imgs.append(box_img)
                 else:
+                    # 沒有設定batch模式就會到這裡，每次只會預測一個標註匡
                     if recog_model == 'Tesseract_recog':
+                        # 使用Tesseract模型就會到這裡
                         recog_result = self.single_inference(
                             recog_model, box_img, batch_mode=True)
                     else:
+                        # 其他判讀模型就會到這裡
                         recog_result = model_inference(recog_model, box_img)
                     text = recog_result['text']
                     text_score = recog_result['score']
@@ -831,9 +863,11 @@ class MMOCR:
                         text_score = sum(text_score) / max(1, len(text))
                     box_res['text'] = text
                     box_res['text_score'] = text_score
+                # 將最後的預測結果放到img_e2e_res當中
                 img_e2e_res['result'].append(box_res)
 
             if self.args.batch_mode:
+                # 如果有設定batch模式就會到這裡，一次將裁切出來的部分進行文字判讀
                 recog_results = self.single_inference(
                     recog_model, box_imgs, True, self.args.recog_batch_size)
                 for i, recog_result in enumerate(recog_results):
@@ -845,10 +879,12 @@ class MMOCR:
                     img_e2e_res['result'][i]['text_score'] = text_score
 
             if self.args.merge:
+                # 如果有設定merge就會到這裡
                 img_e2e_res['result'] = stitch_boxes_into_lines(
                     img_e2e_res['result'], self.args.merge_xdist, 0.5)
 
             if kie_model:
+                # 如果有需要進行關鍵字檢測就會到這裡
                 annotations = copy.deepcopy(img_e2e_res['result'])
                 # Customized for kie_dataset, which
                 # assumes that boxes are represented by only 4 points

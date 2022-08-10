@@ -95,31 +95,45 @@ def crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
         short_edge_pad_ratio (float): Box pad ratio for short edge
             corresponding to font size.
     """
+    # 已看過，根據指定的範圍對原始圖像進行裁切獲取需要的部分
+    # src_img = 原始圖像資料，ndarray shape [height, width, channel]
+    # box = 我們需要的部分(xmin, ymin, xmax, ymax)
+
+    # 檢查傳入的資料是否合法
     assert utils.is_type_list(box, (float, int))
     assert len(box) == 8
     assert 0. <= long_edge_pad_ratio < 1.0
     assert 0. <= short_edge_pad_ratio < 1.0
 
+    # 獲取當前圖像高寬
     h, w = src_img.shape[:2]
+    # 將需要的部分控制在高寬以內
     points_x = np.clip(np.array(box[0::2]), 0, w)
     points_y = np.clip(np.array(box[1::2]), 0, h)
 
+    # 獲取裁切後圖像的高寬
     box_width = np.max(points_x) - np.min(points_x)
     box_height = np.max(points_y) - np.min(points_y)
+    # 這個是用來決定padding的大小的
     font_size = min(box_height, box_width)
 
     if box_height < box_width:
+        # 如果匡選區域寬邊較長就會到這裡
         horizontal_pad = long_edge_pad_ratio * font_size
         vertical_pad = short_edge_pad_ratio * font_size
     else:
+        # 相反的就會到這裡
         horizontal_pad = short_edge_pad_ratio * font_size
         vertical_pad = long_edge_pad_ratio * font_size
 
+    # 這裡會加上padding的部分，也就是我們不會切的剛剛好，會在四周預留空間
     left = np.clip(int(np.min(points_x) - horizontal_pad), 0, w)
     top = np.clip(int(np.min(points_y) - vertical_pad), 0, h)
     right = np.clip(int(np.max(points_x) + horizontal_pad), 0, w)
     bottom = np.clip(int(np.max(points_y) + vertical_pad), 0, h)
 
+    # 進行裁切
     dst_img = src_img[top:bottom, left:right]
 
+    # 回傳裁切後的圖像
     return dst_img
