@@ -112,14 +112,19 @@ class ResizeOCR:
 
         if self.keep_aspect_ratio:
             # 如果需要保持高寬比就會到這裡
+            # 獲取通過resize與padding後的寬度，這裡依據當前高度變成最終高度需要放大或是縮小的倍率決定最終寬度
             new_width = math.ceil(float(dst_height) / ori_height * ori_width)
+            # 根據寬度部分在backbone會下採樣的倍率，這裡需要調整到可以被整除
             width_divisor = int(1 / self.width_downsample_ratio)
             # make sure new_width is an integral multiple of width_divisor.
             if new_width % width_divisor != 0:
+                # 如果無法被整除就會找到可以整除且離當前指定寬度做接近且大於的值
                 new_width = round(new_width / width_divisor) * width_divisor
             if dst_min_width is not None:
+                # 如果有設定最小寬度就會到這裡，會在最小寬度與當前指定寬度當中選較大的作為最終寬度
                 new_width = max(dst_min_width, new_width)
             if dst_max_width is not None:
+                # 如果有設定最大寬度就會到這裡
                 valid_ratio = min(1.0, 1.0 * new_width / dst_max_width)
                 resize_width = min(dst_max_width, new_width)
                 img_resize = mmcv.imresize(
@@ -134,13 +139,15 @@ class ResizeOCR:
                         pad_val=self.img_pad_value)
                     pad_shape = img_resize.shape
             else:
-                # 如果不需要保持高寬比就會到這裡
+                # 如果沒有指定的最大寬度就會到這裡，透過imresize將圖像resize到指定大小
                 img_resize = mmcv.imresize(
                     results['img'], (new_width, dst_height),
                     backend=self.backend)
+                # 獲取resize後的結果
                 resize_shape = img_resize.shape
                 pad_shape = img_resize.shape
         else:
+            # 如果不需要保持高寬比就會到這裡
             # 這裡透過imresize進行大小調整，會將最大寬度以及最終高度傳入，最終會直接調整到指定的大小
             img_resize = mmcv.imresize(
                 results['img'], (dst_max_width, dst_height),

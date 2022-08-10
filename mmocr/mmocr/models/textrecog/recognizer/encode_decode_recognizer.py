@@ -180,22 +180,31 @@ class EncodeDecodeRecognizer(BaseRecognizer):
         """Test function with test time augmentation.
 
         Args:
-            imgs (torch.Tensor): Image input tensor.
+            img (torch.Tensor): Image input tensor.
             img_metas (list[dict]): List of image information.
 
         Returns:
             list[str]: Text label result of each image.
         """
+        # 已看過，這裡會對單張圖像進行預測
+        # img = 要預測的圖像，tensor shape [batch_size=1, channel, height, width]
+        # img_metas = 該圖像的詳細資訊
+        # kwargs = 會有rescale，是否需要將圖像進行resize
+
         for img_meta in img_metas:
+            # 獲取valid_ratio資訊
             valid_ratio = 1.0 * img_meta['resize_shape'][1] / img.size(-1)
             img_meta['valid_ratio'] = valid_ratio
 
+        # 進行特徵提取，feat = tensor shape [batch_size=1, channel, height, width]
         feat = self.extract_feat(img)
 
         out_enc = None
         if self.encoder is not None:
+            # 如果有encoder層結構就會通過
             out_enc = self.encoder(feat, img_metas)
 
+        # 通過decoder層結構，獲取預測結果
         out_dec = self.decoder(
             feat, out_enc, None, img_metas, train_mode=False)
 
@@ -203,25 +212,37 @@ class EncodeDecodeRecognizer(BaseRecognizer):
         if torch.onnx.is_in_onnx_export():
             return out_dec
 
+        # label_indexes = list[list]，第一個list長度會是batch_size，第二個list長度會是該圖像最終字串長度，這裡會是預測的index
+        # label_scores = 型態與label_indexes相同，只是裡面存的資料是置信度
         label_indexes, label_scores = self.label_convertor.tensor2idx(
             out_dec, img_metas)
+        # 將index轉成最後的字串，label_strings = list[str]，list長度就會是batch_size
         label_strings = self.label_convertor.idx2str(label_indexes)
 
         # flatten batch results
+        # 最終回傳結果
         results = []
         for string, score in zip(label_strings, label_scores):
+            # 將預測的字串與每個文字的置信度包成dict後放到results當中
             results.append(dict(text=string, score=score))
 
         return results
 
     def merge_aug_results(self, aug_results):
+        # 已看過，合併results資料
+        # 先將out_text與out_score初始化
         out_text, out_score = '', -1
+        # 遍歷aug_results當中資料，也就是遍歷一個batch的資料
         for result in aug_results:
+            # 獲取預測的文字
             text = result[0]['text']
+            # 這裡會求出平均置信度分數
             score = sum(result[0]['score']) / max(1, len(text))
             if score > out_score:
+                # 如果平均分數大於閾值就會到這裡
                 out_text = text
                 out_score = score
+        # 最終構成輸出的results
         out_results = [dict(text=out_text, score=out_score)]
         return out_results
 
@@ -233,9 +254,24 @@ class EncodeDecodeRecognizer(BaseRecognizer):
                 which contains all images in the batch.
             img_metas (list[list[dict]]): The metadata of images.
         """
+        # 已看過，測試部分調用
+        # imgs = 輸入到網路的圖像資料，list[tensor]，list長度會是要檢測的圖像數量
+        #        tensor shape [batch_size=1, channel, height, width]
+        # img_metas = 圖像的詳細資料
+
+        # 最終結果保存的地方
         aug_results = []
+        # 遍歷需要預測的圖像
         for img, img_meta in zip(imgs, img_metas):
+            # 透過simple_test進行預測並且獲取結果
+            # result = list[dict]
+            # dict = {
+            #   'text': 預測出來的字串
+            #   'score': list[float]，list長度會與text長度相同，每個代表對應index的置信度分數
+            # }
             result = self.simple_test(img, img_meta, **kwargs)
+            # 將結果保存
             aug_results.append(result)
 
+        # 將結果進行合併後回傳
         return self.merge_aug_results(aug_results)

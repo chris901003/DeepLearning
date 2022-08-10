@@ -63,7 +63,9 @@ class BaseRecognizer(BaseModule, metaclass=ABCMeta):
             img_metas (list[dict] | list[list[dict]]):
                 The outer list indicates images in a batch.
         """
+        # 已看過，測試模式下會到這裡
         if isinstance(imgs, list):
+            # 如果傳入的imgs是list型態就會到這裡
             assert len(imgs) > 0
             assert imgs[0].size(0) == 1, ('aug test does not support '
                                           f'inference with batch size '
@@ -93,6 +95,7 @@ class BaseRecognizer(BaseModule, metaclass=ABCMeta):
             if len(img_metas) == 1 and isinstance(img_metas[0], list):
                 img_metas = img_metas[0]
 
+        # 如果是在測試模式就會到這裡，回傳的不會是損失值而是預測的結果
         return self.forward_test(img, img_metas, **kwargs)
 
     def _parse_losses(self, losses):

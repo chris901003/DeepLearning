@@ -32,9 +32,14 @@ def bgr2gray(img: np.ndarray, keepdim: bool = False) -> np.ndarray:
     Returns:
         ndarray: The converted grayscale image.
     """
+    # 已看過，將圖像從RGB轉成灰度圖像
+    # 透過cv2的函數進行轉換
+    # out_img shape = [height, width]
     out_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     if keepdim:
+        # 如果需要將channel維度保留就會到這裡，shape [height, width, channel=1]
         out_img = out_img[..., None]
+    # 回傳轉換後的結果
     return out_img
 
 

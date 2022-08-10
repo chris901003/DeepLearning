@@ -130,47 +130,82 @@ class CTCConvertor(BaseConvertor):
                     scores_topk (list[list[list[float]->len=topk]])
                 ).
         """
+        # 已看過，在測試時將 預測結果的tensor轉成對應的index
+        # output = 預測的輸出，tensor shape [batch_size=1, width, channel]
+        # img_metas = 當前batch圖像的詳細資訊
+        # topk = 前k大的可能進行回傳
+        # return_topk = 是否將topk都進行回傳，如果是False就只會回傳最大的
+
+        # 檢查傳入的img_metas是否是dict格式
         assert utils.is_type_list(img_metas, dict)
+        # img_metas的資料數量要與output的數量對齊
         assert len(img_metas) == output.size(0)
+        # topk需要是int格式
         assert isinstance(topk, int)
         assert topk >= 1
 
+        # 獲取valid_ratios資訊
         valid_ratios = [
             img_meta.get('valid_ratio', 1.0) for img_meta in img_metas
         ]
 
+        # 獲取batch大小
         batch_size = output.size(0)
+        # 將預測出來的結果通過softmax，這裡是在channel維度上面進行softmax
         output = F.softmax(output, dim=2)
+        # 將tensor轉到cpu上同時取消反向傳遞的計算
         output = output.cpu().detach()
+        # 獲取每個序列時間點topk的值以及對應的index
+        # batch_topk_value與batch_topk_idx的shape = [batch_size=1, width, channel=topk]
         batch_topk_value, batch_topk_idx = output.topk(topk, dim=2)
+        # 獲取top1的資訊，batch_max_idx shape = [batch_size=1, width]
         batch_max_idx = batch_topk_idx[:, :, 0]
+        # 記錄下topk的資訊
         scores_topk, indexes_topk = [], []
+        # 置信度分數以及index的保存
         scores, indexes = [], []
+        # 獲取序列長度資訊
         feat_len = output.size(1)
+        # 遍歷一個batch的預測
         for b in range(batch_size):
+            # 獲取valid_ratio資訊
             valid_ratio = valid_ratios[b]
+            # 根據valid_ratio會決定最終decode的序列長度，因為有些部分是透過padding變長的，這樣padding部分就會需要忽略掉
             decode_len = min(feat_len, math.ceil(feat_len * valid_ratio))
+            # 獲取該圖像的預測當中每個序列上置信度最大的index
             pred = batch_max_idx[b, :]
+            # 保存每個序列時間點上選擇的index
             select_idx = []
             prev_idx = self.blank_idx
+            # 遍歷我們需要解碼的長度，這裡就會是執行將blank忽略同時如果有相同連續的index就只會取一個的操作
             for t in range(decode_len):
+                # 獲取該序列點上最大置信度的index
                 tmp_value = pred[t].item()
                 if tmp_value not in (prev_idx, self.blank_idx):
+                    # 如果選擇的index不是blank_idx也不是prev_idx就會到這裡，直接保存到select_idx當中
                     select_idx.append(t)
+                # 將prev_idx變成當前的index
                 prev_idx = tmp_value
+            # 將select_idx轉成LongTensor格式
             select_idx = torch.LongTensor(select_idx)
+            # 將select_idx套用到batch_topk_value與batch_topk_idx，這樣就會是過濾掉連續相同index與空白的部分
             topk_value = torch.index_select(batch_topk_value[b, :, :], 0,
                                             select_idx)  # valid_seqlen * topk
             topk_idx = torch.index_select(batch_topk_idx[b, :, :], 0,
                                           select_idx)
+            # 這裡將資料轉成list[list]，第一個list就會是最後的預測文字長度，第二個list長度會是topk
             topk_idx_list, topk_value_list = topk_idx.numpy().tolist(
             ), topk_value.numpy().tolist()
+            # 將topk_idx_list與topk_value_list進行保存
             indexes_topk.append(topk_idx_list)
             scores_topk.append(topk_value_list)
+            # 這裡會將top1的資料另外保存
             indexes.append([x[0] for x in topk_idx_list])
             scores.append([x[0] for x in topk_value_list])
 
         if return_topk:
+            # 如果需要topk的全部資料就會回傳這些
             return indexes_topk, scores_topk
 
+        # 否則我們只會回傳top1的資料
         return indexes, scores

@@ -141,13 +141,22 @@ class BaseConvertor:
         Returns:
             strings (list[str]): ['hello', 'world'].
         """
+        # 已看過，將index轉成str
+        # indexes = 需要轉換的index，list[list]，第一個list長度會是batch_size，第二個list會是該圖像的文字長度
+
+        # 檢查傳入的indexes需要是list型態
         assert isinstance(indexes, list)
 
+        # 保存最後轉換的str的空間
         strings = []
+        # 遍歷一整個batch的index
         for index in indexes:
+            # 從index轉到char
             string = [self.idx2char[i] for i in index]
+            # 添加上去
             strings.append(''.join(string))
 
+        # 最後回傳
         return strings
 
     def tensor2idx(self, output):
