@@ -128,6 +128,7 @@ class BaseDataset(Dataset):
             dict: Testing data after pipeline with new keys introduced by
                 pipeline.
         """
+        # 已看過，進行測試模式下的圖像處理流
         return self.prepare_train_img(img_info)
 
     def _log_error_index(self, index):

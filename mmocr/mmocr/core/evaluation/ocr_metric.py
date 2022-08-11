@@ -39,6 +39,7 @@ def count_matches(pred_texts, gt_texts):
         match_res: (dict[str: int]): Match number used for
             metric calculation.
     """
+    # 已看過，計算預測與標註的有對應上的數量
     match_res = {
         'gt_char_num': 0,
         'pred_char_num': 0,
@@ -108,24 +109,36 @@ def eval_ocr_metric(pred_texts, gt_texts, metric='acc'):
         'word_acc_ignore_case_symbol', 'char_recall', 'char_precision',
         '1-N.E.D'].
     """
+    # 已看過，主要是在OCR當中文字判讀時檢測正確率用的函數
+    # pred_texts = 預測出來的字串結果，list[str]，list長度會是當前dataset的圖像數量
+    # gt_texts = 標註訊息，list[str]，list長度會是當前dataset的圖像數量
+    # metric = 要計算的指標類型
+
+    # 檢查傳入的資料是否合法
     assert isinstance(pred_texts, list)
     assert isinstance(gt_texts, list)
+    # pred_texts與gt_texts的數量必須相同
     assert len(pred_texts) == len(gt_texts)
 
     assert isinstance(metric, str) or is_type_list(metric, str)
     if metric == 'acc' or metric == ['acc']:
+        # 如果metric當中指定的是只有acc的話就會到這裡，將metric進行更新
         metric = [
             'word_acc', 'word_acc_ignore_case', 'word_acc_ignore_case_symbol',
             'char_recall', 'char_precision', 'one_minus_ned'
         ]
+    # 將metric當中有重複的值去除掉
     metric = set([metric]) if isinstance(metric, str) else set(metric)
 
+    # 這裡是所有支援的計算指標類型
     supported_metrics = set([
         'word_acc', 'word_acc_ignore_case', 'word_acc_ignore_case_symbol',
         'char_recall', 'char_precision', 'one_minus_ned'
     ])
+    # 指定的計算指標需要在有支援的方式當中
     assert metric.issubset(supported_metrics)
 
+    # 計算預測與標註的相同數量
     match_res = count_matches(pred_texts, gt_texts)
     eps = 1e-8
     eval_res = {}

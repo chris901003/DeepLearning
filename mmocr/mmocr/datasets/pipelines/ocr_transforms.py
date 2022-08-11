@@ -171,9 +171,11 @@ class ToTensorOCR:
     """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor."""
 
     def __init__(self):
+        # 已看過，簡單的將圖像從ndarray轉成tensor格式
         pass
 
     def __call__(self, results):
+        # 已看過，將圖像轉成tensor格式
         results['img'] = TF.to_tensor(results['img'].copy())
 
         return results
@@ -184,11 +186,19 @@ class NormalizeOCR:
     """Normalize a tensor image with mean and standard deviation."""
 
     def __init__(self, mean, std):
+        """ 已看過，將圖像通過均值標準化
+        Args:
+            mean: 均值
+            std: 表準差
+        """
+        # 將傳入資料進行保存
         self.mean = mean
         self.std = std
 
     def __call__(self, results):
+        # 已看過，進行均值以及標準化調整
         results['img'] = TF.normalize(results['img'], self.mean, self.std)
+        # 保存調整的資訊
         results['img_norm_cfg'] = dict(mean=self.mean, std=self.std)
         return results
 

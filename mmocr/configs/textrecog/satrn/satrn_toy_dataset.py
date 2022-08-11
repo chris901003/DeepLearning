@@ -11,7 +11,7 @@ train_pipeline = {{_base_.train_pipeline}}
 test_pipeline = {{_base_.test_pipeline}}
 
 label_convertor = dict(
-    type='AttnConvertor', dict_type='DICT36', with_unknown=True)
+    type='AttnConvertor', dict_type='DICT90', with_unknown=True)
 
 model = dict(
     type='SATRN',

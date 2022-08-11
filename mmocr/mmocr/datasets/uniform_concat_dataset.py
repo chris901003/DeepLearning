@@ -134,36 +134,52 @@ class UniformConcatDataset(ConcatDataset):
             dict[str: float]: Results of each separate
             dataset if `self.separate_eval=True`.
         """
+        # 已看過，這裡主要就是評測最後的效果
+        # 這裡需要檢查results當中的輸出數量與dataset當中的數量是否相同，如果有不同表示有錯誤
         assert len(results) == self.cumulative_sizes[-1], \
             ('Dataset and results have different sizes: '
              f'{self.cumulative_sizes[-1]} v.s. {len(results)}')
 
         # Check whether all the datasets support evaluation
         for dataset in self.datasets:
+            # 檢查dataset當中有沒有評測的方式
             assert hasattr(dataset, 'evaluate'), \
                 f'{type(dataset)} does not implement evaluate function'
 
         if self.separate_eval:
+            # 如果separate_eval是True就會到這裡
+            # 先將dataset_idx設定成-1
             dataset_idx = -1
 
+            # 最終要回傳的東西
             total_eval_results = dict()
 
             if self.show_mean_scores:
+                # 如果有需要顯示平均分數就會到這裡
                 mean_eval_results = defaultdict(list)
 
+            # cumulative_sizes = dataset當中的圖像數量累加，假設有3個dataset且圖像數量為[10, 5, 3]
+            #                    則cumulative_sizes就會是 = [10, 15, 18]
+            # 遍歷所有的dataset
             for dataset in self.datasets:
+                # 如果是第一個dataset則start_idx就會是0，否則就會是cumulative_sizes[dataset_idx]，也就是接續在上個dataset的後面
                 start_idx = 0 if dataset_idx == -1 else \
                     self.cumulative_sizes[dataset_idx]
+                # 結束的index就會是下一個dataset的開始index
                 end_idx = self.cumulative_sizes[dataset_idx + 1]
 
+                # 將當前dataset部分的預測結果提取出來
                 results_per_dataset = results[start_idx:end_idx]
+                # 打印當前的dataset
                 print_log(
                     f'\nEvaluating {dataset.ann_file} with '
                     f'{len(results_per_dataset)} images now',
                     logger=logger)
 
+                # 透過當前dataset當中的evaluate進行模型預測的評估
                 eval_results_per_dataset = dataset.evaluate(
                     results_per_dataset, logger=logger, **kwargs)
+                # 將dataset_idx往下一個移動
                 dataset_idx += 1
                 for k, v in eval_results_per_dataset.items():
                     total_eval_results.update({f'{dataset_idx}_{k}': v})
@@ -176,6 +192,7 @@ class UniformConcatDataset(ConcatDataset):
 
             return total_eval_results
         else:
+            # separate_eval為False的部分還沒有實作對象
             raise NotImplementedError(
                 'Evaluating datasets as a whole is not'
                 ' supported yet. Please use "separate_eval=True"')
