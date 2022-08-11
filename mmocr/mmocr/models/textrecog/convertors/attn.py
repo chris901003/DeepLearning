@@ -33,41 +33,66 @@ class AttnConvertor(BaseConvertor):
                  lower=False,
                  start_end_same=True,
                  **kwargs):
+        """ 已看過，將index與文字與tensor格式之間轉換，這裡是針對encoder-decoder設計
+        Args:
+            dict_type: 資料集的文字集
+            dict_file: 透過file獲取文字集
+            dict_list: 透過很多的file獲取文字集
+            with_unknown: 是否包含unknown這個index
+            max_seq_len: 最大序列長度
+            lower: 是否需要將標註文字轉成小寫
+            start_end_same: start與end的index是否相同
+        """
+        # 繼承自BaseConverter，對繼承對象進行初始化
         super().__init__(dict_type, dict_file, dict_list)
+        # 檢查傳入的資料型態是否正確
         assert isinstance(with_unknown, bool)
         assert isinstance(max_seq_len, int)
         assert isinstance(lower, bool)
 
+        # 保存傳入的資料
         self.with_unknown = with_unknown
         self.max_seq_len = max_seq_len
         self.lower = lower
         self.start_end_same = start_end_same
 
+        # 將對應關係更新，添加上一些對應關係
         self.update_dict()
 
     def update_dict(self):
+        # 已看過，添加一些對應關係
+
+        # 開始與結束的標籤名稱
         start_end_token = '<BOS/EOS>'
+        # unknown的標籤名稱
         unknown_token = '<UKN>'
+        # padding的標籤名稱
         padding_token = '<PAD>'
 
         # unknown
+        # 將unknown的index預設為None
         self.unknown_idx = None
         if self.with_unknown:
+            # 如果有需要unknown的index就會到這裡將unknown添加上去，這裡會加在最後面
             self.idx2char.append(unknown_token)
             self.unknown_idx = len(self.idx2char) - 1
 
         # BOS/EOS
+        # 將開始與結束標籤往最後的地方添加
         self.idx2char.append(start_end_token)
         self.start_idx = len(self.idx2char) - 1
         if not self.start_end_same:
+            # 如果start與end不是同一個index就會到這裡，再將token往最後面加
             self.idx2char.append(start_end_token)
         self.end_idx = len(self.idx2char) - 1
 
         # padding
+        # padding部分添加上去
         self.idx2char.append(padding_token)
         self.padding_idx = len(self.idx2char) - 1
 
         # update char2idx
+        # 最後一次更新char對應到idx的資料
         self.char2idx = {}
         for idx, char in enumerate(self.idx2char):
             self.char2idx[char] = idx
@@ -83,28 +108,48 @@ class AttnConvertor(BaseConvertor):
                                                     torch.Tensor([5,4,6,3,7])]
                 padded_targets (Tensor(bsz * max_seq_len))
         """
+        # 已看過，將標註的str轉成tensor格式，將文字映射到對應的index之後再轉成tensor格式
+        # strings = list[str]，list長度就會是batch_size
+
+        # 檢查傳入的strings是否為list且當中的資料是str格式
         assert utils.is_type_list(strings, str)
 
+        # 最終要回傳的資料保存的地方
         tensors, padded_targets = [], []
+        # 將strings的內容轉成index，indexes = list[list[int]]，第一個list長度會是batch_size，第二個list會是該圖像的字串長度
         indexes = self.str2idx(strings)
+        # 遍歷一個batch的標註資料
         for index in indexes:
+            # 將index的資料轉成tensor格式
             tensor = torch.LongTensor(index)
+            # 添加到tensors當中保存
             tensors.append(tensor)
             # target tensor for loss
+            # src_target = 長度會是len(index)+2且全為0
             src_target = torch.LongTensor(tensor.size(0) + 2).fill_(0)
+            # 在最後的部分更改成end的index
             src_target[-1] = self.end_idx
+            # 在最前的部分更改成start的index
             src_target[0] = self.start_idx
+            # 中間部分將tensor資料放入
             src_target[1:-1] = tensor
+            # 構建長度為max_seq_len且全為padding的index的tensor
             padded_target = (torch.ones(self.max_seq_len) *
                              self.padding_idx).long()
+            # 獲取當前標註的文字長度
             char_num = src_target.size(0)
             if char_num > self.max_seq_len:
+                # 如果當前標註的文字長度大於最大序列長度，我們就會取前max_seq_len放到padded_target當中
                 padded_target = src_target[:self.max_seq_len]
             else:
+                # 如果max_seq_len比當前標註文字長度長就會將前src_target變成當前標註字串
                 padded_target[:char_num] = src_target
+            # 最後保存
             padded_targets.append(padded_target)
+        # 最後在第0個維度進行stack，padded_targets = tensor shape [batch_size, len=max_seq_len]
         padded_targets = torch.stack(padded_targets, 0).long()
 
+        # 將最後結果回傳
         return {'targets': tensors, 'padded_targets': padded_targets}
 
     def tensor2idx(self, outputs, img_metas=None):

@@ -152,7 +152,13 @@ class EncodeDecodeRecognizer(BaseRecognizer):
         #   'targets': 原始標註資訊轉成文字對應index後的tensor格式，list[tensor]且tensor shape [len_gt_words]
         #   'flatten_target': 將標註的index全部展平，tensor shape [total_words]
         #   'target_lengths': 每一張圖像的標註文字長度，tensor shape [batch_size]
-        # }
+        # } (這是使用CRNN時的返回結果)
+
+        # targets_dict = dict{
+        #   'targets': 將str轉成對應index的結果，list[list[int]]，第一個list長度是batch_size，第二個是該圖像的字串長度
+        #   'padded_targets': 將長度補齊到max_seq_len，將不足的部分用padding_index補齊，超過的部分去除
+        #                     tensor shape [batch_size, max_seq_len]
+        # } (這是如果是採用encoder-decoder的時候的結果)
         targets_dict = self.label_convertor.str2tensor(gt_labels)
 
         out_enc = None
@@ -161,7 +167,7 @@ class EncodeDecodeRecognizer(BaseRecognizer):
             out_enc = self.encoder(feat, img_metas)
 
         # 進行decoder部分的向前傳播
-        # out_dec shape = [batch_size, width, channel]
+        # out_dec shape = [batch_size, seq_len, channel=num_classes]
         out_dec = self.decoder(
             feat, out_enc, targets_dict, img_metas, train_mode=True)
 

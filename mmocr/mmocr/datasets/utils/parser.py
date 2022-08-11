@@ -79,13 +79,26 @@ class LineJsonParser:
         self.keys = keys
 
     def get_item(self, data_ret, index):
+        """ 已看過，獲取指定index的圖像資料
+        Args:
+            data_ret: LmdbAnnFileBackend的實例對象，會是由lmdb的標註文件所組成的
+            index: 指定的圖像index
+        """
+        # 這裡的index是隨機選取的透過取mod後可以找到在data_ret當中的哪個index
         map_index = index % len(data_ret)
+        # 獲取該index的json字串資料，這裡會是dict的樣式不過型態是str
         json_str = data_ret[map_index]
+        # 將樣式為dict的str變成dict
         line_json_obj = json.loads(json_str)
+        # 最終回傳的結果
         line_info = {}
+        # 這裡會遍歷我們指定需要提取出來的key
         for key in self.keys:
             if key not in line_json_obj:
+                # 如果line_json_obj當中沒有找到指定的key就會報錯
                 raise Exception(f'key {key} not in line json {line_json_obj}')
+            # 將需要提取出的資料保存
             line_info[key] = line_json_obj[key]
 
+        # 最後回傳
         return line_info

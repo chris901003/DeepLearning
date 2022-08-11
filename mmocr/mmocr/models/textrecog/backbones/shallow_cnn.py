@@ -27,28 +27,43 @@ class ShallowCNN(BaseModule):
                      dict(type='Kaiming', layer='Conv2d'),
                      dict(type='Uniform', layer='BatchNorm2d')
                  ]):
+        """ 已看過，SATRN使用的淺層CNN層結構
+        Args:
+            input_channels: 輸入圖像的channel深度
+            hidden_dim: 隱藏的channel深度
+            init_cfg: 初始化設定
+        """
+        # 繼承自BaseModule，將繼承對象進行初始化
         super().__init__(init_cfg=init_cfg)
+        # 檢查input_channels與hidden_dim是否都為int格式
         assert isinstance(input_channels, int)
         assert isinstance(hidden_dim, int)
 
+        # 構建卷積以及標準化以及激活層結構
         self.conv1 = ConvModule(
             input_channels,
+            # 通過conv1後channel深度會是hidden_dim的一半
             hidden_dim // 2,
             kernel_size=3,
             stride=1,
+            # 透過padding通過conv1後的高寬不會改變
             padding=1,
             bias=False,
             norm_cfg=dict(type='BN'),
             act_cfg=dict(type='ReLU'))
+        # 構建第二個卷積以及標準化以及激活層結構
         self.conv2 = ConvModule(
             hidden_dim // 2,
+            # 將channel深度調整到hidden_dim深度
             hidden_dim,
             kernel_size=3,
             stride=1,
+            # 透過padding通過conv2後圖像大小不會改變
             padding=1,
             bias=False,
             norm_cfg=dict(type='BN'),
             act_cfg=dict(type='ReLU'))
+        # 最後通過最大池化2倍下採樣，通過此層後高寬會是原來的一半
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x):
@@ -60,10 +75,16 @@ class ShallowCNN(BaseModule):
             Tensor: A tensor of shape :math:`(N, D_m, H/4, W/4)`.
         """
 
+        # 已看過，SATRN的淺層CNN的forward函數部分
+        # 通過conv1將channel加深
         x = self.conv1(x)
+        # 通過pool後高寬會下採樣2倍
         x = self.pool(x)
 
+        # 再通過conv2將channel加深
         x = self.conv2(x)
+        # 通過pool後高寬會下採樣2倍
         x = self.pool(x)
 
+        # 最後回傳高寬下採樣4倍的特徵圖，tensor shape [batch_size, channel=512, height, width]
         return x

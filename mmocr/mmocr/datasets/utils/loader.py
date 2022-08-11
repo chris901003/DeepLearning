@@ -76,6 +76,7 @@ class AnnFileLoader:
 
     def __getitem__(self, index):
         """Retrieve anno info of one instance with dict format."""
+        # 已看過，會傳入需要獲取圖像資料的指定index
         return self.parser.get_item(self.ori_data_infos, index)
 
     def __iter__(self):
