@@ -240,27 +240,46 @@ class NRTRDecoder(BaseDecoder):
         return outputs
 
     def forward_test(self, feat, out_enc, img_metas):
+        """ 已看過，NRTR在測試時的forward函數
+        Args:
+            feat: backbone輸出的特徵圖資訊，tensor shape [batch_size, channel, height, width]
+            out_enc: encoder輸出的結果，tensor shape [batch_size, height * width, channel]
+            img_metas: 圖像的詳細資訊
+        """
+        # 獲取mask資訊，src_mask shape = [batch_size, seq_len]，會在需要忽略的地方是0，需要的地方會是1
         src_mask = self._get_mask(out_enc, img_metas)
+        # 獲取batch的大小
         N = out_enc.size(0)
+        # 構建shape為[batch_size, max_seq_len + 1]且全為padding_idx的tensor，這裡會作為最開始傳入到decoder的資料
         init_target_seq = torch.full((N, self.max_seq_len + 1),
                                      self.padding_idx,
                                      device=out_enc.device,
                                      dtype=torch.long)
         # bsz * seq_len
+        # 將所有的開頭部分的index設定成start的index
         init_target_seq[:, 0] = self.start_idx
 
+        # 最終要回傳的資料
         outputs = []
+        # 遍歷整個序列長度
         for step in range(0, self.max_seq_len):
+            # 進行注意力機制，將init_target_seq與out_enc傳入，decoder_output shape = [batch_size, seq_len + 1, channel]
             decoder_output = self._attention(
                 init_target_seq, out_enc, src_mask=src_mask)
             # bsz * seq_len * C
+            # 首先提取出當前step的資訊放到classifier當中將channel調整到num_classes，之後再通過softmax進行概率化
+            # step_result shape = [batch_size, num_classes]，seq_len的部分會因為只取當前的step就消失
             step_result = F.softmax(
                 self.classifier(decoder_output[:, step, :]), dim=-1)
             # bsz * num_classes
+            # 保存step_result
             outputs.append(step_result)
+            # 透過torch.max獲取最大類別的index
             _, step_max_index = torch.max(step_result, dim=-1)
+            # 更新init_target_seq，將當前最佳預測的類別更新到下次注意力機制可以看到的index上，這樣就可以繼續往下推理
             init_target_seq[:, step + 1] = step_max_index
 
+        # 最後將outputs內容進行堆疊，outputs shape = [batch_size, seq_len, num_classes]
         outputs = torch.stack(outputs, dim=1)
 
         return outputs

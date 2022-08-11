@@ -163,25 +163,44 @@ class AttnConvertor(BaseConvertor):
             scores (list[list[float]]): [[0.9,0.8,0.95,0.97,0.94],
                                          [0.9,0.9,0.98,0.97,0.96]]
         """
+        # 已看過，將預測結果的tensor格式轉回成index格式
+        # outputs = tensor shape [batch_size, seq_len, num_classes]
+        # img_metas = 圖像的詳細資訊
+
+        # 獲取當前的batch大小
         batch_size = outputs.size(0)
+        # 獲取當前需被忽略的index值
         ignore_indexes = [self.padding_idx]
+        # 最終結果保存的地方
         indexes, scores = [], []
+        # 遍歷整個batch的資料
         for idx in range(batch_size):
+            # 獲取當前圖像的序列資訊，seq shape = [seq_len, num_classes]
             seq = outputs[idx, :, :]
+            # 將num_classes通道進行softmax概率化
             seq = seq.softmax(dim=-1)
+            # 獲取置信度分數最大的分類類別以及置信度分數，max_value與max_idx的shape = [seq_len]
             max_value, max_idx = torch.max(seq, -1)
+            # 一張圖像資料的保存地方
             str_index, str_score = [], []
+            # 將tensor轉成ndarray同時將資料轉好cpu上
             output_index = max_idx.cpu().detach().numpy().tolist()
             output_score = max_value.cpu().detach().numpy().tolist()
+            # 開始遍歷整個序列的長度
             for char_index, char_score in zip(output_index, output_score):
                 if char_index in ignore_indexes:
+                    # 如果獲取的index是需要忽略的index就直接continue
                     continue
                 if char_index == self.end_idx:
+                    # 如果獲取的是結束的index就直接break跳出
                     break
+                # 否則就將預測的結果放到str_index與str_score當中
                 str_index.append(char_index)
                 str_score.append(char_score)
 
+            # 最後完整的句子資訊就會放到indexes與scores當中
             indexes.append(str_index)
             scores.append(str_score)
 
+        # 回傳
         return indexes, scores

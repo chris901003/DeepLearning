@@ -29,4 +29,5 @@ class BaseDecoder(BaseModule):
             # 如果當前是訓練模式就會到這裡，return shape = [batch_size, seq_len, num_classes]
             return self.forward_train(feat, out_enc, targets_dict, img_metas)
 
+        # 在測試模式下就不會將target_dict資料傳入進去，return shape = [batch_size, seq_len, num_classes]
         return self.forward_test(feat, out_enc, img_metas)
