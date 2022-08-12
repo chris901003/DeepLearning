@@ -125,18 +125,25 @@ class ResizeOCR:
                 new_width = max(dst_min_width, new_width)
             if dst_max_width is not None:
                 # 如果有設定最大寬度就會到這裡
+                # 如果當前的寬度不到最大寬度就會看是最大寬度的多少倍，因為不足的部分晚點會用padding，但是在推理時需要將padding部分mask
+                # 如果當前的寬度大於最大寬度，這裡的valid_ratio就會是1，表示整個寬度都是有效的
                 valid_ratio = min(1.0, 1.0 * new_width / dst_max_width)
+                # 從最大寬度與當前寬度中選一個小的
                 resize_width = min(dst_max_width, new_width)
+                # 進行resize，這裡會是按照等比例進行縮放
                 img_resize = mmcv.imresize(
                     results['img'], (resize_width, dst_height),
                     backend=self.backend)
+                # 獲取resize後圖像的大小
                 resize_shape = img_resize.shape
                 pad_shape = img_resize.shape
                 if new_width < dst_max_width:
+                    # 如果當前寬度小於最大寬度就會到這裡進行padding
                     img_resize = mmcv.impad(
                         img_resize,
                         shape=(dst_height, dst_max_width),
                         pad_val=self.img_pad_value)
+                    # 將padding後的圖像大小取出
                     pad_shape = img_resize.shape
             else:
                 # 如果沒有指定的最大寬度就會到這裡，透過imresize將圖像resize到指定大小

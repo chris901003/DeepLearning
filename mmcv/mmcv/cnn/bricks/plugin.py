@@ -29,6 +29,7 @@ def infer_abbr(class_type: type) -> str:
     Returns:
         str: The inferred abbreviation.
     """
+    # 已看過，從類名推斷縮寫
 
     def camel2snack(word):
         """Convert camel case word into snack case.
@@ -73,22 +74,38 @@ def build_plugin_layer(cfg: Dict,
         tuple[str, nn.Module]: The first one is the concatenation of
         abbreviation and postfix. The second is the created plugin layer.
     """
+    # 已看過，構建插入層結構的實例對象
+    # cfg = 層結構的config資料
+    # postfix = 命名用的
+    # kwargs = 實例化層結構時的設定
+
     if not isinstance(cfg, dict):
+        # 如果傳入的cfg不是dict格式就會直接報錯
         raise TypeError('cfg must be a dict')
     if 'type' not in cfg:
+        # 如果cfg當中沒有type就直接報錯，沒有type沒辦法知道要構建哪個實例對象
         raise KeyError('the cfg dict must contain the key "type"')
+    # 拷貝一份config資料
     cfg_ = cfg.copy()
 
+    # 將type資訊拿出來
     layer_type = cfg_.pop('type')
     if layer_type not in PLUGIN_LAYERS:
+        # 如果指定層結構不在PLUGIN_LAYERS註冊器當中就會報錯，表示不支援
         raise KeyError(f'Unrecognized plugin type {layer_type}')
 
+    # 獲取指定的class
     plugin_layer = PLUGIN_LAYERS.get(layer_type)
+    # 從class獲取縮寫名稱
     abbr = infer_abbr(plugin_layer)
 
+    # 檢查postfix是否合法
     assert isinstance(postfix, (int, str))
+    # 創建此實例對象的名稱
     name = abbr + str(postfix)
 
+    # 進行實例化
     layer = plugin_layer(**kwargs, **cfg_)
 
+    # 將名稱以及實例化對象進行回傳
     return name, layer

@@ -13,7 +13,7 @@ test_pipeline = {{_base_.test_pipeline}}
 
 data = dict(
     workers_per_gpu=2,
-    samples_per_gpu=8,
+    samples_per_gpu=2,
     train=dict(
         type='UniformConcatDataset',
         datasets=train_list,
