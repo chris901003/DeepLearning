@@ -1,0 +1,7 @@
+einops
+matplotlib
+numpy
+opencv-contrib-python
+Pillow
+scipy
+torch>=1.3
