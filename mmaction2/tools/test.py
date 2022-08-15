@@ -139,6 +139,7 @@ def inference_pytorch(args, cfg, distributed, data_loader):
                 cfg.test_cfg.average_clips = args.average_clips
 
     # remove redundant pretrain steps for testing
+    cfg.gpu_ids = 0
     turn_off_pretrained(cfg.model)
 
     # build the model and load checkpoint

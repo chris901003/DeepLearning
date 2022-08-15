@@ -37,21 +37,34 @@ def _init_lazy_if_proper(results, lazy):
         results (dict): A dict stores data pipeline result.
         lazy (bool): Determine whether to apply lazy operation. Default: False.
     """
+    # 已看過，根據當前的資料進行合適的懶處理初始化
 
     if 'img_shape' not in results:
+        # 如果在results2當中沒有img_shape參數就會到這裡補上，根據當前圖像的大小填上
         results['img_shape'] = results['imgs'][0].shape[:2]
     if lazy:
+        # 如果要使用lazy標籤就會到這裡
         if 'lazy' not in results:
+            # 如果results當中沒有lazy的key就會到這裡
+            # 獲取當前圖像的高寬
             img_h, img_w = results['img_shape']
+            # 構建lazy operation的字典
             lazyop = dict()
+            # 在lazy當中添加上原始圖像的大小資訊
             lazyop['original_shape'] = results['img_shape']
+            # 預設裁切的box就會是整張圖
             lazyop['crop_bbox'] = np.array([0, 0, img_w, img_h],
                                            dtype=np.float32)
+            # 將翻轉關閉
             lazyop['flip'] = False
+            # 同時翻轉方向設定成None
             lazyop['flip_direction'] = None
+            # 差值方式也是None
             lazyop['interpolation'] = None
+            # 將lazy的字典放到result的lazy下
             results['lazy'] = lazyop
     else:
+        # 沒有要使用lazy就會到這裡，檢查results當中有沒有lazy，正常來說不應該有
         assert 'lazy' not in results, 'Use Fuse after lazy operations'
 
 
@@ -577,6 +590,7 @@ class RandomCrop:
 
     @staticmethod
     def _crop_imgs(imgs, crop_bbox):
+        # 已看過，根據傳入的crop_bbox對imgs進行裁切
         x1, y1, x2, y2 = crop_bbox
         return [img[y1:y2, x1:x2] for img in imgs]
 
@@ -896,18 +910,32 @@ class MultiScaleCrop(RandomCrop):
                  random_crop=False,
                  num_fixed_crops=5,
                  lazy=False):
+        """ 已看過，將圖像進行剪裁，根據傳入的scale
+        Args:
+            input_size: 傳入到網路的圖像大小
+            scales: 可選擇的高寬比
+            max_wh_scale_gap: 最大高寬比的差距
+            random_crop: 如果啟用就會隨機裁切，如果不啟用就會在指定地方進行裁切
+            num_fixed_crops: 須保留的地方，詳細看英文解說
+            lazy: 是否啟用lazy操作
+        """
+        # 將input_size變成tuple型態 = tuple(int, int)
         self.input_size = _pair(input_size)
         if not mmcv.is_tuple_of(self.input_size, int):
+            # 如果當前的input_size不是tuple(int, int)型態就會報錯
             raise TypeError(f'Input_size must be int or tuple of int, '
                             f'but got {type(input_size)}')
 
         if not isinstance(scales, tuple):
+            # 如果scales不是tuple型態就會報錯
             raise TypeError(f'Scales must be tuple, but got {type(scales)}')
 
         if num_fixed_crops not in [5, 13]:
+            # num_fixed_crops就只有設定成5或是13兩種模式，其他種就會報錯
             raise ValueError(f'Num_fix_crops must be in {[5, 13]}, '
                              f'but got {num_fixed_crops}')
 
+        # 保存傳入資料
         self.scales = scales
         self.max_wh_scale_gap = max_wh_scale_gap
         self.random_crop = random_crop
@@ -921,42 +949,63 @@ class MultiScaleCrop(RandomCrop):
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，進行多種大小的剪裁
+        # 設定lazy資訊，如果有使用lazy的話
         _init_lazy_if_proper(results, self.lazy)
         if 'keypoint' in results:
+            # 如果有關節點檢測就不可以使用lazy operation，如果啟用就會報錯
             assert not self.lazy, ('Keypoint Augmentations are not compatible '
                                    'with lazy == True')
 
+        # 獲取當前圖像的高寬資訊
         img_h, img_w = results['img_shape']
+        # 基底的大小就會是當前高寬較短的地方
         base_size = min(img_h, img_w)
+        # 這裡會給出裁切的大小，會是基礎大小乘上scales
         crop_sizes = [int(base_size * s) for s in self.scales]
 
+        # 構建候選大小的list
         candidate_sizes = []
+        # 遍歷crop_sizes
         for i, h in enumerate(crop_sizes):
+            # 遍歷crop_sizes
             for j, w in enumerate(crop_sizes):
                 if abs(i - j) <= self.max_wh_scale_gap:
+                    # 當遍歷到的兩個index之間距離小於等於max_wh_scale_gap就會進來
+                    # 且會設定成候選的高寬
                     candidate_sizes.append([w, h])
 
+        # 從候選的高寬隨機選則作為需要裁切的大小，crop_size shape = [height, width]
         crop_size = random.choice(candidate_sizes)
         for i in range(2):
+            # 如果crop_size與設定的input_size相差小於3就直接以input_size代替
             if abs(crop_size[i] - self.input_size[i]) < 3:
                 crop_size[i] = self.input_size[i]
 
+        # 獲取剪裁後的圖像大小
         crop_w, crop_h = crop_size
 
         if self.random_crop:
+            # 如果是透過隨機剪裁就會到這裡
+            # 選取一個[0, img_w - crop_w]的值作為x方向的偏移
             x_offset = random.randint(0, img_w - crop_w)
+            # 選取一個[0, img_h - crop_h]的值作為y方向的偏移
             y_offset = random.randint(0, img_h - crop_h)
         else:
+            # 如果不是隨機剪裁就會到這裡
+            # 獲取可以偏移量的四分之一
             w_step = (img_w - crop_w) // 4
             h_step = (img_h - crop_h) // 4
+            # 獲取剪裁的候選項
             candidate_offsets = [
-                (0, 0),  # upper left
-                (4 * w_step, 0),  # upper right
-                (0, 4 * h_step),  # lower left
-                (4 * w_step, 4 * h_step),  # lower right
-                (2 * w_step, 2 * h_step),  # center
+                (0, 0),  # upper left，右上角
+                (4 * w_step, 0),  # upper right，左上角
+                (0, 4 * h_step),  # lower left，左下角
+                (4 * w_step, 4 * h_step),  # lower right，右下角
+                (2 * w_step, 2 * h_step),  # center，中心點
             ]
             if self.num_fixed_crops == 13:
+                # 如果num_fixed_crops是13個點就會進來，有更詳細的額外候選偏移
                 extra_candidate_offsets = [
                     (0, 2 * h_step),  # center left
                     (4 * w_step, 2 * h_step),  # center right
@@ -967,45 +1016,65 @@ class MultiScaleCrop(RandomCrop):
                     (1 * w_step, 3 * h_step),  # lower left quarter
                     (3 * w_step, 3 * h_step)  # lower right quarter
                 ]
+                # 將額外的點放到candidate_offsets當中
                 candidate_offsets.extend(extra_candidate_offsets)
+            # 從候選點當中隨機選取一組作為偏移量
             x_offset, y_offset = random.choice(candidate_offsets)
 
+        # 新的高寬就會是crop_h與crop_w
         new_h, new_w = crop_h, crop_w
 
+        # 構建選取範圍的矩形匡，這裏面的範圍就是我們需要裁切後留下的圖像面積
         crop_bbox = np.array(
             [x_offset, y_offset, x_offset + new_w, y_offset + new_h])
+        # 將裁切匡保存到results當中
         results['crop_bbox'] = crop_bbox
+        # 更新當前圖像大小為裁切後大小
         results['img_shape'] = (new_h, new_w)
+        # 更新scales
         results['scales'] = self.scales
 
         if 'crop_quadruple' not in results:
+            # 如果results當中沒有crop_quadruple就會到這裡，新增上去，預設為[0, 0, 1, 1]
             results['crop_quadruple'] = np.array(
                 [0, 0, 1, 1],  # x, y, w, h
                 dtype=np.float32)
 
+        # 獲取x與y的比例
         x_ratio, y_ratio = x_offset / img_w, y_offset / img_h
+        # 獲取高寬經過crop後與原先圖像的縮放比例
         w_ratio, h_ratio = new_w / img_w, new_h / img_h
 
+        # 獲取crop_quadruple資訊，這裡如果一開始沒有預設會是[0, 0, 1, 1]
         old_crop_quadruple = results['crop_quadruple']
+        # 獲取舊的x與y的比例
         old_x_ratio, old_y_ratio = old_crop_quadruple[0], old_crop_quadruple[1]
+        # 獲取舊的w與h的比例
         old_w_ratio, old_h_ratio = old_crop_quadruple[2], old_crop_quadruple[3]
+        # 更新quadruple資訊
         new_crop_quadruple = [
-            old_x_ratio + x_ratio * old_w_ratio,
-            old_y_ratio + y_ratio * old_h_ratio, w_ratio * old_w_ratio,
-            h_ratio * old_h_ratio
+            old_x_ratio + x_ratio * old_w_ratio, old_y_ratio + y_ratio * old_h_ratio,
+            w_ratio * old_w_ratio, h_ratio * old_h_ratio
         ]
+        # 將quadruple資訊更新到results當中
         results['crop_quadruple'] = np.array(
             new_crop_quadruple, dtype=np.float32)
 
         if not self.lazy:
+            # 如果沒有使用lazy operation就會到這裡
             if 'keypoint' in results:
+                # 將關節點部分透過_crop_kps與惡crop_bbox進行剪裁
                 results['keypoint'] = self._crop_kps(results['keypoint'],
                                                      crop_bbox)
             if 'imgs' in results:
+                # 將圖像透過_crop_imgs與指定的crop_bbox進行剪裁
                 results['imgs'] = self._crop_imgs(results['imgs'], crop_bbox)
         else:
+            # 如果有使用lazy operation就會到這裡
+            # 獲取lazy的字典資訊
             lazyop = results['lazy']
             if lazyop['flip']:
+                # 在lazy當中的flip需要是None
                 raise NotImplementedError('Put Flip at last for now')
 
             # record crop_bbox in lazyop dict to ensure only crop once in Fuse
@@ -1014,6 +1083,7 @@ class MultiScaleCrop(RandomCrop):
             right = (x_offset + new_w) * (lazy_right - lazy_left) / img_w
             top = y_offset * (lazy_bottom - lazy_top) / img_h
             bottom = (y_offset + new_h) * (lazy_bottom - lazy_top) / img_h
+            # 更新lazy當中的crop_bbox資訊
             lazyop['crop_bbox'] = np.array([(lazy_left + left),
                                             (lazy_top + top),
                                             (lazy_left + right),
@@ -1021,9 +1091,13 @@ class MultiScaleCrop(RandomCrop):
                                            dtype=np.float32)
 
         if 'gt_bboxes' in results:
+            # 如果results當中有目標檢測的標註匡就會到這裡
+            # 有目標檢測的標註匡就不支援lazy模式
             assert not self.lazy
+            # 使用_all_box_crop進行標註匡剪裁
             results = self._all_box_crop(results, results['crop_bbox'])
 
+        # 回傳更新後的results資訊
         return results
 
     def __repr__(self):
@@ -1065,25 +1139,51 @@ class Resize:
                  keep_ratio=True,
                  interpolation='bilinear',
                  lazy=False):
+        """ 已看過，將圖像進行resize到指定的大小
+        Args:
+            scale: 如果keep_ratio是True，這裡的值表示的就會是縮放比例或是最大大小
+                   如果是float型態，圖像就會縮放指定的float倍率
+                   如果是tuple且是兩個int構成，圖像就會盡可能放大到給定的範圍內
+                   否則就是直接指定最後圖像大小
+            keep_ratio: 是否需要保留圖像長寬比
+            interpolation: 差值方式
+            lazy: 是否使用lazy操作
+        """
         if isinstance(scale, float):
+            # 如果傳入的scale是float格式就會到這裡
             if scale <= 0:
+                # 如果scale的值小於0就會報錯
                 raise ValueError(f'Invalid scale {scale}, must be positive.')
         elif isinstance(scale, tuple):
+            # 如果傳入的scale是tuple就會到這裡
+            # 提取出最大的邊的長度
             max_long_edge = max(scale)
+            # 提取出最小的邊的長度
             max_short_edge = min(scale)
             if max_short_edge == -1:
+                # 如果短編設定的是-1就會到這裡
                 # assign np.inf to long edge for rescaling short edge later.
+                # 將最大邊設定成無窮，短邊設定為傳入的最大邊
                 scale = (np.inf, max_long_edge)
         else:
+            # 其他的情況就會直接報錯
             raise TypeError(
                 f'Scale must be float or tuple of int, but got {type(scale)}')
+        # 保存傳入的參數
         self.scale = scale
         self.keep_ratio = keep_ratio
         self.interpolation = interpolation
         self.lazy = lazy
 
     def _resize_imgs(self, imgs, new_w, new_h):
+        """ 已看過，進行圖像的resize
+        Args:
+            imgs: 圖像資料，list[ndarray]，list的長度就是照片數量
+            new_w: 新圖像的寬度
+            new_h: 新圖像的高度
+        """
         return [
+            # 透過imresize進行高寬調整
             mmcv.imresize(
                 img, (new_w, new_h), interpolation=self.interpolation)
             for img in imgs
@@ -1112,50 +1212,73 @@ class Resize:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，進行resize的數據增強
 
+        # 進行lazy的初始化，如果適合的話就會初始化
         _init_lazy_if_proper(results, self.lazy)
         if 'keypoint' in results:
+            # 如果當前有需要關節點檢測就不允許使用lazy，如果有使用到就會報錯
             assert not self.lazy, ('Keypoint Augmentations are not compatible '
                                    'with lazy == True')
 
         if 'scale_factor' not in results:
+            # 如果results當中沒有scale_factor參數就會到這裡，將scale_factor設定成[1., 1.]
             results['scale_factor'] = np.array([1, 1], dtype=np.float32)
+        # 獲取當前圖像的高寬
         img_h, img_w = results['img_shape']
 
         if self.keep_ratio:
+            # 如果有需要保持高寬比的resize就會到這裡，會將當前圖像的長邊控制在最長邊以內，將當前圖像短邊控制在最短邊以內
             new_w, new_h = mmcv.rescale_size((img_w, img_h), self.scale)
         else:
+            # 否則scale就會是新的高寬
             new_w, new_h = self.scale
 
+        # 獲取圖像在高寬上面縮放比例，這個對於關節點之類的標註會有效果，可以直接透過縮放比例調整新的標註位置
         self.scale_factor = np.array([new_w / img_w, new_h / img_h],
                                      dtype=np.float32)
 
+        # 更新當前圖像大小
         results['img_shape'] = (new_h, new_w)
+        # 記錄下是否有保持高寬比
         results['keep_ratio'] = self.keep_ratio
+        # 縮放比例會是原先的縮放比例乘上現在的縮放比例，因為縮放比例是可以連乘的，像是如果有經過兩次resize那麼最終圖像的縮放比例就是兩次的相乘
         results['scale_factor'] = results['scale_factor'] * self.scale_factor
 
         if not self.lazy:
+            # 如果沒有使用lazy operation就會到這裡
             if 'imgs' in results:
+                # 如果results當中有圖像資料就根據指定的大小進行resize
                 results['imgs'] = self._resize_imgs(results['imgs'], new_w,
                                                     new_h)
             if 'keypoint' in results:
+                # 如果results當中有關節點資訊就根據縮放比例進行調整
                 results['keypoint'] = self._resize_kps(results['keypoint'],
                                                        self.scale_factor)
         else:
+            # 如果有使用lazy operation就會到這裡
+            # 將lazy的字典取出，這裡會有lazy的相關配置
             lazyop = results['lazy']
             if lazyop['flip']:
+                # 這裡的flip應該要是None，如果不是None會報錯表示當前沒有實作
                 raise NotImplementedError('Put Flip at last for now')
+            # 將差值方式放到lazy的字典當中
             lazyop['interpolation'] = self.interpolation
 
         if 'gt_bboxes' in results:
+            # 如果results當中有目標檢測的標註匡就會到這裡
+            # 如果有目標檢測的標註匡時就不可以使用lazy operation
             assert not self.lazy
+            # 將標註匡根據縮放比例進行調整
             results['gt_bboxes'] = self._box_resize(results['gt_bboxes'],
                                                     self.scale_factor)
             if 'proposals' in results and results['proposals'] is not None:
+                # 如果有預選匡也需要將預選匡進行位置調整
                 assert results['proposals'].shape[1] == 4
                 results['proposals'] = self._box_resize(
                     results['proposals'], self.scale_factor)
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):
@@ -1254,9 +1377,20 @@ class Flip:
                  left_kp=None,
                  right_kp=None,
                  lazy=False):
+        """ 已看過，有概率的將圖像進行翻轉
+        Args:
+            flip_ratio: 翻轉的概率
+            direction: 翻轉的方向
+            flip_label_map: 用特定標籤變換翻轉圖像的標籤
+            left_kp: 左邊關鍵點的索引，用於翻轉關鍵點，如果有進行關鍵點檢測就會用到
+            right_kp: 右邊關鍵點的索引，用於翻轉關鍵點，如果有進行關鍵點檢測就會用到
+            lazy: 是否啟用lazy操作
+        """
         if direction not in self._directions:
+            # 如果指定的翻轉方向不在有實作的方式當中就會報錯
             raise ValueError(f'Direction {direction} is not supported. '
                              f'Currently support ones are {self._directions}')
+        # 保存傳入的參數
         self.flip_ratio = flip_ratio
         self.direction = direction
         self.flip_label_map = flip_label_map
@@ -1265,12 +1399,22 @@ class Flip:
         self.lazy = lazy
 
     def _flip_imgs(self, imgs, modality):
+        """ 已看過，將圖像進行翻轉
+        Args:
+            imgs: 圖像資料，list[ndarray]
+            modality: 圖像的類別，會是RGB(一般影片圖像)或是Flow(光流圖像)
+        """
+        # 透過imflip_進行翻轉
         _ = [mmcv.imflip_(img, self.direction) for img in imgs]
+        # 獲取圖像數量
         lt = len(imgs)
         if modality == 'Flow':
+            # 如果是處理光流圖像就會到這裡
             # The 1st frame of each 2 frames is flow-x
             for i in range(0, lt, 2):
+                # 透過iminvertr進行翻轉，等到有機會再來看
                 imgs[i] = mmcv.iminvert(imgs[i])
+        # 回傳翻轉後的imgs
         return imgs
 
     def _flip_kps(self, kps, kpscores, img_width):
@@ -1306,34 +1450,49 @@ class Flip:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，進行圖像的翻轉
+        # 初始化lazy字典，如果沒有設定lazy就不會有任何改變
         _init_lazy_if_proper(results, self.lazy)
         if 'keypoint' in results:
+            # 如果results當中有關節點資訊就不可以使用lazy
             assert not self.lazy, ('Keypoint Augmentations are not compatible '
                                    'with lazy == True')
+            # 如果有關節點資訊就只能使用水平翻轉，不可以有其他翻轉方式
             assert self.direction == 'horizontal', (
                 'Only horizontal flips are'
                 'supported for human keypoints')
 
+        # 獲取modality資訊
         modality = results['modality']
         if modality == 'Flow':
+            # 如果是Flow也就是光流資訊就會到這裡，光流資訊只支援水平翻轉
             assert self.direction == 'horizontal'
 
+        # 獲取隨機值決定是否進行翻轉
         flip = np.random.rand() < self.flip_ratio
 
+        # 將是否進行翻轉資料保存
         results['flip'] = flip
+        # 保存翻轉方向
         results['flip_direction'] = self.direction
+        # 獲取當前圖像寬度，水平翻轉只會需要用到寬度資訊
         img_width = results['img_shape'][1]
 
         if self.flip_label_map is not None and flip:
+            # 如果有設定flip_label_map且當前需要進行flip就會到這裡
             results['label'] = self.flip_label_map.get(results['label'],
                                                        results['label'])
 
         if not self.lazy:
+            # 如果沒有使用lazy operation就會到這裡
             if flip:
+                # 如果有需要翻轉就會進來
                 if 'imgs' in results:
+                    # 將圖像資料進行翻轉
                     results['imgs'] = self._flip_imgs(results['imgs'],
                                                       modality)
                 if 'keypoint' in results:
+                    # 將關節點資料進行翻轉
                     kp = results['keypoint']
                     kpscore = results.get('keypoint_score', None)
                     kp, kpscore = self._flip_kps(kp, kpscore, img_width)
@@ -1341,21 +1500,27 @@ class Flip:
                     if 'keypoint_score' in results:
                         results['keypoint_score'] = kpscore
         else:
+            # 如果有啟用lazy就會到這裡
             lazyop = results['lazy']
             if lazyop['flip']:
                 raise NotImplementedError('Use one Flip please')
+            # 保存當前是否翻轉
             lazyop['flip'] = flip
+            # 保存翻轉方向
             lazyop['flip_direction'] = self.direction
 
         if 'gt_bboxes' in results and flip:
+            # 如果有目標檢測標註匡就會到這裡進行翻轉
             assert not self.lazy and self.direction == 'horizontal'
             width = results['img_shape'][1]
             results['gt_bboxes'] = self._box_flip(results['gt_bboxes'], width)
             if 'proposals' in results and results['proposals'] is not None:
+                # 將預選匡也進行翻轉
                 assert results['proposals'].shape[1] == 4
                 results['proposals'] = self._box_flip(results['proposals'],
                                                       width)
 
+        # 將更新後的results回傳
         return results
 
     def __repr__(self):
@@ -1384,6 +1549,14 @@ class Normalize:
     """
 
     def __init__(self, mean, std, to_bgr=False, adjust_magnitude=False):
+        """ 已看過，將圖像進行均值標準化操作
+        Args:
+            mean: 均值
+            std: 表準差
+            to_bgr: 是否需要轉成RGB
+            adjust_magnitude:
+        """
+        # 檢查傳入的參數
         if not isinstance(mean, Sequence):
             raise TypeError(
                 f'Mean must be list, tuple or np.ndarray, but got {type(mean)}'
@@ -1393,29 +1566,45 @@ class Normalize:
             raise TypeError(
                 f'Std must be list, tuple or np.ndarray, but got {type(std)}')
 
+        # 將傳入的mean與std轉成ndarray格式
         self.mean = np.array(mean, dtype=np.float32)
         self.std = np.array(std, dtype=np.float32)
+        # 保存傳入參數
         self.to_bgr = to_bgr
         self.adjust_magnitude = adjust_magnitude
 
     def __call__(self, results):
+        # 已看過，將圖像進行均值標準化調整
+
+        # 獲取當前處理圖像的類型
         modality = results['modality']
 
         if modality == 'RGB':
+            # 如果傳入的是RGB資料就會到這裡
+            # 獲取圖像數量
             n = len(results['imgs'])
+            # 獲取圖像的shape資訊
             h, w, c = results['imgs'][0].shape
+            # 構建一個ndarray且shape是[clip_len, height, width, channel]
             imgs = np.empty((n, h, w, c), dtype=np.float32)
+            # 遍歷傳入的圖像列表
             for i, img in enumerate(results['imgs']):
+                # 將圖像放到imgs上
                 imgs[i] = img
 
+            # 遍歷imgs當中的圖像
             for img in imgs:
+                # 進行均值標準化調整，這裡也會看是否需要將通道調整成RGB
                 mmcv.imnormalize_(img, self.mean, self.std, self.to_bgr)
 
+            # 更新results當中imgs的資訊
             results['imgs'] = imgs
+            # 保存調整的均值以及標準差數值
             results['img_norm_cfg'] = dict(
                 mean=self.mean, std=self.std, to_bgr=self.to_bgr)
             return results
         if modality == 'Flow':
+            # 如果處理的是光流資訊就會到這裡，等有機會處理光流資訊再到這裡查看
             num_imgs = len(results['imgs'])
             assert num_imgs % 2 == 0
             assert self.mean.shape[0] == 2

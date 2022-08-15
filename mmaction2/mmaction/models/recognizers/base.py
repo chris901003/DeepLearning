@@ -36,78 +36,126 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
                  neck=None,
                  train_cfg=None,
                  test_cfg=None):
+        """ 已看過，動作判別模型的基底，初始化函數
+        Args:
+            backbone: 骨幹特徵提取構建資料
+            cls_head: 分類頭設定資料
+            neck: 從backbone輸出的特徵有需要可以通過neck進行調整，neck設定資料
+            train_cfg: 在train當中的額外設定資料
+            test_cfg: 在test當中的額外設定資料
+        """
+        # 繼承自nn.Module，對繼承對象進行初始化
         super().__init__()
         # record the source of the backbone
+        # 記錄下backbone的來源，這裡預設會是mmaction2
         self.backbone_from = 'mmaction2'
 
         if backbone['type'].startswith('mmcls.'):
+            # 如果backbone的type是mmcls.為開頭的就會到這裡
             try:
+                # 嘗試導入mmcls模組
                 import mmcls.models.builder as mmcls_builder
             except (ImportError, ModuleNotFoundError):
+                # 如果沒有辦法導入mmcls模組就會到這裡報錯，提示需要安裝mmcls來使用指定的backbone模塊
+                # 這裡官方沒有直接給出mmcls的源碼，須透過pip install mmcls進行安裝
                 raise ImportError('Please install mmcls to use this backbone.')
+            # 更新backbone的type，將前面的mmcls.部分拿掉
             backbone['type'] = backbone['type'][6:]
+            # 透過mmcls_builder進行構建backbone實例化對象
             self.backbone = mmcls_builder.build_backbone(backbone)
+            # 將backbone的來源指定到mmcls上
             self.backbone_from = 'mmcls'
         elif backbone['type'].startswith('torchvision.'):
+            # 如果backbone的type是torchvision.為開頭的就會到這裡
             try:
+                # 嘗試導入torchvision模組
                 import torchvision.models
             except (ImportError, ModuleNotFoundError):
+                # 如果無法導入torchvision就會報錯，這裡會需要安裝torchvision
                 raise ImportError('Please install torchvision to use this '
                                   'backbone.')
+            # 將type當中的torchvision.去除，獲取真正需要的模型名稱
             backbone_type = backbone.pop('type')[12:]
+            # 直接透過torchvision.models獲取模型實例化對象
             self.backbone = torchvision.models.__dict__[backbone_type](
                 **backbone)
             # disable the classifier
+            # 這裡將最終的分類部分使用Identity進行替代
             self.backbone.classifier = nn.Identity()
+            # 全連接層部分也進行替代
             self.backbone.fc = nn.Identity()
+            # 將backbone的來源指定到torchvision上
             self.backbone_from = 'torchvision'
         elif backbone['type'].startswith('timm.'):
+            # 如果backbone的type是timm.為開頭的就會到這裡
             try:
+                # 嘗試導入timm模組
                 import timm
             except (ImportError, ModuleNotFoundError):
+                # 如果無法導入timm模組就會報錯，這裡會需要安裝timm
                 raise ImportError('Please install timm to use this '
                                   'backbone.')
+            # 將type當中的timm.去除，獲取真正需要的模型迷稱
             backbone_type = backbone.pop('type')[5:]
             # disable the classifier
+            # 將backbone當中的num_classes設定成0，這樣在構建時就不會有分類頭
             backbone['num_classes'] = 0
+            # 透過timm.create_model構建模型實例化對象
             self.backbone = timm.create_model(backbone_type, **backbone)
+            # 將backbone的來源指定到timm上
             self.backbone_from = 'timm'
         else:
+            # 其他backbone的type就是使用mmaction2的模型，透過mmaction2的builder進行構建模型實例化對象
             self.backbone = builder.build_backbone(backbone)
 
         if neck is not None:
+            # 如果有指定的neck模塊就會到這裡進行neck模塊的實例化
             self.neck = builder.build_neck(neck)
 
+        # 構建分類頭實例對象
         self.cls_head = builder.build_head(cls_head) if cls_head else None
 
+        # 保存train_cfg與test_cfg資料
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
         # aux_info is the list of tensor names beyond 'imgs' and 'label' which
         # will be used in train_step and val_step, data_batch should contain
         # these tensors
+        # 構建一個aux_info的空間
         self.aux_info = []
         if train_cfg is not None and 'aux_info' in train_cfg:
+            # 如果有給定train_cfg且當中有aux_info就會將當中的內容直接貼上
             self.aux_info = train_cfg['aux_info']
         # max_testing_views should be int
+        # 將max_testing_views設定成None
         self.max_testing_views = None
         if test_cfg is not None and 'max_testing_views' in test_cfg:
+            # 如果有給定test_cfg且當中有max_testing_views就會複製過去
             self.max_testing_views = test_cfg['max_testing_views']
+            # 檢查max_testing_views需要是int格式
             assert isinstance(self.max_testing_views, int)
 
         if test_cfg is not None and 'feature_extraction' in test_cfg:
+            # 如果test_cfg當中有feature_extraction就會將內容貼上去
             self.feature_extraction = test_cfg['feature_extraction']
         else:
+            # 否則就將feature_extraction默認設定成False
             self.feature_extraction = False
 
         # mini-batch blending, e.g. mixup, cutmix, etc.
+        # 將混合設定成None
         self.blending = None
         if train_cfg is not None and 'blending' in train_cfg:
+            # 如果train_cfg當中有設定blending就會到這裡
+            # 將build_from_cfg導入近來
             from mmcv.utils import build_from_cfg
 
             from mmaction.datasets.builder import BLENDINGS
+            # 構建blending實例化對象
             self.blending = build_from_cfg(train_cfg['blending'], BLENDINGS)
 
+        # 進行權重初始化
         self.init_weights()
 
         self.fp16_enabled = False
@@ -150,18 +198,26 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         Returns:
             torch.tensor: The extracted features.
         """
+        # 已看過，進行特徵提取
+        # imgs = 一個batch的圖像資料，tensor shape [batch_size * num_clips, channel, clip_len, height, width]
         if (hasattr(self.backbone, 'features')
                 and self.backbone_from == 'torchvision'):
+            # 如果backbone當中有features層結構且backbone是由torchvision提供的就會到這裡
             x = self.backbone.features(imgs)
         elif self.backbone_from == 'timm':
+            # 如果backbone是由timm提供的就會到這裡
             x = self.backbone.forward_features(imgs)
         elif self.backbone_from == 'mmcls':
+            # 如果backbone是由mmcls提供的就會到這裡
             x = self.backbone(imgs)
             if isinstance(x, tuple):
                 assert len(x) == 1
                 x = x[0]
         else:
+            # 其他的也就是mmaction2提供的就會到這裡，x shape = [batch_size * num_clips, channel, clip_len, height, width]
+            # 這裡的channel與clip_len與height與width會與傳入時有所不同，因為透過提取會進行下採樣
             x = self.backbone(imgs)
+        # 回傳提取好的特徵
         return x
 
     def average_clip(self, cls_score, num_segs=1):
@@ -252,16 +308,24 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
 
     def forward(self, imgs, label=None, return_loss=True, **kwargs):
         """Define the computation performed at every call."""
+        # 已看過，準備進行正向傳遞
         if kwargs.get('gradcam', False):
+            # 如果kwargs當中有gradcam就會到這裡
             del kwargs['gradcam']
+            # 使用gradcam的forward函數
             return self.forward_gradcam(imgs, **kwargs)
         if return_loss:
+            # 如果需要計算loss就會到這裡
             if label is None:
+                # 如果沒有給正確的label就會報錯
                 raise ValueError('Label should not be None.')
             if self.blending is not None:
+                # 如果有設定blending就會到這裡
                 imgs, label = self.blending(imgs, label)
+            # 透過forward_train函數進行正向傳播
             return self.forward_train(imgs, label, **kwargs)
 
+        # 如果是驗證或是測試就會走這裡，不去計算損失值也不用提供標註訊息
         return self.forward_test(imgs, **kwargs)
 
     def train_step(self, data_batch, optimizer, **kwargs):
@@ -290,23 +354,38 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
                 DDP, it means the batch size on each GPU), which is used for
                 averaging the logs.
         """
+        # 已看過，開始進行一個batch的訓練
+        # data_batch = 一個batch的訓練資料，dict型態
+        # optimizer = 優化器實例對象
+        # kwargs = 其他參數，通常為空
+
+        # 將data_batch當中圖像資料提取出來，imgs shape = [batch_size, num_clip, channel, clip_len, height, width]
         imgs = data_batch['imgs']
+        # 將data_batch當中每個影像資料的標註訊息提取出來，label shape = [batch_size, labels(一段影片可能會有多個標註)]
         label = data_batch['label']
 
+        # 如果有aux_info資訊就會保存在這裡
         aux_info = {}
+        # 遍歷aux_info資訊
         for item in self.aux_info:
+            # 檢查data_batch當中需要有item資訊
             assert item in data_batch
+            # 將data_batch的item資訊放到aux_info當中
             aux_info[item] = data_batch[item]
 
+        # 進行正向傳遞與計算損失
         losses = self(imgs, label, return_loss=True, **aux_info)
 
+        # 將獲取的損失進行整理壓縮
         loss, log_vars = self._parse_losses(losses)
 
+        # 構建損失的dict
         outputs = dict(
             loss=loss,
             log_vars=log_vars,
             num_samples=len(next(iter(data_batch.values()))))
 
+        # 最後回傳損失值進行反向傳遞
         return outputs
 
     def val_step(self, data_batch, optimizer, **kwargs):

@@ -49,7 +49,9 @@ class CrossEntropyLoss(BaseWeightedLoss):
         Returns:
             torch.Tensor: The returned CrossEntropy loss.
         """
+        # 已看過，透過交叉熵計算分類類別損失
         if cls_score.size() == label.size():
+            # 如果預測的size與標註的size相同就會到這裡
             # calculate loss for soft label
 
             assert cls_score.dim() == 2, 'Only support 2-dim soft label'
@@ -72,14 +74,20 @@ class CrossEntropyLoss(BaseWeightedLoss):
             else:
                 loss_cls = loss_cls.mean()
         else:
+            # 如果預測的size與標註的size不同就會到這裡
             # calculate loss for hard label
 
             if self.class_weight is not None:
+                # 如果在初始化時有設定每個class的權重就會到這裡
+                # 如果在kwargs又再次設定權重就會報錯
                 assert 'weight' not in kwargs, \
                     "The key 'weight' already exists."
+                # 將權重放到kwargs當中並且轉到訓練設備上
                 kwargs['weight'] = self.class_weight.to(cls_score.device)
+            # 透過pytorch官方實現的交叉熵計算
             loss_cls = F.cross_entropy(cls_score, label, **kwargs)
 
+        # 回傳分類損失值
         return loss_cls
 
 

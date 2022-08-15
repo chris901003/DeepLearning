@@ -37,7 +37,10 @@ def build_dataset(cfg, default_args=None):
     Returns:
         Dataset: The constructed dataset.
     """
+    # 已看過，構建dataset實例化對象
+    # 透過build_from_cfg獲取指定類別的實例化對象
     dataset = build_from_cfg(cfg, DATASETS, default_args)
+    # 回傳dataset
     return dataset
 
 

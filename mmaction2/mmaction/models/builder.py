@@ -65,13 +65,19 @@ def build_localizer(cfg):
 
 def build_model(cfg, train_cfg=None, test_cfg=None):
     """Build model."""
+    # 已看過，構建模型實例化對象函數
+    # 將config資料拷貝一份
     args = cfg.copy()
+    # 獲取使用哪個模型
     obj_type = args.pop('type')
     if obj_type in LOCALIZERS:
+        # 如果是屬於Localizer的類型就會到這裡，使用localizer的註冊器進行模型實例化
         return build_localizer(cfg)
     if obj_type in RECOGNIZERS:
+        # 如果是屬於Recognizer的類型就會到這裡，使用recognizer的註冊器進行模型實例化
         return build_recognizer(cfg, train_cfg, test_cfg)
     if obj_type in DETECTORS:
+        # 如果是屬於Detector的類型就會到這裡，使用detector的註冊器進行模型實例化
         if train_cfg is not None or test_cfg is not None:
             warnings.warn(
                 'train_cfg and test_cfg is deprecated, '
@@ -79,10 +85,13 @@ def build_model(cfg, train_cfg=None, test_cfg=None):
                 'PR: https://github.com/open-mmlab/mmaction2/pull/629',
                 UserWarning)
         return build_detector(cfg, train_cfg, test_cfg)
+    # 不在以上幾種註冊器當中就會到這裡
     model_in_mmdet = ['FastRCNN']
     if obj_type in model_in_mmdet:
+        # 如果是時空任務就需要安裝mmdet才可以
         raise ImportError(
             'Please install mmdet for spatial temporal detection tasks.')
+    # 其他就會到這裡報錯
     raise ValueError(f'{obj_type} is not registered in '
                      'LOCALIZERS, RECOGNIZERS or DETECTORS')
 

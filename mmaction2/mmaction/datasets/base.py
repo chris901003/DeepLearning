@@ -68,8 +68,24 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                  sample_by_class=False,
                  power=0,
                  dynamic_length=False):
+        """ 已看過，Dataset的底層類初始化函數
+        Args:
+            ann_file: 標註檔案路徑
+            pipeline: 影片處理流水線
+            data_prefix: 檔案的root
+            test_mode: 是否為測試模式
+            multi_class: 是否為多類別的分類
+            num_classes: 分類類別數量
+            start_index: 開始幀的index
+            modality: 數據的型態
+            sample_by_class: 是否根據類別進行抽樣
+            power: 抽樣概率
+            dynamic_length: 數據集的長度是否為動態的
+        """
+        # 繼承自torch的Dataset，將繼承對象進行初始化
         super().__init__()
 
+        # 保存傳入的參數
         self.ann_file = ann_file
         self.data_prefix = osp.realpath(
             data_prefix) if data_prefix is not None and osp.isdir(
@@ -83,11 +99,15 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.power = power
         self.dynamic_length = dynamic_length
 
+        # multi_class與sample_by_class不能同時設定為True
         assert not (self.multi_class and self.sample_by_class)
 
+        # 構建影片處理流水線實例對象
         self.pipeline = Compose(pipeline)
+        # 獲取資料集當中每個影像的詳細資料，當給定一個index時就可以找到對應的影像資料
         self.video_infos = self.load_annotations()
         if self.sample_by_class:
+            # 如果有設定sample_by_class就會到這裡
             self.video_infos_by_class = self.parse_by_class()
 
             class_prob = []
@@ -249,17 +269,23 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
 
     def prepare_train_frames(self, idx):
         """Prepare the frames for training given the index."""
+        # 已看過，透過給定的idx獲取相關的影片資訊
+        # 拷貝一份指定index的影片資訊，這裡是從video_infos取出資料
         results = copy.deepcopy(self.video_infos[idx])
+        # 將modality參數放到results當中，這裡是說明影片的類型，通常會是RGB
         results['modality'] = self.modality
+        # 將start_index參數放到results當中，這裡是說要從哪一幀開始
         results['start_index'] = self.start_index
 
         # prepare tensor in getitem
         # If HVU, type(results['label']) is dict
         if self.multi_class and isinstance(results['label'], list):
+            # 如果一個影片當中有多個行為標註就會到這裡
             onehot = torch.zeros(self.num_classes)
             onehot[results['label']] = 1.
             results['label'] = onehot
 
+        # 將results資料通過pipeline處理，最後回傳
         return self.pipeline(results)
 
     def prepare_test_frames(self, idx):
@@ -283,7 +309,10 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
 
     def __getitem__(self, idx):
         """Get the sample for either training or testing given index."""
+        # 已看過，獲取指定idx的圖像資料，這裡會讀取單個影片的資料
         if self.test_mode:
+            # 如果是測試模式會到這裡
             return self.prepare_test_frames(idx)
 
+        # 如果是驗證模式就會到這裡
         return self.prepare_train_frames(idx)

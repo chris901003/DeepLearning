@@ -118,7 +118,20 @@ class SampleFrames:
                  test_mode=False,
                  start_index=None,
                  keep_tail_frames=False):
+        """ 已看過，對影片進行幀採樣
+        Args:
+            clip_len: 每個採樣輸出剪輯的幀數量
+            frame_interval: 相鄰採樣點的時間間隔
+            num_clips: 需要分成幾個剪輯數
+            temporal_jitter: 是否啟用時間抖動
+            twice_sample: 當測試時是否啟用二次採樣
+            out_of_bound_opt: 當需要的幀數已經超過片長的處理方式，可以選擇重複最後一幀或是將影片是為環狀
+            test_mode: 是否為測試模式
+            start_index: 開始幀的index
+            keep_tail_frames: 採樣時是否保留最後一幀
+        """
 
+        # 將傳入的參數進行保存
         self.clip_len = clip_len
         self.frame_interval = frame_interval
         self.num_clips = num_clips
@@ -127,9 +140,11 @@ class SampleFrames:
         self.out_of_bound_opt = out_of_bound_opt
         self.test_mode = test_mode
         self.keep_tail_frames = keep_tail_frames
+        # 檢查out_of_bound_opt需要是loop或是repeat_last
         assert self.out_of_bound_opt in ['loop', 'repeat_last']
 
         if start_index is not None:
+            # 如果有設定start_index會跳出警告，這裡已經將start_index的功能改到dataset當中
             warnings.warn('No longer support "start_index" in "SampleFrames", '
                           'it should be set in dataset class, see this pr: '
                           'https://github.com/open-mmlab/mmaction2/pull/89')
@@ -148,9 +163,15 @@ class SampleFrames:
         Returns:
             np.ndarray: Sampled frame indices in train mode.
         """
+        # 已看過，獲取訓練階段的剪輯幀的偏移量
+        # 這裡會計算出平均經過多少幀會提取一次，並且決定好位置後還會有小幅度的隨機偏移，這個幅度會在[0, avg_interval]之間
+        # 如果傳入的影片總幀數不到最少的幀數就會用0 indices代替
+
+        # 計算出ori_clip_len，這裡會是總共需要的幀數乘上每幀之間的間隔，就可以獲取原先需要多少幀的影片
         ori_clip_len = self.clip_len * self.frame_interval
 
         if self.keep_tail_frames:
+            # 如果有設定keep_tail_frames就會到這裡
             avg_interval = (num_frames - ori_clip_len + 1) / float(
                 self.num_clips)
             if num_frames > ori_clip_len - 1:
@@ -160,22 +181,36 @@ class SampleFrames:
             else:
                 clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
         else:
+            # 如果沒有設定keep_tail_frames就會到這裡
+            # 計算出平均的距離，這裡會是用(總幀數 - 每個片段需要的幀數 + 1) // 總共需要的片段量
+            # 這裡會需要剪掉ori_clip_len的原因是因為之後我們會做base_offsets加上一個隨機值範圍在[0, avg_interval]
+            # 如果我們有先預留一個ori_clip_len就不會超出最後的長度
             avg_interval = (num_frames - ori_clip_len + 1) // self.num_clips
 
             if avg_interval > 0:
+                # 如果計算出來的avg_interval大於0就會到這裡
+                # 計算基底的偏移量，這裡計算出的是每個片段的開頭位置
                 base_offsets = np.arange(self.num_clips) * avg_interval
+                # 獲取clip_offsets，透過基底的偏移量再加上隨機生成的數字，這裡的數字會是從[0, avg_interval]
                 clip_offsets = base_offsets + np.random.randint(
                     avg_interval, size=self.num_clips)
             elif num_frames > max(self.num_clips, ori_clip_len):
+                # 如果總共的幀數比max(需要的片段數量, 一個片段需要的長度)要多就會到這裡
+                # 隨機從[0, 總幀數 - 一個片段需要的長度 + 1]取num_clips個，最後進行排序就獲得clip_pffsets
                 clip_offsets = np.sort(
                     np.random.randint(
                         num_frames - ori_clip_len + 1, size=self.num_clips))
             elif avg_interval == 0:
+                # 如果avg_interval剛好是0就會這裡
+                # 用比例進行分配
                 ratio = (num_frames - ori_clip_len + 1.0) / self.num_clips
+                # 這裡就會是依據比例進行分配clip_offsets的位置
                 clip_offsets = np.around(np.arange(self.num_clips) * ratio)
             else:
+                # 其他情況就全部都給0，全部的片段都從0幀開始取
                 clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
 
+        # 最後回傳clip_offsets
         return clip_offsets
 
     def _get_test_clips(self, num_frames):
@@ -212,11 +247,15 @@ class SampleFrames:
         Returns:
             np.ndarray: Sampled frame indices.
         """
+        # 已看過，根據當前的模式獲取剪輯幀的偏移量
         if self.test_mode:
+            # 如果是測試模式會到這裡
             clip_offsets = self._get_test_clips(num_frames)
         else:
+            # 如過是訓練模式就會到這裡
             clip_offsets = self._get_train_clips(num_frames)
 
+        # 最終返回結果
         return clip_offsets
 
     def __call__(self, results):
@@ -226,36 +265,60 @@ class SampleFrames:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，執行樣本幀處理
+
+        # 獲取當前影片總共有多少幀
         total_frames = results['total_frames']
 
+        # 使用_sample_clips計算clip_offsets，clip_offsets = list[int]，list長度就是要切的片段數量
         clip_offsets = self._sample_clips(total_frames)
+        # frame_inds = ndarray shape [num_clips, clip_len]，這個資料就是我們要取哪幾幀的圖像
         frame_inds = clip_offsets[:, None] + np.arange(
             self.clip_len)[None, :] * self.frame_interval
+        # 透過concatenate將全部的值拼接起來，frame_inds = ndarray shape [num_clips * clip_len]
         frame_inds = np.concatenate(frame_inds)
 
         if self.temporal_jitter:
+            # 如果有設定temporal_jitter就會到這裡
             perframe_offsets = np.random.randint(
                 self.frame_interval, size=len(frame_inds))
             frame_inds += perframe_offsets
 
+        # 將frame_inds進行通道調整 [num_clips * clip_len] -> [num_clips, clip_len]
         frame_inds = frame_inds.reshape((-1, self.clip_len))
         if self.out_of_bound_opt == 'loop':
+            # 如果設定超出影片總幀數的地方要用loop方式處理就會到這裡
+            # 這裡簡單使用mod的方式將超出的部分變回影片開頭的幀數
             frame_inds = np.mod(frame_inds, total_frames)
         elif self.out_of_bound_opt == 'repeat_last':
+            # 如果設定超出影片總幀數的地方要用repeat_last處理就會這裡
+            # 獲取哪些部分的index是合法的
             safe_inds = frame_inds < total_frames
+            # 用safe去推出哪些部分是超出影片幀數的
             unsafe_inds = 1 - safe_inds
+            # 找到合法當中最大的index值
             last_ind = np.max(safe_inds * frame_inds, axis=1)
+            # 將合法的地方提取出來，不合法的index用最大的合法index代替
             new_inds = (safe_inds * frame_inds + (unsafe_inds.T * last_ind).T)
+            # 更新frame_inds資料
             frame_inds = new_inds
         else:
+            # 其他設定就會直接報錯，這裡只接受兩種方式
             raise ValueError('Illegal out_of_bound option.')
 
+        # 獲取start_index的資訊
         start_index = results['start_index']
+        # 將frame_inds進行調整並且將所有的index平移start_index，frame_inds shape [num_clip * clip_len]
         frame_inds = np.concatenate(frame_inds) + start_index
+        # 將需要的幀數保存
         results['frame_inds'] = frame_inds.astype(np.int)
+        # 將每個片段需要的幀數保存
         results['clip_len'] = self.clip_len
+        # 將每幀之間的間隔保存
         results['frame_interval'] = self.frame_interval
+        # 將需要的片段數保存
         results['num_clips'] = self.num_clips
+        # 最後回傳更新後的results
         return results
 
     def __repr__(self):
@@ -739,7 +802,14 @@ class PyAVInit:
     """
 
     def __init__(self, io_backend='disk', **kwargs):
+        """ 已看過，使用PyAV對影片進行初始化
+        Args:
+            io_backend: 影片存放的設備
+            kwargs: 其他參數
+        """
+        # 保存io_backend資料
         self.io_backend = io_backend
+        # 保存kwargs當中的參數
         self.kwargs = kwargs
         self.file_client = None
 
@@ -750,21 +820,30 @@ class PyAVInit:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，透過PyAV進行初始化
         try:
+            # 這裡我們先嘗試將av導入
             import av
         except ImportError:
+            # 如果無法導入av就會報錯，這裡會需要安裝av才可以進行
             raise ImportError('Please run "conda install av -c conda-forge" '
                               'or "pip install av" to install PyAV first.')
 
         if self.file_client is None:
+            # 獲取影片存放設備對應需要使用到的FileClient類
             self.file_client = FileClient(self.io_backend, **self.kwargs)
 
+        # 讀取影片，這裡會先透過file_client.get獲取影片的二進制資料，之後再透過io.BytesIO將二進制資料包裝起來
         file_obj = io.BytesIO(self.file_client.get(results['filename']))
+        # 使用ac的open將每一幀提取出來
         container = av.open(file_obj)
 
+        # 將container保存到results當中
         results['video_reader'] = container
+        # 計算當前影片總共的幀數
         results['total_frames'] = container.streams.video[0].frames
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):
@@ -793,8 +872,15 @@ class PyAVDecode:
     """
 
     def __init__(self, multi_thread=False, mode='accurate'):
+        """ 已看過，使用PyAV對影像進行解碼
+        Args:
+            multi_thread: 是否使用多線程
+            mode: decoding的模式
+        """
+        # 將傳入資料進行保存
         self.multi_thread = multi_thread
         self.mode = mode
+        # mode需要是accurate或是efficient兩種
         assert mode in ['accurate', 'efficient']
 
     @staticmethod
@@ -812,30 +898,44 @@ class PyAVDecode:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，對影片進行解碼
+        # 獲取container，這裡的會是透過av模組獲取的影片擷取成幀的實例對象
         container = results['video_reader']
+        # 構建一個imgs的list
         imgs = list()
 
         if self.multi_thread:
+            # 如果有啟用multi_thread就會到這裡
             container.streams.video[0].thread_type = 'AUTO'
         if results['frame_inds'].ndim != 1:
+            # 如果results當中的frame_inds的維度不是1就會到這裡，將frame_inds進行壓平
+            # 不是1的情況就是shape為[num_clip, clip_len]我們要轉成[num_clip * clip_len]
             results['frame_inds'] = np.squeeze(results['frame_inds'])
 
         if self.mode == 'accurate':
-            # set max indice to make early stop
+            # 如果使用的模式是accurate就會到這裡，accurate會裁切的更加精準但是花費時間較長
+            # set max indices to make early stop
+            # 獲取指定幀數當中最大的幀數值，表示切到這裡就可以停止
             max_inds = max(results['frame_inds'])
+            # 給一個計數當前是第幾幀
             i = 0
+            # 開始遍歷每一幀圖像，這裡用到的是container.decode的方式讀取
             for frame in container.decode(video=0):
+                # 如果已經超過需要幀的最後一個就提前跳出
                 if i > max_inds + 1:
                     break
+                # 將獲取的frame轉成rgb且換成ndarray後添加到imgs當中，獲取到的就會是ndarray shape = [height, width, channel=3]
                 imgs.append(frame.to_rgb().to_ndarray())
+                # 將計數器多一
                 i += 1
 
-            # the available frame in pyav may be less than its length,
-            # which may raise error
+            # the available frame in pyav may be less than its length, which may raise error (應該不會發生這種問題)
+            # 透過指定的幀獲取該幀的圖像
             results['imgs'] = [
                 imgs[i % len(imgs)] for i in results['frame_inds']
             ]
         elif self.mode == 'efficient':
+            # 如果是希望有效率的獲取圖像資料，但是精確度就不會太高，就會到這裡
             for frame in container.decode(video=0):
                 backup_frame = frame
                 break
@@ -852,11 +952,16 @@ class PyAVDecode:
                 else:
                     imgs.append(backup_frame)
             results['imgs'] = imgs
+        # 將當前圖像的大小放到results當中，這裡會是original_shape
         results['original_shape'] = imgs[0].shape[:2]
+        # 將當前圖像大小也記錄下來，之後有進行reshape等操作就會改這裡的大小
         results['img_shape'] = imgs[0].shape[:2]
+        # 將video_reader的av實例化對象清空
         results['video_reader'] = None
+        # 將container移除，可以節省記憶體消耗
         del container
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):

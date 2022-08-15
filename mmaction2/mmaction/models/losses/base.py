@@ -35,11 +35,16 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
         Returns:
             torch.Tensor: The calculated loss.
         """
+        # 已看過，使用交叉熵計算分類類別損失
+        # ret = 計算出來的交叉熵損失
         ret = self._forward(*args, **kwargs)
         if isinstance(ret, dict):
+            # 如果ret是dict格式就會到這裡
             for k in ret:
                 if 'loss' in k:
                     ret[k] *= self.loss_weight
         else:
+            # 如果只是單一值就乘上損失權重
             ret *= self.loss_weight
+        # 最後將ret回傳
         return ret

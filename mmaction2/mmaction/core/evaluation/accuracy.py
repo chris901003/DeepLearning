@@ -142,14 +142,28 @@ def top_k_accuracy(scores, labels, topk=(1, )):
     Returns:
         list[float]: Top k accuracy score for each k.
     """
+    # 已看過，計算前k高的置信度預測出來的正確率
+    # scores = 經過模型預測出來的置信度分數，tensor shape [batch_size * num_clips, num_classes]
+    # labels = 標註訊息，tensor shape [batch_size]
+    # topk = tuple，裡面表示要計算的topk，通常會是1跟5
+
+    # 保存最後結果的list
     res = []
+    # 透過np.newaxis可以在指定地方多出一個維度，labels shape = [batch_size, 1]
     labels = np.array(labels)[:, np.newaxis]
+    # 開始遍歷topk的k
     for k in topk:
+        # 將預測的置信度分數進行排序，並且獲取前k大的index，因為這裡是由小到大，所以最後還需要將取出的index反過來
+        # max_k_preds = 前k大的index，shape [batch_size * num_clips, k]
         max_k_preds = np.argsort(scores, axis=1)[:, -k:][:, ::-1]
+        # 先進行max_k_preds == labels確定哪些預測出來的index與labels有對應上，這裡用的是logical_or所以只要前k大的其中一個對了就是對的
+        # match_array shape = [batch_size]
         match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
+        # 計算正確率
         topk_acc_score = match_array.sum() / match_array.shape[0]
         res.append(topk_acc_score)
 
+    # 回傳每個topk底下的正確率
     return res
 
 

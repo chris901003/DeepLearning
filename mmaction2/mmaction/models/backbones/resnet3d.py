@@ -206,10 +206,31 @@ class Bottleneck3d(nn.Module):
                  norm_cfg=dict(type='BN3d'),
                  act_cfg=dict(type='ReLU'),
                  with_cp=False):
+        """ 已看過，ResNet當中的Bottleneck3D的初始化函數
+        Args:
+            inflate: 輸入的channel深度
+            planes: 當前block的基礎channel深度
+            spatial_stride: 空間部分的步距
+            temporal_stride: 時間部分的步距
+            dilation: 膨脹係數
+            downsample: 下採樣的層結構，如果殘差結構不需要通過downsample就會是None
+            style: 模型風格
+            inflate: 是否需要膨脹到3D
+            inflate_style: 膨脹的風格
+            non_local: 是否需要用non-local模型
+            non_local_cfg: non-local模型的設定資料
+            conv_cfg: 卷積配置資訊
+            act_cfg: 激活函數配置資訊
+            with_cp: 是否使用checkpoint
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 傳入的style需要是pytorch或是caffe的風格
         assert style in ['pytorch', 'caffe']
+        # 傳入的膨脹風格需要是3x1x1或是3x3x3的
         assert inflate_style in ['3x1x1', '3x3x3']
 
+        # 保存傳入的參數
         self.inplanes = inplanes
         self.planes = planes
         self.spatial_stride = spatial_stride
@@ -226,51 +247,72 @@ class Bottleneck3d(nn.Module):
         self.non_local_cfg = non_local_cfg
 
         if self.style == 'pytorch':
+            # 如果底層的風格是用pytorch就會到這裡
+            # 將conv1的時間與空間的步距都設定成1
+            # 將conv2的時間與空間的步距根據傳入的資料進行設定
             self.conv1_stride_s = 1
             self.conv2_stride_s = spatial_stride
             self.conv1_stride_t = 1
             self.conv2_stride_t = temporal_stride
         else:
+            # 如果底層的風格是用caffe就會到這裡
+            # 將conv1的時間與空間步距都根據傳入的資料進行設定
+            # 將conv2的時間與空間步距都設定成1
             self.conv1_stride_s = spatial_stride
             self.conv2_stride_s = 1
             self.conv1_stride_t = temporal_stride
             self.conv2_stride_t = 1
 
         if self.inflate:
+            # 如果有需要進行膨脹就會到這裡
             if inflate_style == '3x1x1':
+                # 如果傳入的膨脹風格是3x1x1就會到這裡
+                # 將conv1卷積核設定成(3, 1, 1)，通過padding後經過conv1後shape不會產生變化
                 conv1_kernel_size = (3, 1, 1)
+                # 將conv1的padding設定成(1, 0, 0)
                 conv1_padding = (1, 0, 0)
+                # 將conv2的卷積核設定成(1, 3, 3)，通過padding後經過conv2後shape不會產生變化
                 conv2_kernel_size = (1, 3, 3)
+                # 設定conv2的padding
                 conv2_padding = (0, dilation, dilation)
             else:
+                # 如果傳入的膨脹風格是3x3x3就會到這裡
+                # 主要是在第二個卷積將卷積核設定成(3, 3, 3)
                 conv1_kernel_size = (1, 1, 1)
                 conv1_padding = (0, 0, 0)
                 conv2_kernel_size = (3, 3, 3)
                 conv2_padding = (1, dilation, dilation)
         else:
+            # 如果沒有設定膨脹就會到這裡，這裡在時間維度上面都不會進行融合
             conv1_kernel_size = (1, 1, 1)
             conv1_padding = (0, 0, 0)
             conv2_kernel_size = (1, 3, 3)
             conv2_padding = (0, dilation, dilation)
 
+        # 構建卷積以及標準化以及激活函數多層結構
         self.conv1 = ConvModule(
             inplanes,
             planes,
+            # 使用的卷積核就是上面設定好的
             conv1_kernel_size,
             stride=(self.conv1_stride_t, self.conv1_stride_s,
                     self.conv1_stride_s),
+            # padding大小就會是上面設定好的
             padding=conv1_padding,
             bias=False,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
 
+        # 構建中間層卷積
         self.conv2 = ConvModule(
             planes,
             planes,
+            # 使用的卷積核就是上面設定好的
             conv2_kernel_size,
             stride=(self.conv2_stride_t, self.conv2_stride_s,
                     self.conv2_stride_s),
+            # padding大小就會是上面設定好的
             padding=conv2_padding,
             dilation=(1, dilation, dilation),
             bias=False,
@@ -278,49 +320,72 @@ class Bottleneck3d(nn.Module):
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
 
+        # 最後通過第三個卷積將channel進行擴維
         self.conv3 = ConvModule(
             planes,
             planes * self.expansion,
+            # 卷積核就設定成1x1x1
             1,
             bias=False,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             # No activation in the third ConvModule for bottleneck
+            # 這裡將激活函數取消
             act_cfg=None)
 
+        # 保存downsample的層結構
         self.downsample = downsample
+        # 構建激活函數，將主幹與殘差邊相加後會需要經過激活函數
         self.relu = build_activation_layer(self.act_cfg)
 
         if self.non_local:
+            # 如果有需要使用到non_local就會實例化non_local模型
+            # non_local主要是可以提供類似注意力的行為，可以獲取到非局部的特徵
             self.non_local_block = NonLocal3d(self.conv3.norm.num_features,
                                               **self.non_local_cfg)
 
     def forward(self, x):
         """Defines the computation performed at every call."""
+        # 已看過，ResNet3D的Bottleneck的forward部分
+        # x = 輸入的影像特徵資料，tensor shape [batch_size * num_clip, channel, clip_len, height, width]
 
         def _inner_forward(x):
             """Forward wrapper for utilizing checkpoint."""
+            # 已看過，向前傳遞
+
+            # 保留傳入的x作為之後殘差結構的值
             identity = x
 
+            # 通過第一層卷積以及標準化以及激活層，如果是pytorch格式就會是進行時空的融合
             out = self.conv1(x)
+            # 通過第二層卷積以及標準化以及激活層，如果是pytorch格式就會是進行空間的融合
             out = self.conv2(out)
+            # 通過第三層卷積以及標準化，不管任何格式就是進行channel深度調整
             out = self.conv3(out)
 
             if self.downsample is not None:
+                # 如果主幹提取時有改變特徵圖大小或是深度有改變，殘差邊上的資料也會需要調整
                 identity = self.downsample(x)
 
+            # 進行特徵融合
             out = out + identity
+            # 回傳結果
             return out
 
         if self.with_cp and x.requires_grad:
+            # 如果有啟用checkpoint且x需要進行反向傳遞就會到這裡
             out = cp.checkpoint(_inner_forward, x)
         else:
+            # 其他就會到這裡
             out = _inner_forward(x)
+        # 將經過多層結構的結果放入到激活層當中
         out = self.relu(out)
 
         if self.non_local:
+            # 如果有啟用non_local模塊就會到這裡進行正向傳遞
             out = self.non_local_block(out)
 
+        # 將提取特徵後的特徵圖進行回傳
         return out
 
 
@@ -428,27 +493,69 @@ class ResNet3d(nn.Module):
                  non_local_cfg=dict(),
                  zero_init_residual=True,
                  **kwargs):
+        """ 已看過，ResNet3D模型的初始化函數
+        Args:
+            depth: 指定ResNet的深度，通常會是使用50的深度
+            pretrained: 預訓練權重設定
+            stage_blocks: 對於resnet當中每層需要堆疊的數量
+            pretrained2d: 是否需要載入2D的預訓練權重
+            in_channels: 輸入的channel深度
+            num_stages: resnet當中的主要stage數量
+            base_channels: 基礎的channel深度，每到下一個stage就會是(2 ^ stage) * base_channels的channel深度
+            out_indices: 哪幾個stages的結果需要進行輸出
+            spatial_strides: 每個stage在空間維度上面的步距，也就是原先2D上面的步距，對於圖像的高寬步距
+            temporal_strides: 每個stage在時間維度上面的步距(這個是在3D卷積當中新出來的)
+            dilations: 膨脹係數，通常在resnet當中不會用到膨脹卷積
+            conv1_kernel: 第一層卷積層的卷積核設定
+            conv1_stride_s: 第一層卷積層在空間維度上的步距
+            conv1_stride_t: 第一層卷積層在時間維度上的步距
+            pool1_stride_s: 第一層池化層在空間維度上的步距
+            pool1_stride_t: 第一層池化層在時間維度上的步距
+            with_pool1: 是否使用第一層池化層
+            with_pool2: 是否使用第二層池化層
+            style: 模型架構風格，這裡常用pytorch
+            frozen_stages: 哪部分的層結構需要進行凍結，如果設定為-1就表示都不進行凍結
+            inflate: 每個stage的膨脹深度(這是在action中才有的)
+            inflate_style: 決定在每個stage的conv1與conv2的kernel_size與padding_stride
+            conv_cfg: 卷積的配置，這裡默認會使用Conv3D
+            norm_cfg: 標準化的配置，這裡默認會使用BN3D
+            act_cfg: 激活函數的配置，這裡默認使用ReLU
+            norm_eval: 在訓練過程是否凍結標準化層的均值以及標準差
+            with_cp: 是否使用checkpoint，如果啟用可以減少memory的使用，但是會使模型訓練速度變慢
+            non_local: 是否使用non-local模型
+            non_local_cfg: non-local模型的設定參數
+            zero_init_residual: 使用0進行初始化殘差邊，這裡是訓練resnet的小技巧
+            kwargs: 其他參數，通常為空
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
         if depth not in self.arch_settings:
+            # 如果指定的depth不在合法的深度就會直接報錯，這裡支援的深度有[18, 34, 50, 101, 152]
             raise KeyError(f'invalid depth {depth} for resnet')
+        # 保存傳入的參數
         self.depth = depth
         self.pretrained = pretrained
         self.pretrained2d = pretrained2d
         self.in_channels = in_channels
         self.base_channels = base_channels
         self.num_stages = num_stages
+        # 這裡的num_stages範圍會在[1, 4]之間
         assert 1 <= num_stages <= 4
         self.stage_blocks = stage_blocks
         self.out_indices = out_indices
+        # 指定輸出的層數不會超過stage的數量，最多就是將每個stage的輸出進行輸出
         assert max(out_indices) < num_stages
         self.spatial_strides = spatial_strides
         self.temporal_strides = temporal_strides
         self.dilations = dilations
+        # 這裡檢查一下(空間上的步距, 時間上的步距, 膨脹係數)的長度需要一樣，相同index的資訊會湊成一個stage的配置
         assert len(spatial_strides) == len(temporal_strides) == len(
             dilations) == num_stages
         if self.stage_blocks is not None:
+            # 如果有指定stage_blocks的話長度就會需要與num_stages相同，這樣每個index表示該stage當中的block需要堆疊多少次
             assert len(self.stage_blocks) == num_stages
 
+        # 保存傳入參數
         self.conv1_kernel = conv1_kernel
         self.conv1_stride_s = conv1_stride_s
         self.conv1_stride_t = conv1_stride_t
@@ -458,7 +565,11 @@ class ResNet3d(nn.Module):
         self.with_pool2 = with_pool2
         self.style = style
         self.frozen_stages = frozen_stages
+        # 每個stage的膨脹設定，這裡使用的_ntuple是torch官方的函數
+        # stage_inflations = tuple(tuple)，第一個tuple長度會是num_stage，第二個tuple會是每個block的inflation參數
+        # 以resnet50為例就會是 = tuple(tuple(1, 1, 1), tuple(1, 0, 1, 0), tuple(1, 0, 1, 0, 1, 0), tuple(0, 1, 0))
         self.stage_inflations = _ntuple(num_stages)(inflate)
+        # non_local_stages相關設定
         self.non_local_stages = _ntuple(num_stages)(non_local)
         self.inflate_style = inflate_style
         self.conv_cfg = conv_cfg
@@ -468,23 +579,35 @@ class ResNet3d(nn.Module):
         self.with_cp = with_cp
         self.zero_init_residual = zero_init_residual
 
+        # 根據指定的depth，獲取相配對的block以及每個stage當中要堆疊多少個block
         self.block, stage_blocks = self.arch_settings[depth]
 
         if self.stage_blocks is None:
+            # 如果原先沒有指定的stage_blocks就會到這裡
+            # 提取剛剛獲得的stage_blocks前num_stages的堆疊數量
             self.stage_blocks = stage_blocks[:num_stages]
 
+        # 將inplanes設定成base_channels，因為在第一個stage輸入的channel會已經是base_channels
         self.inplanes = self.base_channels
 
         self.non_local_cfg = non_local_cfg
 
+        # 構建stage之前的卷積層
         self._make_stem_layer()
 
+        # 剩下的resnet的多層stage層模塊
         self.res_layers = []
+        # 遍歷每層stage模塊進行實例化
         for i, num_blocks in enumerate(self.stage_blocks):
+            # 獲取該層stage在空間上的步距
             spatial_stride = spatial_strides[i]
+            # 獲取該層stage在時間上的步距
             temporal_stride = temporal_strides[i]
+            # 獲取該層stage的膨脹係數
             dilation = dilations[i]
+            # 該層基底的channel深度
             planes = self.base_channels * 2**i
+            # 透過make_res_layer構建stage實例化對象
             res_layer = self.make_res_layer(
                 self.block,
                 self.inplanes,
@@ -503,11 +626,16 @@ class ResNet3d(nn.Module):
                 inflate_style=self.inflate_style,
                 with_cp=with_cp,
                 **kwargs)
+            # 輸出的channel深度，透過輸入的深度乘上中間擴大的channel深度
             self.inplanes = planes * self.block.expansion
+            # 給層結構一個名稱
             layer_name = f'layer{i + 1}'
+            # 透過add_module將名稱與實例化對象進行配對方到模型當中
             self.add_module(layer_name, res_layer)
+            # 保存層結構名稱，使用時就可以透過呼叫名字使用
             self.res_layers.append(layer_name)
 
+        # 最終輸出的channel深度
         self.feat_dim = self.block.expansion * self.base_channels * 2**(
             len(self.stage_blocks) - 1)
 
@@ -567,25 +695,55 @@ class ResNet3d(nn.Module):
         Returns:
             nn.Module: A residual layer for the given config.
         """
-        inflate = inflate if not isinstance(inflate,
-                                            int) else (inflate, ) * blocks
-        non_local = non_local if not isinstance(
-            non_local, int) else (non_local, ) * blocks
+        # 已看過，構建resnet當中的stage模塊
+        # block = stage當中的基礎層結構，一個stage當中需要堆疊多層block模塊
+        # inplanes = 輸入的channel深度
+        # planes = 該層stage的基底channel深度
+        # blocks = 當中的block需要堆疊多少次
+        # spatial_stride = 空間上的步距
+        # temporal_stride = 時間上的步距
+        # dilation = 膨脹係數
+        # style = 底層使用的架構
+        # inflate = 是否需要對該block進行膨脹到3D卷積
+        # inflate_style = 膨脹的型態
+        # non_local = 是否需要在指定的block上使用non-local的層結構
+        # non_local_cfg = non-local模型的設定config資料
+        # norm_cfg = 標準化層的設定
+        # act_cfg = 激活函數的設定
+        # conv_cfg = 卷積層的設定
+        # with_cp = 是否有啟用checkpoint
+        # kwargs = 其他參數
+
+        # 如果inflate是int格式就會拓展成tuple型態，且tuple長度會與堆疊的block數量相同，數值都會是一樣
+        # 如果傳入時不是int就不會有任合變動
+        inflate = inflate if not isinstance(inflate, int) else (inflate, ) * blocks
+        # 這裡會做出與inflate一樣的動作
+        non_local = non_local if not isinstance(non_local, int) else (non_local, ) * blocks
+        # 檢查inflate與non_local的長度需要一致
         assert len(inflate) == blocks and len(non_local) == blocks
+        # 先將下採樣的部分設定成None
         downsample = None
         if spatial_stride != 1 or inplanes != planes * block.expansion:
+            # 當通過第一個block會使得channel變化或是高寬產生變化，就會需要downsample讓殘差邊的特徵圖進行downsample使其可以相加
+            # 構建downsample的卷積以及標準化以及激活函數層結構
             downsample = ConvModule(
+                # 輸入的channel深度
                 inplanes,
+                # 輸出的channel深度
                 planes * block.expansion,
+                # 透過1*1*1的卷積核
                 kernel_size=1,
+                # 這裡的步距就會與主幹上的步距相同
                 stride=(temporal_stride, spatial_stride, spatial_stride),
                 bias=False,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=None)
 
+        # stage當中的block結構存放位置
         layers = []
         layers.append(
+            # 先構建第一個block實例對象
             block(
                 inplanes,
                 planes,
@@ -603,7 +761,9 @@ class ResNet3d(nn.Module):
                 act_cfg=act_cfg,
                 with_cp=with_cp,
                 **kwargs))
+        # 更新輸入的channel深度
         inplanes = planes * block.expansion
+        # 構建剩下的block層結構的實例對象
         for i in range(1, blocks):
             layers.append(
                 block(
@@ -623,6 +783,7 @@ class ResNet3d(nn.Module):
                     with_cp=with_cp,
                     **kwargs))
 
+        # 最後統一放到nn.Sequential後回傳
         return nn.Sequential(*layers)
 
     @staticmethod
@@ -757,24 +918,41 @@ class ResNet3d(nn.Module):
     def _make_stem_layer(self):
         """Construct the stem layers consists of a conv+norm+act module and a
         pooling layer."""
+        # 已看過，構建resnet當中最一開始的幾個層結構
+
+        # 構建第一個卷積模塊，這裡使用的ConvModule會與一般2D圖像在使用的卷積會有所不同
+        # 這裡的模塊依舊會包含[卷積, 標準化層, 激活函數]三個層結構
         self.conv1 = ConvModule(
+            # 給定輸入的channel
             self.in_channels,
+            # 輸出的channel
             self.base_channels,
+            # 卷積核大小
             kernel_size=self.conv1_kernel,
-            stride=(self.conv1_stride_t, self.conv1_stride_s,
-                    self.conv1_stride_s),
+            # 步距，這裡分別給的會是(時間方面的步距, 空間方面的步距, 空間方面的步距)
+            stride=(self.conv1_stride_t, self.conv1_stride_s, self.conv1_stride_s),
+            # 根據kernel大小決定需要padding的大小，主要是不讓維度有所減小
             padding=tuple([(k - 1) // 2 for k in _triple(self.conv1_kernel)]),
+            # 是否啟用bias
             bias=False,
+            # 卷積設定
             conv_cfg=self.conv_cfg,
+            # 標準化層設定
             norm_cfg=self.norm_cfg,
+            # 激活函數設定
             act_cfg=self.act_cfg)
 
+        # 通過一個最大池化下採樣，這裡用的是3D的池化核，這裡在時間維度上面核心大小是1
+        # 這裡會對空間上面進行2倍下採樣，時間維度上面不會發生變化
         self.maxpool = nn.MaxPool3d(
             kernel_size=(1, 3, 3),
+            # 步距
             stride=(self.pool1_stride_t, self.pool1_stride_s,
                     self.pool1_stride_s),
+            # padding設定
             padding=(0, 1, 1))
 
+        # 這裡還會有先實例化第二個池化層結構，看起來是要將時間維度進行2倍下採樣用的，空間維度上面不會發生變化
         self.pool2 = nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1))
 
     def _freeze_stages(self):
@@ -845,20 +1023,33 @@ class ResNet3d(nn.Module):
             torch.Tensor: The feature of the input
             samples extracted by the backbone.
         """
+        # 已看過，ResNet3D的forward函數
+        # x = 一個batch的影像資料，tensor shape [batch_size * num_clips, channel, clip_len, height, width]
+
+        # 通過第一個卷積
         x = self.conv1(x)
         if self.with_pool1:
+            # 如果有實例化)
             x = self.maxpool(x)
+        # 構建保存輸出的list
         outs = []
+        # 遍歷剩下resnet當中的層結構
         for i, layer_name in enumerate(self.res_layers):
+            # 透過當前需要層結構的名稱，透過層結構名稱獲取實例對象
             res_layer = getattr(self, layer_name)
+            # 將x放入到層結構中進行向前傳遞
             x = res_layer(x)
             if i == 0 and self.with_pool2:
+                # 如果當前是在第0層的stage且有pool2就會進來
                 x = self.pool2(x)
             if i in self.out_indices:
+                # 如果當前的層數是需要進行輸出的就會到這裡進行保留
                 outs.append(x)
         if len(outs) == 1:
+            # 如果輸出的層數只有一層就直接提取出來進行輸出
             return outs[0]
 
+        # 如果有多層就用tuple包起來
         return tuple(outs)
 
     def train(self, mode=True):

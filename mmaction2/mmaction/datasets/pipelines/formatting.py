@@ -38,6 +38,7 @@ class ToTensor:
     """
 
     def __init__(self, keys):
+        # 已看過，將指定的value轉成tensor格式
         self.keys = keys
 
     def __call__(self, results):
@@ -47,6 +48,7 @@ class ToTensor:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，將指定的資料轉成tensor格式
         for key in self.keys:
             results[key] = to_tensor(results[key])
         return results
@@ -228,11 +230,16 @@ class Collect:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，蒐集指定的資料
+        # 最終需要的data資料內容
         data = {}
+        # 遍歷指定需要保存的key資料
         for key in self.keys:
+            # 將results當中的資料放到data當中
             data[key] = results[key]
 
         if len(self.meta_keys) != 0:
+            # 如果有需要保存到meta當中的資料就會進來
             meta = {}
             for key in self.meta_keys:
                 meta[key] = results[key]
@@ -241,6 +248,7 @@ class Collect:
             for k in data:
                 data[k] = [data[k]]
 
+        # 回傳過濾好的data
         return data
 
     def __repr__(self):
@@ -264,9 +272,16 @@ class FormatShape:
     """
 
     def __init__(self, input_format, collapse=False):
+        """ 已看過，將最終的imgs形狀格式化為給定的input_format
+        Args:
+            input_format: 最終的格式樣子
+            collapse: 是否需要將batch維度拆掉
+        """
+        # 保存input_format以及collapse
         self.input_format = input_format
         self.collapse = collapse
         if self.input_format not in ['NCTHW', 'NCHW', 'NCHW_Flow', 'NPTCHW']:
+            # 檢查input_format是否為合法的排列方式，如果不合法就會直接報錯
             raise ValueError(
                 f'The input format {self.input_format} is invalid.')
 
@@ -277,22 +292,31 @@ class FormatShape:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，將資料進行格式化
         if not isinstance(results['imgs'], np.ndarray):
+            # 如果results當中的imgs就會將其轉成ndarray格式
             results['imgs'] = np.array(results['imgs'])
+        # 獲取imgs資料
         imgs = results['imgs']
         # [M x H x W x C]
         # M = 1 * N_crops * N_clips * L
         if self.collapse:
+            # 如果需要攤平就會到這裡，檢查片段數量是否為1
             assert results['num_clips'] == 1
 
         if self.input_format == 'NCTHW':
+            # 獲取裁切片段數量
             num_clips = results['num_clips']
+            # 獲取每個片段的幀數
             clip_len = results['clip_len']
 
+            # 將imgs的通道進行更改，最後的shape = [1, num_clips, clip_len, height, width, channel]
             imgs = imgs.reshape((-1, num_clips, clip_len) + imgs.shape[1:])
             # N_crops x N_clips x L x H x W x C
+            # 將imgs通道進行變換，shape [1, num_clips, channel, clip_len, height, width]
             imgs = np.transpose(imgs, (0, 1, 5, 2, 3, 4))
             # N_crops x N_clips x C x L x H x W
+            # 再次進行通道變換，shape [1 * num_clips, channel, clip_len, height, width]
             imgs = imgs.reshape((-1, ) + imgs.shape[2:])
             # M' x C x L x H x W
             # M' = N_crops x N_clips
@@ -323,11 +347,16 @@ class FormatShape:
             # P x M x C x H x W
 
         if self.collapse:
+            # 如果有需要進行攤平就會到這裡
             assert imgs.shape[0] == 1
+            # 將imgs的第0個維度壓縮
             imgs = imgs.squeeze(0)
 
+        # 更新imgs資訊
         results['imgs'] = imgs
+        # 更新當前的圖像的shape
         results['input_shape'] = imgs.shape
+        # 回傳更新後的results
         return results
 
     def __repr__(self):
