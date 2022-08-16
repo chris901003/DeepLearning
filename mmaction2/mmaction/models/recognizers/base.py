@@ -234,26 +234,40 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         Returns:
             torch.Tensor: Averaged class score.
         """
+        # 已看過，將多個剪輯片段算出一個預測的平均分數
+        # cls_score = 預測出來的置信度分數，shape [batch_size * num_crop * num_clips, num_classes]
+        # num_segs = 一個影片有多少個片段，也就是(num_clips * num_crop)
+
         if 'average_clips' not in self.test_cfg.keys():
+            # 檢查test_cfg當中有沒有average_clips的方式，如果沒有就會報錯
             raise KeyError('"average_clips" must defined in test_cfg\'s keys')
 
+        # 獲取average_clips的方式
         average_clips = self.test_cfg['average_clips']
         if average_clips not in ['score', 'prob', None]:
+            # 這裡只能有兩個選項，不是score模式就是prob模式或是None
             raise ValueError(f'{average_clips} is not supported. '
                              f'Currently supported ones are '
                              f'["score", "prob", None]')
 
         if average_clips is None:
+            # 如果是None就直接將原先傳入的cls_score返回
             return cls_score
 
+        # 獲取當前的batch_size x num_crops x num_clips
         batch_size = cls_score.shape[0]
+        # 進行cls_score通道調整 [batch_size, num_crops x num_clips, num_classes]
         cls_score = cls_score.view(batch_size // num_segs, num_segs, -1)
 
         if average_clips == 'prob':
+            # 如果設定的是prob就會到這裡，先在num_classes維度上進行softmax操作，之後再第一個維度上取平均
+            # 這樣就可以得到一個影片在每個分類的最終平均概率
             cls_score = F.softmax(cls_score, dim=2).mean(dim=1)
         elif average_clips == 'score':
+            # 如果是score模式就直接取均值就行
             cls_score = cls_score.mean(dim=1)
 
+        # cls_score shape = [batch_size, num_classes]
         return cls_score
 
     @abstractmethod

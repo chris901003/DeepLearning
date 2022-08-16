@@ -290,17 +290,26 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
 
     def prepare_test_frames(self, idx):
         """Prepare the frames for testing given the index."""
+        # 已看過，獲取測試的資料
+        # 透過指定的idx獲取該index對應的影片的詳細資料
         results = copy.deepcopy(self.video_infos[idx])
+        # 獲取圖像的性質，這裡會是RGB或是Flow
         results['modality'] = self.modality
+        # 獲取影片開始的幀，當我們決定好所有幀的時間後會進行平移
         results['start_index'] = self.start_index
 
         # prepare tensor in getitem
         # If HVU, type(results['label']) is dict
         if self.multi_class and isinstance(results['label'], list):
+            # 如果一段影片當有多個標註訊息且results當中的label是list型態就會到這裡，label是list型態就表示該影片有多個標註
+            # 構建與num_classes相同長度的tensor且全為0
             onehot = torch.zeros(self.num_classes)
+            # 將label的部分設定成1，其他都會是0
             onehot[results['label']] = 1.
+            # 將label資料更新上去
             results['label'] = onehot
 
+        # 將影像資料通過資料處理流水線
         return self.pipeline(results)
 
     def __len__(self):

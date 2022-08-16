@@ -45,11 +45,18 @@ class Recognizer3D(BaseRecognizer):
     def _do_test(self, imgs):
         """Defines the computation performed at every call when evaluation,
         testing and gradcam."""
+        # 已看過，進行測試的向前傳遞
+        # imgs = 圖像資料，tensor shape [batch_size, num_crop * num_clip, channel, clip_len, height, width]
+
+        # 獲取當前batch_size
         batches = imgs.shape[0]
+        # 獲取片段數量，這裡我們將不同的剪裁也視為不同的片段
         num_segs = imgs.shape[1]
+        # 將imgs進行通道調整 [batch_size * num_crop * num_clip, channel, clip_len, height, width]，將batch維度進行融合
         imgs = imgs.reshape((-1, ) + imgs.shape[2:])
 
         if self.max_testing_views is not None:
+            # 如果有設定max_testing_views就會到這裡
             total_views = imgs.shape[0]
             assert num_segs == total_views, (
                 'max_testing_views is only compatible '
@@ -73,11 +80,15 @@ class Recognizer3D(BaseRecognizer):
             else:
                 feat = torch.cat(feats)
         else:
+            # 沒有設定max_testing_views就會到這裡
+            # 進行特徵提取，feat shape = [batch_size * num_crop * num_clips, channel, clip_len, height, width]
             feat = self.extract_feat(imgs)
             if self.with_neck:
+                # 如果有neck模塊就會到這裡
                 feat, _ = self.neck(feat)
 
         if self.feature_extraction:
+            # 如果有需要進行feature_extraction就會到這裡
             feat_dim = len(feat[0].size()) if isinstance(feat, tuple) else len(
                 feat.size())
             assert feat_dim in [
@@ -101,8 +112,11 @@ class Recognizer3D(BaseRecognizer):
             return feat
 
         # should have cls_head if not extracting features
+        # 檢查是否有分類頭，如果沒有分類頭就會報錯
         assert self.with_cls_head
+        # 進行分類，cls_score shape = [batch_size * num_crop * num_clips, num_classes]
         cls_score = self.cls_head(feat)
+        # 經過average_clip處理，cls_score shape = [batch_size, num_classes]
         cls_score = self.average_clip(cls_score, num_segs)
         return cls_score
 

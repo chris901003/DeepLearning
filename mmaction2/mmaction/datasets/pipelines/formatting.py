@@ -310,13 +310,13 @@ class FormatShape:
             # 獲取每個片段的幀數
             clip_len = results['clip_len']
 
-            # 將imgs的通道進行更改，最後的shape = [1, num_clips, clip_len, height, width, channel]
+            # 將imgs的通道進行更改，最後的shape = [n_crops, num_clips, clip_len, height, width, channel]
             imgs = imgs.reshape((-1, num_clips, clip_len) + imgs.shape[1:])
             # N_crops x N_clips x L x H x W x C
-            # 將imgs通道進行變換，shape [1, num_clips, channel, clip_len, height, width]
+            # 將imgs通道進行變換，shape [n_crops, num_clips, channel, clip_len, height, width]
             imgs = np.transpose(imgs, (0, 1, 5, 2, 3, 4))
             # N_crops x N_clips x C x L x H x W
-            # 再次進行通道變換，shape [1 * num_clips, channel, clip_len, height, width]
+            # 再次進行通道變換，shape [n_crops * num_clips, channel, clip_len, height, width]
             imgs = imgs.reshape((-1, ) + imgs.shape[2:])
             # M' x C x L x H x W
             # M' = N_crops x N_clips

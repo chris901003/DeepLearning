@@ -227,15 +227,24 @@ class SampleFrames:
         Returns:
             np.ndarray: Sampled frame indices in test mode.
         """
+        # 已看過，如果是測試模式就會到這裡進行計算test_clip_offset
+        # 計算一個段需要的幀數，會是(一段需要的幀數 x 每幀之間的距離)
         ori_clip_len = self.clip_len * self.frame_interval
+        # 計算平均距離，會是((總幀數 - 一個片段需要的幀數 + 1) / 總共需要片段數)
         avg_interval = (num_frames - ori_clip_len + 1) / float(self.num_clips)
         if num_frames > ori_clip_len - 1:
+            # 如果總幀數比一個片段所需幀數-1還要多就會到這裡
+            # 獲取基礎偏移量，就會是依照片段的index在乘上平均距離
             base_offsets = np.arange(self.num_clips) * avg_interval
+            # 最後的clip_offsets會是基礎的偏移量加上一半的平均距離
             clip_offsets = (base_offsets + avg_interval / 2.0).astype(np.int)
             if self.twice_sample:
+                # 如果需要二次採樣就會到這裡，將clip_offsets與base_offsets進行拼接
                 clip_offsets = np.concatenate([clip_offsets, base_offsets])
         else:
+            # 其他情況就直接全部都回傳0
             clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
+        # 將結果回傳
         return clip_offsets
 
     def _sample_clips(self, num_frames):

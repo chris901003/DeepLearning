@@ -27,20 +27,33 @@ def single_gpu_test(model: nn.Module, data_loader: DataLoader) -> list:
     Returns:
         list: The prediction results.
     """
+    # 已看過，透過單gpu或是cpu進行測試
+
+    # 將模型設定成驗證模式
     model.eval()
+    # 保存結果的地方
     results = []
+    # 獲取Dataloader當中的dataset部分
     dataset = data_loader.dataset
+    # 這裡會創建一個進度條，可以方便知道當前進度
     prog_bar = mmcv.ProgressBar(len(dataset))
+    # 遍歷整個data_loader資料
     for data in data_loader:
+        # 將反向傳遞計算關閉
         with torch.no_grad():
+            # 進行正向推理，result shape = [batch_size, num_classes]
             result = model(return_loss=False, **data)
+        # 將result資料保存到results當中
         results.extend(result)
 
         # Assume result has the same length of batch_size
         # refer to https://github.com/open-mmlab/mmcv/issues/985
+        # 獲取batch_size資料
         batch_size = len(result)
         for _ in range(batch_size):
+            # 更新進度條
             prog_bar.update()
+    # 最後回傳結果
     return results
 
 

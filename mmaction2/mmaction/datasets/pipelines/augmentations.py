@@ -1852,8 +1852,13 @@ class ThreeCrop:
     """
 
     def __init__(self, crop_size):
+        # 已看過，將圖像均勻地裁剪為沿較短邊等間隔的三個裁剪
+        # crop_size = 指定的剪裁大小
+
+        # 將crop_size變成(crop_size, crop_size)保存下來
         self.crop_size = _pair(crop_size)
         if not mmcv.is_tuple_of(self.crop_size, int):
+            # 檢查crop_size是否為int格式，如果不是就會報錯
             raise TypeError(f'Crop_size must be int or tuple of int, '
                             f'but got {type(crop_size)}')
 
@@ -1864,44 +1869,70 @@ class ThreeCrop:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，進行將圖像進行均勻剪裁
+        # 如果有使用lazy operation就會到這裡進行初始化，如果已經初始化過就不會有任何改變
         _init_lazy_if_proper(results, False)
         if 'gt_bboxes' in results or 'proposals' in results:
+            # 如果results當中有目標檢測匡或是目標候選匡都是沒有辦法進行ThreeCrop，這裡會跳出警告
             warnings.warn('ThreeCrop cannot process bounding boxes')
 
+        # 獲取當前圖像資料
         imgs = results['imgs']
+        # 獲取圖像高寬資料
         img_h, img_w = results['imgs'][0].shape[:2]
+        # 獲取裁切後指定的高寬大小
         crop_w, crop_h = self.crop_size
+        # 檢查剪裁的高或是剪裁的寬其中一個需要與當前圖像高寬相同，如果不相同表示前面的Resize有問題
         assert crop_h == img_h or crop_w == img_w
 
         if crop_h == img_h:
+            # 如果是crop_h與img_h相同就會到這裡
+            # 獲取w_step，這裡正常來說img_w會是比crop_w還要大
             w_step = (img_w - crop_w) // 2
+            # 獲取offsets資訊，寬度上面的偏移量，可以是從哪裡開始進行剪裁
             offsets = [
-                (0, 0),  # left
-                (2 * w_step, 0),  # right
-                (w_step, 0),  # middle
+                (0, 0),  # left，左邊部分
+                (2 * w_step, 0),  # right，右邊部分
+                (w_step, 0),  # middle，中心部分
             ]
         elif crop_w == img_w:
+            # 如果是crop_w與img_w相同就會到這裡
+            # 獲取h_step，這裡正常來說img_h會比crop_h還要大
             h_step = (img_h - crop_h) // 2
+            # 獲取offsets資訊，高度上面的偏移量，可以是從哪裡開始進行剪裁
             offsets = [
-                (0, 0),  # top
-                (0, 2 * h_step),  # down
-                (0, h_step),  # middle
+                (0, 0),  # top，頂部部分
+                (0, 2 * h_step),  # down，下邊部分
+                (0, h_step),  # middle，中心部分
             ]
 
+        # 保存裁切資訊
         cropped = []
+        # 對於目標檢測匡的資訊
         crop_bboxes = []
+        # 遍歷3種偏移的方式
         for x_offset, y_offset in offsets:
+            # x_offset = x方向上的偏移
+            # y_offset = y方向上的偏移
+            # 獲取選取出來的匡
             bbox = [x_offset, y_offset, x_offset + crop_w, y_offset + crop_h]
+            # 對圖像進行剪裁，會剪裁出被匡出來的部分
             crop = [
                 img[y_offset:y_offset + crop_h, x_offset:x_offset + crop_w]
                 for img in imgs
             ]
+            # 將剪裁後的圖像保存
             cropped.extend(crop)
+            # 將剪裁的範圍進行保存
             crop_bboxes.extend([bbox for _ in range(len(imgs))])
 
+        # 最後將crop_bboxes轉成ndarray shape = [num_clips * clips_len * 3, 4]
         crop_bboxes = np.array(crop_bboxes)
+        # cropped = list[ndarray]，list長度會是num_clips * clips_len * 3，ndarray shape [height, width, 3]
         results['imgs'] = cropped
+        # 保存crop_bbox
         results['crop_bbox'] = crop_bboxes
+        # 保存當前圖像大小
         results['img_shape'] = results['imgs'][0].shape[:2]
 
         return results
