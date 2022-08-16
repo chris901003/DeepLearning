@@ -14,11 +14,17 @@ from mmaction.apis import inference_recognizer, init_recognizer
 
 
 def parse_args():
+    # 已看過，demo部分的傳入參數
     parser = argparse.ArgumentParser(description='MMAction2 demo')
+    # 指定的模型config檔案位置
     parser.add_argument('config', help='test config file path')
+    # 訓練權重檔案位置，這裡可以傳入的是url
     parser.add_argument('checkpoint', help='checkpoint file/url')
+    # 要進行預測的影片資料，可以是檔案或是網址，可以是影片或是每一幀的圖像
     parser.add_argument('video', help='video file/url or rawframes directory')
+    # 標註列表的檔案，最後需要透過index映射回到對應的字串
     parser.add_argument('label', help='label file')
+    # 額外添加到config當中的參數
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -27,28 +33,34 @@ def parse_args():
         help='override some settings in the used config, the key-value pair '
         'in xxx=yyy format will be merged into config file. For example, '
         "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
+    # 傳入的影片資料如果是分解成一幀一幀就會需要使用use_frames
     parser.add_argument(
         '--use-frames',
         default=False,
         action='store_true',
         help='whether to use rawframes as input')
+    # 推理的設備，這裡預設會是去掉用gpu，所以如果是要用cpu進行推理要特別設定
     parser.add_argument(
         '--device', type=str, default='cuda:0', help='CPU/CUDA device option')
+    # 指定輸出的fps，當輸入是透過一幀一幀進行輸入時需要指定
     parser.add_argument(
         '--fps',
         default=30,
         type=int,
         help='specify fps value of the output video when using rawframes to '
         'generate file')
+    # 標註文字大小
     parser.add_argument(
         '--font-scale',
         default=0.5,
         type=float,
         help='font scale of the label in output video')
+    # 標註文字顏色
     parser.add_argument(
         '--font-color',
         default='white',
         help='font color of the label in output video')
+    # 分辨率，如果調得較細緻會讓輸出時間變長
     parser.add_argument(
         '--target-resolution',
         nargs=2,
@@ -57,12 +69,16 @@ def parse_args():
         help='Target resolution (w, h) for resizing the frames when using a '
         'video as input. If either dimension is set to -1, the frames are '
         'resized by keeping the existing aspect ratio')
+    # 使用的resize算法
     parser.add_argument(
         '--resize-algorithm',
         default='bicubic',
         help='resize algorithm applied to generate video')
+    # 如果需要將結果輸出就需要設定輸出的位置，如果沒有設定就不會輸出影片，只會打印出可能的行為
     parser.add_argument('--out-filename', default=None, help='output filename')
+    # 將參數壓縮到args當中
     args = parser.parse_args()
+    # 回傳args
     return args
 
 
@@ -152,14 +168,20 @@ def get_output(video_path,
 
 
 def main():
+    # 已看過，進行展示
+    # 獲取啟動時傳入的參數
     args = parse_args()
     # assign the desired device.
+    # 指定接下來會在哪個設備上執行
     device = torch.device(args.device)
 
+    # 讀取config資料，將config資料讀出
     cfg = Config.fromfile(args.config)
+    # 如果有設定額外的config資料就會到這裡，將額外的資料進行融合
     cfg.merge_from_dict(args.cfg_options)
 
     # build the recognizer from a config file and checkpoint file/url
+    # 初始化模型，並且將模型轉到指定設備上
     model = init_recognizer(cfg, args.checkpoint, device=device)
 
     # e.g. use ('backbone', ) to return backbone feature
@@ -170,17 +192,24 @@ def main():
         results, returned_feature = inference_recognizer(
             model, args.video, outputs=output_layer_names)
     else:
+        # 進行正向傳遞獲取預測結果
         results = inference_recognizer(model, args.video)
 
+    # 將類別的label從檔案當中讀取出來
     labels = open(args.label).readlines()
+    # 將每個str的開頭以及結尾的換行符去除
     labels = [x.strip() for x in labels]
+    # 將results當中的index部分用對應的index替代掉
     results = [(labels[k[0]], k[1]) for k in results]
 
+    # 打印出當前狀態
     print('The top-5 labels with corresponding scores are:')
     for result in results:
+        # 將結果打印出來
         print(f'{result[0]}: ', result[1])
 
     if args.out_filename is not None:
+        # 如果有需要將結果透過影片進行輸出就會到這裡
 
         if args.target_resolution is not None:
             if args.target_resolution[0] == -1:

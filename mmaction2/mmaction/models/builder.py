@@ -37,7 +37,12 @@ def build_head(cfg):
 
 def build_recognizer(cfg, train_cfg=None, test_cfg=None):
     """Build recognizer."""
+    # 已看過，構建辨識器
+    # cfg = 構建的配置文件
+    # train_cfg = 在train時候對圖像的額外處理方式
+    # test_cfg = 在test時候對圖像的額外處理方式
     if train_cfg is not None or test_cfg is not None:
+        # 如果有使用train_cfg或是test_cfg就會跳出警告，這兩個已經要被淘汰了
         warnings.warn(
             'train_cfg and test_cfg is deprecated, '
             'please specify them in model. Details see this '
@@ -49,6 +54,7 @@ def build_recognizer(cfg, train_cfg=None, test_cfg=None):
     assert cfg.get(
         'test_cfg'
     ) is None or test_cfg is None, 'test_cfg specified in both outer field and model field '  # noqa: E501
+    # 構建模型
     return RECOGNIZERS.build(
         cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
 
