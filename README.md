@@ -58,6 +58,12 @@ MMDetection官方原始碼，目前是直接在官方原始碼上進行標注 \
 MMDetection官方原始碼，目前是直接在官方原始碼上進行標注 \
 主要是文字方面處理
 
+### mmaction2
+[官方Github](https://github.com/open-mmlab/mmaction2) \
+[官方文檔](https://mmaction2.readthedocs.io/zh_CN/latest/install.html) \
+MMAction2官方原始碼，目前是直接在官方原始碼上進行標注 \
+主要是文字方面處理
+
 ### learn_mmcv
 學習mmcv官方原始碼，將需要的部分擷取出來，同時學習mmcv框架\
 暫時停止更新
