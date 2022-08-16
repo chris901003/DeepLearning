@@ -799,19 +799,35 @@ class ResNet3d(nn.Module):
             inflated_param_names (list[str]): List of parameters that have been
                 inflated.
         """
+        # 已看過，將2D的卷積預訓練權重轉到3D上
+        # conv3d = 3D卷積的實例化對象
+        # state_dict_2d = 預訓練的權重值，這裡會是個OrderedDict格式
+        # module_name_2d = 在2D模型當中的層結構名稱
+        # inflated_param_names = 那些參數有被進行膨脹
+
+        # 獲取weight_2d_name = 原始2d層結構名稱再加上.weight
         weight_2d_name = module_name_2d + '.weight'
 
+        # 從預訓練權重字典當中找到我們指定的層結構權重值
         conv2d_weight = state_dict_2d[weight_2d_name]
+        # 獲取時空維度的深度
         kernel_t = conv3d.weight.data.shape[2]
 
+        # 獲取新的權重資料，會在2D權重上的第二個維度擴維，深度會是時空維度的深度，並且會將權重值變成原先的kernel_t分之一
+        # 也就是因為增加了時空的維度，所以需要將原先的權重進行平均化，經過計算可以證明出通過這樣的卷積與通過2D卷積後獲得的值會相同
         new_weight = conv2d_weight.data.unsqueeze(2).expand_as(
             conv3d.weight) / kernel_t
+        # 將權重值拷貝一份到3D卷積當中
         conv3d.weight.data.copy_(new_weight)
+        # 將卷積的名稱保存到inflated_param_names當中
         inflated_param_names.append(weight_2d_name)
 
         if getattr(conv3d, 'bias') is not None:
+            # 如果conv3d當中有bias就會到這裡
             bias_2d_name = module_name_2d + '.bias'
+            # 偏置部分就直接放到3D卷積上就可以了
             conv3d.bias.data.copy_(state_dict_2d[bias_2d_name])
+            # 保存下名稱
             inflated_param_names.append(bias_2d_name)
 
     @staticmethod
@@ -827,21 +843,35 @@ class ResNet3d(nn.Module):
             inflated_param_names (list[str]): List of parameters that have been
                 inflated.
         """
+        # 已看過，將2D的BN預訓練權重膨脹到3D的BN上
+        # bn3d = 3D的BN實例化對象
+        # state_dict_2d = 整個預訓練權重資料，這裡會是dict格式
+        # module_name_2d = 在2D模型當中層結構名稱，需要這個名稱才可以在state_dict_2d當中找到對應的權重資料
+        # inflated_param_names = 有進行膨脹的層結構名稱
+
+        # 遍歷bn3d當中的層結構名稱，一個bn層當中會有兩個可學習參數
         for param_name, param in bn3d.named_parameters():
+            # param_name = 該參數的名稱
+            # param = 參數本身，會是torch的Parameter型態
+            # 獲取在2D模型下的層結構名稱，會是層結構名稱加上權重名稱
             param_2d_name = f'{module_name_2d}.{param_name}'
+            # 獲取在權重字典當中對應的權重資料
             param_2d = state_dict_2d[param_2d_name]
             if param.data.shape != param_2d.shape:
+                # 如果兩個的shape不同就表示有問題，會跳出警告表示匹配不正確
                 warnings.warn(f'The parameter of {module_name_2d} is not'
                               'loaded due to incompatible shapes. ')
                 return
 
+            # 如果shape可以匹配上就會直接將值複製上去
             param.data.copy_(param_2d)
+            # 並添加名稱到inflated_param_names當中
             inflated_param_names.append(param_2d_name)
 
+        # 這裡會通過named_buffers獲取其他參數，有些buffer參數不會在上面的地方被提取出來，這裡會透過named_buffers被提取出來
         for param_name, param in bn3d.named_buffers():
             param_2d_name = f'{module_name_2d}.{param_name}'
-            # some buffers like num_batches_tracked may not exist in old
-            # checkpoints
+            # some buffers like num_batches_tracked may not exist in old checkpoints
             if param_2d_name in state_dict_2d:
                 param_2d = state_dict_2d[param_2d_name]
                 param.data.copy_(param_2d)
@@ -860,59 +890,80 @@ class ResNet3d(nn.Module):
             logger (logging.Logger): The logger used to print
                 debugging information.
         """
+        # 已看過，使用該函數將2D的預訓練參數放到3D的模型當中
 
+        # 使用_load_checkpoint將指定的預訓練模型權重載入
         state_dict_r2d = _load_checkpoint(self.pretrained)
         if 'state_dict' in state_dict_r2d:
+            # 如果模型權重當中有state_dict就將其提取出來，這個才會是我們需要的權重資料
             state_dict_r2d = state_dict_r2d['state_dict']
 
+        # 保存膨脹後的權重名稱
         inflated_param_names = []
+        # 遍歷當前模型的所有層結構的名稱
         for name, module in self.named_modules():
             if isinstance(module, ConvModule):
+                # 如果當前結構是ConvModule類型的就會到這裡
                 # we use a ConvModule to wrap conv+bn+relu layers, thus the
                 # name mapping is needed
                 if 'downsample' in name:
+                    # 如果當中有downsample就會到這裡
                     # layer{X}.{Y}.downsample.conv->layer{X}.{Y}.downsample.0
+                    # original_conv_name = 原始層結構名稱 + '.0'
                     original_conv_name = name + '.0'
                     # layer{X}.{Y}.downsample.bn->layer{X}.{Y}.downsample.1
+                    # original_bn_name = 原始層結構名稱 + '.1'
                     original_bn_name = name + '.1'
                 else:
+                    # 如果不是downsample上的ConvModule就會到這裡
                     # layer{X}.{Y}.conv{n}.conv->layer{X}.{Y}.conv{n}
+                    # original_conv_name = 原始名稱
                     original_conv_name = name
                     # layer{X}.{Y}.conv{n}.bn->layer{X}.{Y}.bn{n}
+                    # original_bn_name = 原始名稱，並且將conv換成bn，原先會是.conv.bn變成.bn
                     original_bn_name = name.replace('conv', 'bn')
                 if original_conv_name + '.weight' not in state_dict_r2d:
+                    # 如果沒有在預訓練權重檔案找到對應的層結構就會報錯，表示有問題
                     logger.warning(f'Module not exist in the state_dict_r2d'
                                    f': {original_conv_name}')
                 else:
-                    shape_2d = state_dict_r2d[original_conv_name +
-                                              '.weight'].shape
+                    # 獲取在預訓練資料上面對於該層結構的shape
+                    shape_2d = state_dict_r2d[original_conv_name + '.weight'].shape
+                    # 獲取在3D模型上該層結構的shape
                     shape_3d = module.conv.weight.data.shape
+                    # 這裡在shape_3d的[2]是時空上的維度，所以去除時空上的維度其他地方應該需要與shape_2d相同
                     if shape_2d != shape_3d[:2] + shape_3d[3:]:
+                        # 如果去除時空維度還是不同表示shape有問題，這裡會跳出警告
                         logger.warning(f'Weight shape mismatch for '
                                        f': {original_conv_name} : '
                                        f'3d weight shape: {shape_3d}; '
                                        f'2d weight shape: {shape_2d}. ')
                     else:
+                        # 如果只有時空上需要對齊就會到這裡，透過_inflate_conv_params將2D的權重膨脹到3D
                         self._inflate_conv_params(module.conv, state_dict_r2d,
                                                   original_conv_name,
                                                   inflated_param_names)
 
                 if original_bn_name + '.weight' not in state_dict_r2d:
+                    # 如果該BN沒有對應到的預訓練權重資料就會跳出警告，表示這裡有問題
                     logger.warning(f'Module not exist in the state_dict_r2d'
                                    f': {original_bn_name}')
                 else:
+                    # 如果有對應的預訓練權重就會透過_inflate_bn_params將預訓練權重調整到可以轉到3D的模型上
                     self._inflate_bn_params(module.bn, state_dict_r2d,
                                             original_bn_name,
                                             inflated_param_names)
 
         # check if any parameters in the 2d checkpoint are not loaded
-        remaining_names = set(
-            state_dict_r2d.keys()) - set(inflated_param_names)
+        # 獲取哪些層結構沒有被從2D模型加載到3D模型上
+        remaining_names = set(state_dict_r2d.keys()) - set(inflated_param_names)
         if remaining_names:
+            # 將沒有加載到的層結構打印出來
             logger.info(f'These parameters in the 2d checkpoint are not loaded'
                         f': {remaining_names}')
 
     def inflate_weights(self, logger):
+        # 已看過，將預訓練權重資料擴展成3D可以接受
         self._inflate_weights(self, logger)
 
     def _make_stem_layer(self):
@@ -979,22 +1030,31 @@ class ResNet3d(nn.Module):
                 override the original `pretrained` if set. The arg is added to
                 be compatible with mmdet. Default: None.
         """
+        # 已看過，進行Resnet3D的權重初始化
         if pretrained:
+            # 如果有傳入pretrained就會將其放入到self當中，如果self當中已經有指定就會被覆蓋
             self.pretrained = pretrained
         if isinstance(self.pretrained, str):
+            # 如果pretrained是str就會到這裡
+            # 構建logger紀錄
             logger = get_root_logger()
+            # 記錄下要從哪裡載入預訓練權重
             logger.info(f'load model from: {self.pretrained}')
 
             if self.pretrained2d:
+                # 如果預訓練權重是從2D獲得的就會到這裡
                 # Inflate 2D model into 3D model.
+                # 透過inflate_weights將權重變成3D模型可以接受的格式
                 self.inflate_weights(logger)
 
             else:
                 # Directly load 3D model.
+                # 如果預訓練權重是從3D模型來的就可以直接載入就可以
                 load_checkpoint(
                     self, self.pretrained, strict=False, logger=logger)
 
         elif self.pretrained is None:
+            # 如果沒有傳入pretrained資料就會到這裡，使用比較好的隨機方式進行初始化
             for m in self.modules():
                 if isinstance(m, nn.Conv3d):
                     kaiming_init(m)
@@ -1008,9 +1068,11 @@ class ResNet3d(nn.Module):
                     elif isinstance(m, BasicBlock3d):
                         constant_init(m.conv2.bn, 0)
         else:
+            # 其他的pretrained就會到這裡直接報錯
             raise TypeError('pretrained must be a str or None')
 
     def init_weights(self, pretrained=None):
+        # 已看過，Resnet3D的初始化權重部分
         self._init_weights(self, pretrained)
 
     def forward(self, x):

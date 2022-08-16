@@ -172,20 +172,28 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
 
     def init_weights(self):
         """Initialize the model network weights."""
+        # 已看過，進行權重初始化
         if self.backbone_from in ['mmcls', 'mmaction2']:
+            # 如果backbone是來自mmcls或是mmaction2就會到這裡
+            # 使用backbone當中的init_weights進行權重初始化
             self.backbone.init_weights()
         elif self.backbone_from in ['torchvision', 'timm']:
+            # 如果backbone是來自torchvision或是timm就會到這裡
+            # 這裡我們不會透過呼叫init_weight進行初始化，因為在模型初始化時就已經被初始化權重
             warnings.warn('We do not initialize weights for backbones in '
                           f'{self.backbone_from}, since the weights for '
                           f'backbones in {self.backbone_from} are initialized'
                           'in their __init__ functions.')
         else:
+            # 其他的backbone出處就會跳出報錯
             raise NotImplementedError('Unsupported backbone source '
                                       f'{self.backbone_from}!')
 
         if self.with_cls_head:
+            # 如果有分類頭就對分類頭進行權重初始化
             self.cls_head.init_weights()
         if self.with_neck:
+            # 如果有neck模塊就對neck進行初始化
             self.neck.init_weights()
 
     @auto_fp16()
