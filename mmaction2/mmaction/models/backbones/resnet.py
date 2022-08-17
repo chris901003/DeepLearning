@@ -251,8 +251,24 @@ def make_res_layer(block,
     Returns:
         nn.Module: A residual layer for the given config.
     """
+    # 已看過，構建stage層結構模型
+    # block = 使用的block模塊類
+    # inplanes = 輸入的channel深度
+    # planes = 當前stage的基礎channel深度
+    # blocks = block的堆疊數量
+    # stride = 第一個block的
+    # dilation = 膨脹係數
+    # style = 底層使用的模組
+    # conv_cfg = 卷積層配置
+    # norm_cfg = 標準化層配置
+    # act_cfg = 激活函數層配置
+    # with_cp = 是否啟用checkpoint
+
+    # 先將downsample部分設定成None
     downsample = None
     if stride != 1 or inplanes != planes * block.expansion:
+        # 如果步距設定非1或是channel有改變就需要透過downsample調整殘差部分
+        # downsample會是卷積標準化
         downsample = ConvModule(
             inplanes,
             planes * block.expansion,
@@ -263,8 +279,10 @@ def make_res_layer(block,
             norm_cfg=norm_cfg,
             act_cfg=None)
 
-    layers = []
+    # block保存地方
+    layers = list()
     layers.append(
+        # 構建第一個block資料
         block(
             inplanes,
             planes,
@@ -276,7 +294,9 @@ def make_res_layer(block,
             norm_cfg=norm_cfg,
             act_cfg=act_cfg,
             with_cp=with_cp))
+    # 更新channel深度
     inplanes = planes * block.expansion
+    # 構建剩下的層結構資料
     for _ in range(1, blocks):
         layers.append(
             block(
@@ -290,6 +310,7 @@ def make_res_layer(block,
                 act_cfg=act_cfg,
                 with_cp=with_cp))
 
+    # 最後包裝到Sequential上
     return nn.Sequential(*layers)
 
 
@@ -348,19 +369,44 @@ class ResNet(nn.Module):
                  norm_eval=False,
                  partial_bn=False,
                  with_cp=False):
+        """ 已看過，普通resnet的構建
+        Args:
+            depth: resnet的深度
+            pretrained: 預訓練權重資料
+            torchvision_pretrain: 是否使用torchvision提供的預訓練全權重
+            in_channels: 輸入的channel深度
+            num_stages: 總共堆疊的stage數量
+            out_indices: 哪些stage的特徵圖要進行輸出
+            strides: 每個stage第一個卷積層的步距
+            dilations: 每個stage的膨脹係數
+            style: 模型的風格，這裡通常預設都會是pytorch
+            frozen_stages: 設定哪些層結構進行凍結
+            conv_cfg: 卷積層的相關設定
+            norm_cfg: 標準化相關設定
+            act_cfg: 激活函數相關設定
+            norm_eval: 是否需要將標準差以及均值固定
+            partial_bn: 是否使用部分標準化層
+            with_cp: 是否啟用checkpoint
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
         if depth not in self.arch_settings:
+            # 如果設定的resnet深度不在指定的幾種當中就會報錯
             raise KeyError(f'invalid depth {depth} for resnet')
+        # 將傳入的參數保存
         self.depth = depth
         self.in_channels = in_channels
         self.pretrained = pretrained
         self.torchvision_pretrain = torchvision_pretrain
         self.num_stages = num_stages
+        # 檢查num_stages的值是否合法
         assert 1 <= num_stages <= 4
         self.out_indices = out_indices
+        # 輸出的數量不可以比stage數量多
         assert max(out_indices) < num_stages
         self.strides = strides
         self.dilations = dilations
+        # strides與dilations與num_stages是配套的，所以數量需要一樣
         assert len(strides) == len(dilations) == num_stages
         self.style = style
         self.frozen_stages = frozen_stages
@@ -371,17 +417,27 @@ class ResNet(nn.Module):
         self.partial_bn = partial_bn
         self.with_cp = with_cp
 
+        # 根據設定的resnet深度，獲取適用的block與每個stage的block數量
         self.block, stage_blocks = self.arch_settings[depth]
+        # 根據需要的stage數量獲取前blocks的設定
         self.stage_blocks = stage_blocks[:num_stages]
+        # 通過stem層後的channel深度
         self.inplanes = 64
 
+        # 構建stem層結構
         self._make_stem_layer()
 
+        # 已看過，構建剩下的stage層結構
         self.res_layers = []
+        # 構建stage層結構
         for i, num_blocks in enumerate(self.stage_blocks):
+            # 獲取當前stage當中的block需要堆疊多少層
             stride = strides[i]
+            # 獲取膨脹係數
             dilation = dilations[i]
+            # 獲取當層stage的channel基礎深度
             planes = 64 * 2**i
+            # 構建stage層結構實例對象
             res_layer = make_res_layer(
                 self.block,
                 self.inplanes,
@@ -394,17 +450,22 @@ class ResNet(nn.Module):
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg,
                 with_cp=with_cp)
+            # 更新下層輸入的channel深度
             self.inplanes = planes * self.block.expansion
+            # 構建層結構名稱
             layer_name = f'layer{i + 1}'
+            # 透過add_module將層結構放到模型當中
             self.add_module(layer_name, res_layer)
+            # 將層結構名稱放到res_layers當中
             self.res_layers.append(layer_name)
 
+        # 紀錄最後輸出的channel深度
         self.feat_dim = self.block.expansion * 64 * 2**(
             len(self.stage_blocks) - 1)
 
     def _make_stem_layer(self):
-        """Construct the stem layers consists of a conv+norm+act module and a
-        pooling layer."""
+        """Construct the stem layers consists of a conv+norm+act module and a pooling layer."""
+        # 已看過，構建resnet當中的stem層結構，卷積以及激活以及標準化最後通過池化下採樣
         self.conv1 = ConvModule(
             self.in_channels,
             64,

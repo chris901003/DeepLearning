@@ -17,11 +17,15 @@ class AvgConsensus(nn.Module):
     """
 
     def __init__(self, dim=1):
+        # 已看過，平均共識的初始化函數
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 紀錄要進行平均的維度
         self.dim = dim
 
     def forward(self, x):
         """Defines the computation performed at every call."""
+        # 已看過，根據指定的維度進行取均值
         return x.mean(dim=self.dim, keepdim=True)
 
 

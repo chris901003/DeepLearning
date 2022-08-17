@@ -12,17 +12,28 @@ class Recognizer2D(BaseRecognizer):
 
     def forward_train(self, imgs, labels, **kwargs):
         """Defines the computation performed at every call when training."""
+        # 已看過，2D的行為檢測模型前項訓練
+        # imgs = 圖像資料，tensor shape [batch_size, num_clips * clip_len * num_crop, channel, height, width]
+        # labels = 標註資料，tensor shape [batch_size, labels]
+        # kwargs = 其他資料，通常為空
 
+        # 檢查是否有構建分類頭實例對象
         assert self.with_cls_head
+        # 獲取batch_size資料
         batches = imgs.shape[0]
+        # 將imgs通道進行改變 [batch_size * num_clips * clip_len * num_crop, channel, height, width]
         imgs = imgs.reshape((-1, ) + imgs.shape[2:])
+        # 獲取一個影片的片段數量
         num_segs = imgs.shape[0] // batches
 
+        # 損失字典
         losses = dict()
 
+        # 進行特徵提取，x shape = [batch_size * num_clips * clip_len * num_crop, channel, height, width]
         x = self.extract_feat(imgs)
 
         if self.backbone_from in ['torchvision', 'timm']:
+            # 如果backbone是來自torchvision或是timm就會到這裡
             if len(x.shape) == 4 and (x.shape[2] > 1 or x.shape[3] > 1):
                 # apply adaptive avg pooling
                 x = nn.AdaptiveAvgPool2d(1)(x)
@@ -30,6 +41,7 @@ class Recognizer2D(BaseRecognizer):
             x = x.reshape(x.shape + (1, 1))
 
         if self.with_neck:
+            # 如果有neck模塊就會到這裡
             x = [
                 each.reshape((-1, num_segs) +
                              each.shape[1:]).transpose(1, 2).contiguous()
@@ -40,8 +52,10 @@ class Recognizer2D(BaseRecognizer):
             num_segs = 1
             losses.update(loss_aux)
 
+        # 進行分類頭，cls_score shape = [batch_size, num_classes]
         cls_score = self.cls_head(x, num_segs)
         gt_labels = labels.squeeze()
+        # 計算損失
         loss_cls = self.cls_head.loss(cls_score, gt_labels, **kwargs)
         losses.update(loss_cls)
 
