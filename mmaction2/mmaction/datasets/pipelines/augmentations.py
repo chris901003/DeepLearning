@@ -732,13 +732,22 @@ class RandomResizedCrop(RandomCrop):
                  area_range=(0.08, 1.0),
                  aspect_ratio_range=(3 / 4, 4 / 3),
                  lazy=False):
+        """ 已看過，根據指定的高寬比以及面積範圍進行隨機剪裁
+        Args:
+            area_range: 候選的縮放區域，可以將原始傳入圖像的縮放大小
+            aspect_ratio_range: 高寬比的範圍
+            lazy: 是否啟用lazy模式
+        """
+        # 將傳入資料進行保存
         self.area_range = area_range
         self.aspect_ratio_range = aspect_ratio_range
         self.lazy = lazy
         if not mmcv.is_tuple_of(self.area_range, float):
+            # 檢查傳入的area_range是否合法
             raise TypeError(f'Area_range must be a tuple of float, '
                             f'but got {type(area_range)}')
         if not mmcv.is_tuple_of(self.aspect_ratio_range, float):
+            # 檢查傳入的aspect_ratio_range是否合法
             raise TypeError(f'Aspect_ratio_range must be a tuple of float, '
                             f'but got {type(aspect_ratio_range)}')
 
@@ -763,34 +772,58 @@ class RandomResizedCrop(RandomCrop):
             (list[int]) A random crop bbox within the area range and aspect
             ratio range.
         """
+        # 已看過，根據給定的面積比例以及高寬比進行剪裁
+        # img_shape = 當前圖像大小
+        # area_range = 剪裁後圖像與原圖大小比例範圍
+        # aspect_ratio_range = 剪裁後高寬比的範圍
+        # max_attempts = 重新剪裁次數，因為隨機剪裁可能會不符合規定，當不符合時就會需要重新剪裁，這裡會設置重新剪裁上限
+
+        # 檢查設定的area_range是否合法
         assert 0 < area_range[0] <= area_range[1] <= 1
+        # 檢查aspect_ratio_range是否合法
         assert 0 < aspect_ratio_range[0] <= aspect_ratio_range[1]
 
+        # 獲取當前圖像高寬
         img_h, img_w = img_shape
+        # 計算當前圖像面積
         area = img_h * img_w
 
+        # 將高寬比的範圍提取出來
         min_ar, max_ar = aspect_ratio_range
+        # 這裡會隨機挑選max_attempts個高寬比，會先將min_ar與max_ar取log最後再用exp還原，默認的log是會以e為底的，所以可以還原
         aspect_ratios = np.exp(
             np.random.uniform(
                 np.log(min_ar), np.log(max_ar), size=max_attempts))
+        # 隨機生成max_attempts個面積值，會從area_range的範圍內選出一個值之後乘上當前的面積
         target_areas = np.random.uniform(*area_range, size=max_attempts) * area
+        # 根據獲取的面積以及高寬比可以獲得對應的高寬才切長度
         candidate_crop_w = np.round(np.sqrt(target_areas *
                                             aspect_ratios)).astype(np.int32)
         candidate_crop_h = np.round(np.sqrt(target_areas /
                                             aspect_ratios)).astype(np.int32)
 
+        # 遍歷所有的隨機裁切方式
         for i in range(max_attempts):
+            # 提取出高寬
             crop_w = candidate_crop_w[i]
             crop_h = candidate_crop_h[i]
             if crop_h <= img_h and crop_w <= img_w:
+                # 如果新的高寬比當前高寬還要小就是有效的裁切
+                # 獲取x方向的偏移量
                 x_offset = random.randint(0, img_w - crop_w)
+                # 獲取y方向的偏移量
                 y_offset = random.randint(0, img_h - crop_h)
+                # 構建最終的矩形匡，匡內的就是我們需要的圖像
                 return x_offset, y_offset, x_offset + crop_w, y_offset + crop_h
 
         # Fallback
+        # 如果max_attempts都不合法就會到這裡
+        # 這裡的裁切大小就會是原始圖像的高寬
         crop_size = min(img_h, img_w)
+        # x與y方向的偏移量就會是0
         x_offset = (img_w - crop_size) // 2
         y_offset = (img_h - crop_size) // 2
+        # 最終返回原圖的範圍
         return x_offset, y_offset, x_offset + crop_size, y_offset + crop_size
 
     def __call__(self, results):
@@ -800,45 +833,66 @@ class RandomResizedCrop(RandomCrop):
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 已看過，進行隨機剪裁數據增強部分
+        # 如果有需要就會進行構建lazy的字典
         _init_lazy_if_proper(results, self.lazy)
         if 'keypoint' in results:
+            # 如果results當中有lazy部分就不可以使用lazy模塊
             assert not self.lazy, ('Keypoint Augmentations are not compatible '
                                    'with lazy == True')
 
+        # 獲取當前圖像高寬
         img_h, img_w = results['img_shape']
 
+        # 將area_range與aspect_ratio_range放入到get_crop_bbox當中獲取擷取匡大小
         left, top, right, bottom = self.get_crop_bbox(
             (img_h, img_w), self.area_range, self.aspect_ratio_range)
+        # 獲取裁切後的圖像高寬
         new_h, new_w = bottom - top, right - left
 
         if 'crop_quadruple' not in results:
+            # 如果results當中沒有crop_quadruple資訊就會到這裡構建
+            # 預設會是[0, 0, 1, 1]的資訊
             results['crop_quadruple'] = np.array(
                 [0, 0, 1, 1],  # x, y, w, h
                 dtype=np.float32)
 
+        # 獲取當前x與y在原圖大小的偏移比率
         x_ratio, y_ratio = left / img_w, top / img_h
+        # 獲取新圖大小與舊圖的高寬比
         w_ratio, h_ratio = new_w / img_w, new_h / img_h
 
+        # 獲取results當中的crop_quadruple資訊
         old_crop_quadruple = results['crop_quadruple']
+        # 獲取舊的x與y的比率資訊
         old_x_ratio, old_y_ratio = old_crop_quadruple[0], old_crop_quadruple[1]
+        # 獲取舊的w與h的比率資訊
         old_w_ratio, old_h_ratio = old_crop_quadruple[2], old_crop_quadruple[3]
+        # 更新quadruple資訊
         new_crop_quadruple = [
             old_x_ratio + x_ratio * old_w_ratio,
             old_y_ratio + y_ratio * old_h_ratio, w_ratio * old_w_ratio,
             h_ratio * old_h_ratio
         ]
+        # 將新資訊放到results當中
         results['crop_quadruple'] = np.array(
             new_crop_quadruple, dtype=np.float32)
 
+        # 構建剪裁匡的範圍
         crop_bbox = np.array([left, top, right, bottom])
+        # 將裁切匡保存到results當中
         results['crop_bbox'] = crop_bbox
+        # 保存裁切後的圖像大小
         results['img_shape'] = (new_h, new_w)
 
         if not self.lazy:
+            # 如果沒有啟用lazy operation就會到這裡
             if 'keypoint' in results:
+                # 如果有關節點就會進行調整
                 results['keypoint'] = self._crop_kps(results['keypoint'],
                                                      crop_bbox)
             if 'imgs' in results:
+                # 將圖像資料進行調整
                 results['imgs'] = self._crop_imgs(results['imgs'], crop_bbox)
         else:
             lazyop = results['lazy']
@@ -858,9 +912,11 @@ class RandomResizedCrop(RandomCrop):
                                            dtype=np.float32)
 
         if 'gt_bboxes' in results:
+            # 如果有目標檢測相關的資料就要進行剪裁
             assert not self.lazy
             results = self._all_box_crop(results, results['crop_bbox'])
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):

@@ -323,5 +323,5 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
             # 如果是測試模式會到這裡
             return self.prepare_test_frames(idx)
 
-        # 如果是驗證模式就會到這裡
+        # 如果是訓練模式就會到這裡
         return self.prepare_train_frames(idx)

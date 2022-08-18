@@ -44,38 +44,65 @@ class ResNet3dPathway(ResNet3d):
                  channel_ratio=8,
                  fusion_kernel=5,
                  **kwargs):
+        """ 已看過，構建SlowFast專用的Resnet3D
+        Args:
+            lateral: 確定是否啟用來自另一個路徑的橫向連接，表示在過程中是否會將slow與fast之間進行特徵融合
+            lateral_norm: 在融合當中是否需要進行標準化
+            speed_ratio: Slow與Fast兩個路徑對於影片的採樣比率
+            channel_ratio: Slow與Fast兩個路徑的channel深度比率
+            fusion_kernel: 橫向融合的卷積核大小
+        """
+        # 將傳入的參數進行保存
         self.lateral = lateral
         self.lateral_norm = lateral_norm
         self.speed_ratio = speed_ratio
         self.channel_ratio = channel_ratio
         self.fusion_kernel = fusion_kernel
+        # 繼承自ResNet3d，將繼承對象進行初始化
         super().__init__(*args, **kwargs)
+        # 獲取基礎的channel深度作為輸入的channel深度計算
         self.inplanes = self.base_channels
         if self.lateral:
+            # 如果會將Fast的特徵圖融合到Slow當中就會到這裡
+            # 構建第一個融合會使用到的卷積
             self.conv1_lateral = ConvModule(
+                # 輸入的channel深度，Fast的channel深度會與Slow的channel深度有channel_ratio關係
                 self.inplanes // self.channel_ratio,
                 # https://arxiv.org/abs/1812.03982, the
                 # third type of lateral connection has out_channel:
                 # 2 * \beta * C
+                # 輸出的channel深度
                 self.inplanes * 2 // self.channel_ratio,
+                # 使用的卷積核大小，這裡主要會是將時間維度融合，所以fusion_kernel就是時空上的維度
                 kernel_size=(fusion_kernel, 1, 1),
+                # 這裡會將步距設定成Fast與Slow採樣幀的速度比設定成步距，這樣就可以將其融合
                 stride=(self.speed_ratio, 1, 1),
+                # 透過padding將卷積核的部分補上
                 padding=((fusion_kernel - 1) // 2, 0, 0),
                 bias=False,
                 conv_cfg=self.conv_cfg,
+                # 如果有設定在融合時會通過標準化才會使用
                 norm_cfg=self.norm_cfg if self.lateral_norm else None,
+                # 如果有設定在融合時會通過標準化才會使用激活函數層
                 act_cfg=self.act_cfg if self.lateral_norm else None)
 
+        # 剩下的所有融合卷積
         self.lateral_connections = []
+        # 遍歷stage的層數，每層都會有融合需要用的卷積
         for i in range(len(self.stage_blocks)):
+            # 獲取輸入的channel深度
             planes = self.base_channels * 2**i
+            # 輸出的channel深度
             self.inplanes = planes * self.block.expansion
 
             if lateral and i != self.num_stages - 1:
+                # 如果有需要融合且不是最後一個stage就會到這裡
                 # no lateral connection needed in final stage
+                # 構建層結構名稱
                 lateral_name = f'layer{(i + 1)}_lateral'
                 setattr(
                     self, lateral_name,
+                    # 構建卷積模塊
                     ConvModule(
                         self.inplanes // self.channel_ratio,
                         self.inplanes * 2 // self.channel_ratio,
@@ -143,30 +170,58 @@ class ResNet3dPathway(ResNet3d):
         Returns:
             nn.Module: A residual layer for the given config.
         """
-        inflate = inflate if not isinstance(inflate,
-                                            int) else (inflate, ) * blocks
-        non_local = non_local if not isinstance(
-            non_local, int) else (non_local, ) * blocks
+        # 已看過，構建SlowFast的Renet3D的stage的地方
+        # block = 一個stage當中堆疊多層的block模塊，指定的block類別
+        # inplanes = 輸入的channel深度
+        # planes = 當前stage的基礎channel深度
+        # blocks = 總共需要堆疊的block數量
+        # spatial_stride = 第一個block對於空間維度的步距
+        # temporal_stride = 第一個block對於時間維度的步距
+        # dilation = 膨脹係數
+        # style = 底層使用的模組
+        # inflate = 是否需要將2D的權重參數放大成3D的權重參數
+        # inflate_style = 根據不同的style會有不同的方式
+        # non_local = 是否使用non_local模塊
+        # non_local_cfg = 構建non_local模塊使用的設定資料
+        # conv_cfg = 卷積層參數
+        # act_cfg = 激活函數參數
+        # with_cp = 是否使用checkpoint
+
+        # 如果inflate是int格式就會將其變成tuple且長度會是block需要堆疊的數量
+        inflate = inflate if not isinstance(inflate, int) else (inflate, ) * blocks
+        # 如果non_local是int格式就會將其變成tuple且長度會是block需要堆疊的數量
+        non_local = non_local if not isinstance(non_local, int) else (non_local, ) * blocks
+        # 檢查infalte與non_local的長度需要與block堆疊數量相同
         assert len(inflate) == blocks and len(non_local) == blocks
         if self.lateral:
+            # 如果有需要融合兩條線的特徵就會到這裡，這裡會是Fast的結果融合到Slow當中
+            # 計算融合的channel深度
             lateral_inplanes = inplanes * 2 // self.channel_ratio
         else:
+            # 如果沒有需要融合就會是0
             lateral_inplanes = 0
         if (spatial_stride != 1
                 or (inplanes + lateral_inplanes) != planes * block.expansion):
+            # 如果特徵圖大小會改變或是channel深度會發生變化就會到這裡，構建捷徑分支的下採樣方式
             downsample = ConvModule(
+                # 將channel深度調整到與主幹輸出的channelg深度相同
                 inplanes + lateral_inplanes,
                 planes * block.expansion,
+                # 透過1x1的卷積核進行
                 kernel_size=1,
+                # 步距會與block上的相同
                 stride=(temporal_stride, spatial_stride, spatial_stride),
                 bias=False,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=None)
         else:
+            # 否則就不會需要經過downsample
             downsample = None
 
-        layers = []
+        # 構建所有的block層結構
+        layers = list()
+        # 構建第一個block結構
         layers.append(
             block(
                 inplanes + lateral_inplanes,
@@ -184,8 +239,10 @@ class ResNet3dPathway(ResNet3d):
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg,
                 with_cp=with_cp))
+        # 更新輸入的channel深度
         inplanes = planes * block.expansion
 
+        # 構建剩下的block層結構
         for i in range(1, blocks):
             layers.append(
                 block(
@@ -204,6 +261,7 @@ class ResNet3dPathway(ResNet3d):
                     act_cfg=act_cfg,
                     with_cp=with_cp))
 
+        # 最後將多層block層結構用Sequential進行包裝
         return nn.Sequential(*layers)
 
     def inflate_weights(self, logger):
@@ -365,17 +423,28 @@ def build_pathway(cfg, *args, **kwargs):
     Returns:
         nn.Module: Created pathway.
     """
+    # 已看過，構建模型途徑，構建slow或是fast的途徑
+    # cfg = 構建模型的config資料
+    # args = 其他參數
+    # kwargs = 其他字典參數
     if not (isinstance(cfg, dict) and 'type' in cfg):
+        # 如過在cfg當中沒有type就會直接報錯，這裡會需要指定使用的模塊
         raise TypeError('cfg must be a dict containing the key "type"')
+    # 拷貝一份config資料
     cfg_ = cfg.copy()
 
+    # 將使用的模塊類型取出
     pathway_type = cfg_.pop('type')
     if pathway_type not in pathway_cfg:
+        # 如果指定的模塊沒有在支援當中就會報錯
         raise KeyError(f'Unrecognized pathway type {pathway_type}')
 
+    # 獲取class，目前只會有ResNet3dPathway類
     pathway_cls = pathway_cfg[pathway_type]
+    # 將參數放入構建實例化對象
     pathway = pathway_cls(*args, **kwargs, **cfg_)
 
+    # 將實例化對象回傳
     return pathway
 
 
@@ -448,17 +517,31 @@ class ResNet3dSlowFast(nn.Module):
                      conv1_kernel=(5, 7, 7),
                      conv1_stride_t=1,
                      pool1_stride_t=1)):
+        """ 已看過，構建Resnet3D專門給SlowFast使用
+        Args:
+            pretrained: 預訓練權重檔案
+            resample_rate: 每幀之間採樣的距離，這裡會是比較長的距離進行採樣
+            speed_ratio: Slow通道的採樣頻率與Fast的採樣頻率的比率
+            channel_ratio: Slow與Fast在channel的深度的比率
+            slow_pathway: 在Slow部分的模型設定
+            fast_pathway: 在Fast部分的模型設定
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 保存傳入資料
         self.pretrained = pretrained
         self.resample_rate = resample_rate
         self.speed_ratio = speed_ratio
         self.channel_ratio = channel_ratio
 
         if slow_pathway['lateral']:
+            # 如果slow_pathway當中lateral是True就會到這裡，將speed_ratio與channel_ratio傳入
             slow_pathway['speed_ratio'] = speed_ratio
             slow_pathway['channel_ratio'] = channel_ratio
 
+        # 構建slow_path實例化對象
         self.slow_path = build_pathway(slow_pathway)
+        # 構建fast_path實例化對象
         self.fast_path = build_pathway(fast_pathway)
 
     def init_weights(self, pretrained=None):
@@ -490,40 +573,64 @@ class ResNet3dSlowFast(nn.Module):
             tuple[torch.Tensor]: The feature of the input samples extracted
                 by the backbone.
         """
+        # 已看過，SlowFast的forward部分
+        # x = 影片的圖像資料，tensor shape [batch_size * num_crop * num_clips, channel, clip_len, height, width]
+
+        # 透過差值方式獲取Slow部分的資料，因為這裡scale_factor會小於0，所以不會增加圖像資料反而是減少
         x_slow = nn.functional.interpolate(
             x,
             mode='nearest',
             scale_factor=(1.0 / self.resample_rate, 1.0, 1.0))
+        # 將slow部分進行第一次卷積
         x_slow = self.slow_path.conv1(x_slow)
+        # 通過池化下採樣
         x_slow = self.slow_path.maxpool(x_slow)
 
+        # 獲取fast部分的資料，通常resample_rate與speed_ratio會是一樣的，也就是直接使用x作為fast的傳入資料
         x_fast = nn.functional.interpolate(
             x,
             mode='nearest',
             scale_factor=(1.0 / (self.resample_rate // self.speed_ratio), 1.0,
                           1.0))
+        # 將fast資料放入到fast路徑上的第一個卷積層
         x_fast = self.fast_path.conv1(x_fast)
+        # 通過池化下採樣
         x_fast = self.fast_path.maxpool(x_fast)
 
         if self.slow_path.lateral:
+            # 如果有需要將fast部分的特徵圖融合到slow當中就會到這裡
+            # 通過slow上面的conv1_lateral將fast的特徵圖進行調整
             x_fast_lateral = self.slow_path.conv1_lateral(x_fast)
+            # 將調整好的特徵圖與slow上的特徵圖用concat進行拼接
             x_slow = torch.cat((x_slow, x_fast_lateral), dim=1)
 
+        # 開始遍歷Resnet當中的stage層結構
         for i, layer_name in enumerate(self.slow_path.res_layers):
+            # 透過slow層結構名稱獲取層結構實例對象
             res_layer = getattr(self.slow_path, layer_name)
+            # 將slow資訊進行向前傳遞
             x_slow = res_layer(x_slow)
+            # 透過fast層結構名稱獲取層結構實例對象
             res_layer_fast = getattr(self.fast_path, layer_name)
+            # 將fast資訊進行向前傳遞
             x_fast = res_layer_fast(x_fast)
             if (i != len(self.slow_path.res_layers) - 1
                     and self.slow_path.lateral):
+                # 如果不是最後一個stage且需要進行特徵融合就會到這裡
                 # No fusion needed in the final stage
+                # 獲取融合的卷積層名稱
                 lateral_name = self.slow_path.lateral_connections[i]
+                # 透過名稱獲取融合層結構實例對象
                 conv_lateral = getattr(self.slow_path, lateral_name)
+                # 將fast的資訊通過卷積調整成可以融合的狀態
                 x_fast_lateral = conv_lateral(x_fast)
+                # 進行concat融合
                 x_slow = torch.cat((x_slow, x_fast_lateral), dim=1)
 
+        # 最終的輸出會是當前slow與fast的特徵圖
         out = (x_slow, x_fast)
 
+        # 回傳out資訊
         return out
 
 
