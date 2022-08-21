@@ -71,20 +71,25 @@ def build_dataset(cfg, default_args=None):
     Returns:
         Dataset: The constructed dataset.
     """
+    # 構建dataset
     from .dataset_wrappers import RepeatDataset
 
     if isinstance(cfg, (list, tuple)):
+        # 如果cfg是list或是tuple表示有多個資料集，這裡會用ConcatDataset合併
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
     elif cfg['type'] == 'ConcatDataset':
-        dataset = ConcatDataset(
-            [build_dataset(c, default_args) for c in cfg['datasets']])
+        # 如果是用ConcatDataset就會到這裡
+        dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg['datasets']])
     elif cfg['type'] == 'RepeatDataset':
-        dataset = RepeatDataset(
-            build_dataset(cfg['dataset'], default_args), cfg['times'])
+        # 如果是用RepeatDataset就會到這裡
+        dataset = RepeatDataset(build_dataset(cfg['dataset'], default_args), cfg['times'])
     elif isinstance(cfg.get('ann_file'), (list, tuple)):
+        # 如果是ann_file就會到這裡
         dataset = _concat_dataset(cfg, default_args)
     else:
+        # 其他就會透過build_from_cfg進行構建
         dataset = build_from_cfg(cfg, DATASETS, default_args)
+    # 回傳dataset實例對象
     return dataset
 
 

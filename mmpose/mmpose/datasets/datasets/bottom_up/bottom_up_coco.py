@@ -59,15 +59,28 @@ class BottomUpCocoDataset(Kpt2dSviewRgbImgBottomUpDataset):
                  pipeline,
                  dataset_info=None,
                  test_mode=False):
+        """ 數據集加載原始特徵並應用指定的變換以返回包含圖像張量和其他信息的字典
+        Args:
+            ann_file: 標註資料檔案保存位置
+            img_prefix: 圖像資料的root路徑
+            data_cfg: data設定資料
+            pipeline: 圖像處理流
+            dataset_info: dataset的詳細資訊
+            test_mode: 在構建test資料集時會使用
+        """
 
         if dataset_info is None:
+            # 如果沒有設定dataset_info就會跳出警告
             warnings.warn(
                 'dataset_info is missing. '
                 'Check https://github.com/open-mmlab/mmpose/pull/663 '
                 'for details.', DeprecationWarning)
+            # 這裡會直接讀取coco的config資料
             cfg = Config.fromfile('configs/_base_/datasets/coco.py')
+            # 從中獲取dataset_info資訊
             dataset_info = cfg._cfg_dict['dataset_info']
 
+        # 繼承自Kpt2dSviewRgbImgBottomUpDataset，將繼承對象進行初始化
         super().__init__(
             ann_file,
             img_prefix,
@@ -76,7 +89,9 @@ class BottomUpCocoDataset(Kpt2dSviewRgbImgBottomUpDataset):
             dataset_info=dataset_info,
             test_mode=test_mode)
 
+        # 將use_different_joint_weights設定成False
         self.ann_info['use_different_joint_weights'] = False
+        # 打印出資料集中總共有多少張圖像
         print(f'=> num_images: {self.num_images}')
 
     def _get_single(self, idx):
@@ -88,55 +103,83 @@ class BottomUpCocoDataset(Kpt2dSviewRgbImgBottomUpDataset):
         Returns:
             dict: info for model training
         """
+        # 獲取單張圖像資料，透過idx獲取單張圖像資料
+        # 將coco實例化對象取出
         coco = self.coco
+        # 獲取該index對應的圖像id
         img_id = self.img_ids[idx]
+        # 獲取該id的標註訊息的id
         ann_ids = coco.getAnnIds(imgIds=img_id)
+        # 透過標註訊息的id獲取當中的標註訊息
         anno = coco.loadAnns(ann_ids)
 
+        # 獲取mask資訊，mask = ndarray shape [height, width]，會在需要mask的部分是False，其他會是True
         mask = self._get_mask(anno, idx)
+        # 會將非難檢測以及有關節點的標註訊息保存
         anno = [
             obj.copy() for obj in anno
             if obj['iscrowd'] == 0 or obj['num_keypoints'] > 0
         ]
 
+        # 獲取關節點資訊
         joints = self._get_joints(anno)
+        # 根據有多少縮放比例就會複製多少份mask
         mask_list = [mask.copy() for _ in range(self.ann_info['num_scales'])]
-        joints_list = [
-            joints.copy() for _ in range(self.ann_info['num_scales'])
-        ]
+        # 根據有多少縮放比例就會複製多少份joints資訊
+        joints_list = [joints.copy() for _ in range(self.ann_info['num_scales'])]
 
-        db_rec = {}
+        # 構建要回傳的字典資料
+        db_rec = dict()
+        # 將資料集名稱放入
         db_rec['dataset'] = self.dataset_name
+        # 放入圖像檔案位置
         db_rec['image_file'] = osp.join(self.img_prefix, self.id2name[img_id])
+        # 放入mask資料
         db_rec['mask'] = mask_list
+        # 放入joints資料
         db_rec['joints'] = joints_list
 
+        # 回傳結果
         return db_rec
 
     def _get_joints(self, anno):
         """Get joints for all people in an image."""
+        # 獲取關節點資訊
+        # 獲取圖像中總共有多少人
         num_people = len(anno)
 
         if self.ann_info['scale_aware_sigma']:
+            # 如果有設定scale_aware_sigma就會到這裡
+            # 構建joints，會是ndarray且全為0，shape [人物數量, 關節點數量, 4]
             joints = np.zeros((num_people, self.ann_info['num_joints'], 4),
                               dtype=np.float32)
         else:
+            # 如果沒有設定就會到這裡
+            # 構建joints，會是ndarray且全為0，shape [人物數量, 關節點數量, 3]
             joints = np.zeros((num_people, self.ann_info['num_joints'], 3),
                               dtype=np.float32)
 
+        # 遍歷整個標註訊息
         for i, obj in enumerate(anno):
-            joints[i, :, :3] = \
-                np.array(obj['keypoints']).reshape([-1, 3])
+            # 將關節點訊息提取出來，每一個關節點會用3個值表示，其中兩個會是(x, y)一個會是類型，屬於看得見或是看不見，或是看不見但是可以預測
+            joints[i, :, :3] = np.array(obj['keypoints']).reshape([-1, 3])
             if self.ann_info['scale_aware_sigma']:
+                # 如果有設定scale_aware_sigma就會到這裡
                 # get person box
+                # 提取出標註匡訊息
                 box = obj['bbox']
+                # 獲取高寬資訊
                 size = max(box[2], box[3])
+                # 獲取sigma資訊
                 sigma = size / self.base_size * self.base_sigma
                 if self.int_sigma:
+                    # 如果需要將sigma設定成int格式就會到這裡
                     sigma = int(np.ceil(sigma))
                 assert sigma > 0, sigma
+                # 將sigma資訊放入到joints
                 joints[i, :, 3] = sigma
 
+        # 回傳joints資訊
         return joints
 
     @deprecated_api_warning(name_dict=dict(outputs='results'))

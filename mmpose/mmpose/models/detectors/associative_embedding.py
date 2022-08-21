@@ -45,27 +45,50 @@ class AssociativeEmbedding(BasePose):
                  test_cfg=None,
                  pretrained=None,
                  loss_pose=None):
+        """ 關聯嵌入關節點檢測器初始化函數
+        Args:
+            backbone: 特徵提取模塊設定資料
+            keypoint_head: 關節點解碼頭設定資料
+            train_cfg: 訓練時對於資料的調整
+            test_cfg: 測試時對於資料的調整
+            pretrained: 預訓練權重地址，可以是檔案位置也可以是網址
+            loss_pose: 不推薦使用這個參數，所以通常會是空
+        """
+        # 繼承自BasePose，對繼承對象進行初始化
+        # BasePose沒有init函數，而BasePose繼承自nn.Module，所以這裡會直接到nn.Module的init函數
         super().__init__()
+        # 將單精度訓練模式設定成False，這裡就會直接使用原始的雙精度進行訓練
         self.fp16_enabled = False
 
+        # 構建backbone模塊
         self.backbone = builder.build_backbone(backbone)
 
         if keypoint_head is not None:
+            # 如果有設定關節點解碼頭就會到這裡
             if 'loss_keypoint' not in keypoint_head and loss_pose is not None:
+                # 如果解碼頭設定檔當中沒有loss_keypoint就會跳出警告，新版本需要將loss_pose直接放到keypoint_head當中
+                # 不是透過初始化函數調用時傳入
                 warnings.warn(
                     '`loss_pose` for BottomUp is deprecated, '
                     'use `loss_keypoint` for heads instead. See '
                     'https://github.com/open-mmlab/mmpose/pull/382'
                     ' for more information.', DeprecationWarning)
+                # 將loss_keypoint資料傳入到kepoint_head當中
                 keypoint_head['loss_keypoint'] = loss_pose
 
+            # 構建關節點解碼頭實例對象
             self.keypoint_head = builder.build_head(keypoint_head)
 
+        # 將傳入資料進行保存
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
+        # 看是否需要使用upd，這個晚點研究
         self.use_udp = test_cfg.get('use_udp', False)
+        # 構建熱力圖資料處理實例化對象
         self.parser = HeatmapParser(self.test_cfg)
+        # 將預訓練權重放入
         self.pretrained = pretrained
+        # 進行初始化權重
         self.init_weights()
 
     @property
@@ -132,10 +155,10 @@ class AssociativeEmbedding(BasePose):
         """
 
         if return_loss:
-            return self.forward_train(img, targets, masks, joints, img_metas,
-                                      **kwargs)
-        return self.forward_test(
-            img, img_metas, return_heatmap=return_heatmap, **kwargs)
+            # 如果需要計算損失會到這裡
+            return self.forward_train(img, targets, masks, joints, img_metas, **kwargs)
+        # 如果不需要計算損失會到這裡
+        return self.forward_test(img, img_metas, return_heatmap=return_heatmap, **kwargs)
 
     def forward_train(self, img, targets, masks, joints, img_metas, **kwargs):
         """Forward the bottom-up model and calculate the loss.
@@ -153,10 +176,8 @@ class AssociativeEmbedding(BasePose):
         Args:
             img (torch.Tensor[N,C,imgH,imgW]): Input image.
             targets (List(torch.Tensor[N,K,H,W])): Multi-scale target heatmaps.
-            masks (List(torch.Tensor[N,H,W])): Masks of multi-scale target
-                                              heatmaps
-            joints (List(torch.Tensor[N,M,K,2])): Joints of multi-scale target
-                                                 heatmaps for ae loss
+            masks (List(torch.Tensor[N,H,W])): Masks of multi-scale target heatmaps
+            joints (List(torch.Tensor[N,M,K,2])): Joints of multi-scale target heatmaps for ae loss
             img_metas (dict):Information about val&test
                 By default this includes:
                 - "image_file": image path
@@ -170,19 +191,33 @@ class AssociativeEmbedding(BasePose):
         Returns:
             dict: The total loss for bottom-up
         """
+        """ 進行向前傳遞
+        Args:
+            img: 圖像資料，tensor shape [batch_size, channel, height, width]
+            targets: 標註熱力圖圖像，list[tensor]且tensor shape [batch_size, num_joints, height, width]
+            masks: 標註哪些部分不需要計算loss，list[tensor]且tensor shape [batch_size, height, width]
+            joints: 關節點位置，list[tensor]且tensor shape [batch_size, max_people_pre_picture, num_joints, 2]
+            img_metas: 圖像的詳細資訊
+            kwargs: 其他資訊
+        """
 
+        # 獲取圖像特徵，透過backbone提取特徵，output = tensor shape [batch_size, channel, height, width]
         output = self.backbone(img)
 
         if self.with_keypoint:
+            # 如果有關節點解碼頭就會到這裡，output = list[tensor]，tensor shape [batch_size, channel, height, width]
             output = self.keypoint_head(output)
 
         # if return loss
+        # 構建計算損失的字典
         losses = dict()
         if self.with_keypoint:
-            keypoint_losses = self.keypoint_head.get_loss(
-                output, targets, masks, joints)
+            # 計算預測損失值
+            keypoint_losses = self.keypoint_head.get_loss(output, targets, masks, joints)
+            # 更新losses字典
             losses.update(keypoint_losses)
 
+        # 將losses回傳
         return losses
 
     def forward_dummy(self, img):

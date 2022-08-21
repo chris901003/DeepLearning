@@ -29,6 +29,7 @@ class ToTensor:
     """
 
     def __init__(self, device='cpu'):
+        # 轉換到tensor格式，保存當前訓練設備
         self.device = device
 
     def _to_tensor(self, x):
@@ -36,11 +37,14 @@ class ToTensor:
             self.device).div_(255.0)
 
     def __call__(self, results):
+        # 將指定的資訊轉成tensor
         if isinstance(results['img'], (list, tuple)):
+            # 將img資訊轉成tensor
             results['img'] = [self._to_tensor(img) for img in results['img']]
         else:
             results['img'] = self._to_tensor(results['img'])
 
+        # 返回更新後的results
         return results
 
 
@@ -56,16 +60,19 @@ class NormalizeTensor:
     """
 
     def __init__(self, mean, std):
+        # 進行圖像均值方差調整
         self.mean = mean
         self.std = std
 
     def __call__(self, results):
+        # 將圖像進行標準化
         if isinstance(results['img'], (list, tuple)):
             results['img'] = [
                 F.normalize(img, mean=self.mean, std=self.std, inplace=True)
                 for img in results['img']
             ]
         else:
+            # 進行表準化
             results['img'] = F.normalize(
                 results['img'], mean=self.mean, std=self.std, inplace=True)
 
@@ -82,15 +89,25 @@ class Compose:
     """
 
     def __init__(self, transforms):
+        """ 構建圖像處理流
+        Args:
+            transforms: 處理流程詳細資訊
+        """
+        # 檢查transforms需要是Sequence
         assert isinstance(transforms, Sequence)
+        # 保存處理實例對象
         self.transforms = []
+        # 遍歷每層處理方式
         for transform in transforms:
             if isinstance(transform, dict):
+                # 如果是dict格式就會到這裡
                 transform = build_from_cfg(transform, PIPELINES)
                 self.transforms.append(transform)
             elif callable(transform):
+                # 如果是可以直接call的就會到這裡
                 self.transforms.append(transform)
             else:
+                # 其他就會報錯
                 raise TypeError('transform must be callable or a dict, but got'
                                 f' {type(transform)}')
 
@@ -142,6 +159,13 @@ class Collect:
     """
 
     def __init__(self, keys, meta_keys, meta_name='img_metas'):
+        """ 蒐集results當中的指定資料
+        Args:
+            keys: 指定哪些資料我們需要保留
+            meta_keys: 哪些要保存到meta當中
+            meta_name: meta的名稱
+        """
+        # 保存傳入資料
         self.keys = keys
         self.meta_keys = meta_keys
         self.meta_name = meta_name
@@ -153,31 +177,46 @@ class Collect:
             results (dict): The resulting dict to be modified and passed
               to the next transform in pipeline.
         """
+        # 蒐集results當中感興趣資料
         if 'ann_info' in results:
+            # 如果results當中有anno_info資料就會到這裡
             results.update(results['ann_info'])
 
+        # 最終需要的資料保存
         data = {}
+        # 遍歷指定需要保存的key
         for key in self.keys:
             if isinstance(key, tuple):
+                # 如果key是tuple就會到這裡
                 assert len(key) == 2
+                # 分別提取出key_src與key_tgt
                 key_src, key_tgt = key[:2]
             else:
+                # 如果只有一個key就將key_src與key_tgt設定成一樣的
                 key_src = key_tgt = key
+            # 獲取results當中指定的key_src放到data當中，且key設定成key_tgt
             data[key_tgt] = results[key_src]
 
+        # 最終需要保存的meta資訊
         meta = {}
+        # 如果meta的key超過一個就會往下
         if len(self.meta_keys) != 0:
+            # 遍歷所有的meta_keys
             for key in self.meta_keys:
                 if isinstance(key, tuple):
                     assert len(key) == 2
                     key_src, key_tgt = key[:2]
                 else:
                     key_src = key_tgt = key
+                # 保存meta值
                 meta[key_tgt] = results[key_src]
         if 'bbox_id' in results:
+            # 如果有bbox_id就會進行保存
             meta['bbox_id'] = results['bbox_id']
+        # 將meta透過DC進行包裝
         data[self.meta_name] = DC(meta, cpu_only=True)
 
+        # 回傳整理後的data資訊
         return data
 
     def __repr__(self):

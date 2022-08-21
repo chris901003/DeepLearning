@@ -45,14 +45,32 @@ class BasicBlock(nn.Module):
                  with_cp=False,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN')):
+        """ mmpose的resnet的basic初始化函數
+        Args:
+            in_channels: 輸入的channel深度
+            out_channels: 輸出的channel深度
+            expansion: 膨脹倍率
+            stride: 步距
+            dilation: 膨脹係數
+            downsample: 捷徑分支上的downsample
+            style: 底層的風格
+            with_cp: 是否使用checkpoint
+            conv_cfg: 卷積層設定
+            norm_cfg: 標準化層設定
+        """
         # Protect mutable default arguments
+        # 將標準化設定拷貝一份
         norm_cfg = copy.deepcopy(norm_cfg)
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 保存傳入的參數
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.expansion = expansion
+        # 檢查expansion需要是1
         assert self.expansion == 1
         assert out_channels % expansion == 0
+        # 獲取中間層的channel深度
         self.mid_channels = out_channels // expansion
         self.stride = stride
         self.dilation = dilation
@@ -61,30 +79,38 @@ class BasicBlock(nn.Module):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
 
-        self.norm1_name, norm1 = build_norm_layer(
-            norm_cfg, self.mid_channels, postfix=1)
-        self.norm2_name, norm2 = build_norm_layer(
-            norm_cfg, out_channels, postfix=2)
+        # 構建標準化參數，這裡會構建兩層標準化參數
+        self.norm1_name, norm1 = build_norm_layer(norm_cfg, self.mid_channels, postfix=1)
+        self.norm2_name, norm2 = build_norm_layer(norm_cfg, out_channels, postfix=2)
 
+        # 構建卷積層結構
         self.conv1 = build_conv_layer(
             conv_cfg,
+            # 將channel深度調整到中間層channel深度
             in_channels,
             self.mid_channels,
+            # 這裡會使用3x3卷積核
             3,
             stride=stride,
+            # 會使用指定的膨脹係數
             padding=dilation,
             dilation=dilation,
             bias=False)
+        # 將卷積層用add_module放到模型當中
         self.add_module(self.norm1_name, norm1)
+        # 構建第二層卷積
         self.conv2 = build_conv_layer(
             conv_cfg,
+            # 將channel深度調整到最終深度
             self.mid_channels,
             out_channels,
             3,
             padding=1,
             bias=False)
+        # 透過add_module添加到模型當中
         self.add_module(self.norm2_name, norm2)
 
+        # 構建激活函數
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
 
@@ -100,10 +126,13 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         """Forward function."""
+        # Resnet當中的BasicBlock的forward函數
 
         def _inner_forward(x):
+            # 保留輸入的x作為殘差結構的特徵圖
             identity = x
 
+            # 通過兩層卷積標準化激活函數
             out = self.conv1(x)
             out = self.norm1(out)
             out = self.relu(out)
@@ -112,19 +141,25 @@ class BasicBlock(nn.Module):
             out = self.norm2(out)
 
             if self.downsample is not None:
+                # 如果需要通過downsample就會通過
                 identity = self.downsample(x)
 
+            # 進行相加
             out += identity
 
             return out
 
         if self.with_cp and x.requires_grad:
+            # 如果有設定checkpoint且需要進行向後傳遞就會到這裡
             out = cp.checkpoint(_inner_forward, x)
         else:
+            # 否則就會透過_inner_forward函數進行向前推理
             out = _inner_forward(x)
 
+        # 將out通過激活函數
         out = self.relu(out)
 
+        # 回傳out結果
         return out
 
 
@@ -162,15 +197,34 @@ class Bottleneck(nn.Module):
                  with_cp=False,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN')):
+        """ MMPose使用的resnet當中的bottleneck初始化函數
+        Args:
+            in_channels: 輸入的channel深度
+            out_channels: 輸出的channel深度
+            expansion: 輸入channel深度與輸出channel深度的膨脹比
+            stride: 卷積層的步距
+            dilation: 膨脹係數
+            downsample: 在殘差邊上的下採樣方式
+            style: 使用的底層模型
+            with_cp: 是否使用checkpoint
+            conv_cfg: 卷積設定
+            norm_cfg: 標準化設定
+        """
         # Protect mutable default arguments
+        # 拷貝一份標準化設定參數
         norm_cfg = copy.deepcopy(norm_cfg)
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 設定的style需要是pytorch或是caffe
         assert style in ['pytorch', 'caffe']
 
+        # 保存傳入的參數
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.expansion = expansion
+        # 檢查輸出的channel深度與放大比率是否是倍數關係
         assert out_channels % expansion == 0
+        # 獲取中間層的channel深度
         self.mid_channels = out_channels // expansion
         self.stride = stride
         self.dilation = dilation
@@ -180,47 +234,71 @@ class Bottleneck(nn.Module):
         self.norm_cfg = norm_cfg
 
         if self.style == 'pytorch':
+            # 如果style是pytorch就會到這裡
+            # 第一個卷積的步距就會是1
             self.conv1_stride = 1
+            # 第二個卷積會是指定的步距
             self.conv2_stride = stride
         else:
+            # 如果style是caffe就會到這裡
+            # 將第一層的卷積步距設定成指定的步距
             self.conv1_stride = stride
+            # 第二層卷積設定成1
             self.conv2_stride = 1
 
+        # 構建第一個標準化模塊，這裡會獲取層結構實例化對象以及名稱
         self.norm1_name, norm1 = build_norm_layer(
             norm_cfg, self.mid_channels, postfix=1)
+        # 構建第二個標準化模塊，這裡會獲取層結構實例化對象以及名稱
         self.norm2_name, norm2 = build_norm_layer(
             norm_cfg, self.mid_channels, postfix=2)
+        # 構建第三個標準化模塊，這裡會獲取層結構實例化對象以及名稱
         self.norm3_name, norm3 = build_norm_layer(
             norm_cfg, out_channels, postfix=3)
 
+        # 構建第一層卷積模塊
         self.conv1 = build_conv_layer(
             conv_cfg,
             in_channels,
+            # 將channel深度調整到中間層的channel深度
             self.mid_channels,
+            # 使用1x1的卷積核
             kernel_size=1,
             stride=self.conv1_stride,
             bias=False)
+        # 將第一個標準化模塊使用add_module添加到模型檔中
         self.add_module(self.norm1_name, norm1)
+        # 構建第二層卷積模塊
         self.conv2 = build_conv_layer(
             conv_cfg,
+            # 這裡channel深度不會發生變化
             self.mid_channels,
             self.mid_channels,
+            # 使用3x3的卷積核提取特徵
             kernel_size=3,
             stride=self.conv2_stride,
+            # 如果需要使用膨脹卷積會在這裡使用
             padding=dilation,
             dilation=dilation,
             bias=False)
 
+        # 將第二個標準化層用add_module添加到模型當中
         self.add_module(self.norm2_name, norm2)
+        # 構建第三層卷積模塊
         self.conv3 = build_conv_layer(
             conv_cfg,
+            # 將channel深度調整到最後輸出channel深度
             self.mid_channels,
             out_channels,
+            # 使用1x1的卷積核
             kernel_size=1,
             bias=False)
+        # 將第三個標準化層用add_module添加到模型當中
         self.add_module(self.norm3_name, norm3)
 
+        # 構建激活函數
         self.relu = nn.ReLU(inplace=True)
+        # 將downsample層結構保存
         self.downsample = downsample
 
     @property
@@ -240,10 +318,14 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         """Forward function."""
+        # Resnet當中的Bottleneck的forward函數
 
         def _inner_forward(x):
+            # 進行正向傳遞
+            # 保存殘差結構特徵圖
             identity = x
 
+            # 分別通過3層卷積標準化激活函數層
             out = self.conv1(x)
             out = self.norm1(out)
             out = self.relu(out)
@@ -256,19 +338,26 @@ class Bottleneck(nn.Module):
             out = self.norm3(out)
 
             if self.downsample is not None:
+                # 如果需要downsample就需要通過
                 identity = self.downsample(x)
 
+            # 最後相加
             out += identity
 
+            # 回傳卷積後的特徵圖
             return out
 
         if self.with_cp and x.requires_grad:
+            # 如果有使用checkpoint以及需要進行反向傳遞
             out = cp.checkpoint(_inner_forward, x)
         else:
+            # 其他就會透過_inner_forward進行向前傳遞
             out = _inner_forward(x)
 
+        # 將out通過激活函數
         out = self.relu(out)
 
+        # 回傳out
         return out
 
 
@@ -290,20 +379,29 @@ def get_expansion(block, expansion=None):
     Returns:
         int: The expansion of the block.
     """
+    # 根據使用的block可以知道會將基礎的channel深度放大多少倍
     if isinstance(expansion, int):
+        # 如果有特別指定expansion數值就會到這裡
         assert expansion > 0
     elif expansion is None:
+        # 如果沒有特別指定expansion就會使根據block查看默認的expansion
         if hasattr(block, 'expansion'):
+            # 如果block當中有著名expansion就直接拿來用
             expansion = block.expansion
         elif issubclass(block, BasicBlock):
+            # 否則就看如果當前是BasicBlock就認定為1
             expansion = 1
         elif issubclass(block, Bottleneck):
+            # 如果是Bottleneck就認定為4
             expansion = 4
         else:
+            # 其他的就直接報錯
             raise TypeError(f'expansion is not specified for {block.__name__}')
     else:
+        # 其他的就報錯
         raise TypeError('expansion must be an integer or None')
 
+    # 回傳expansion數值
     return expansion
 
 

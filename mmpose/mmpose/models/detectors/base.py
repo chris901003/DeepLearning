@@ -101,15 +101,20 @@ class BasePose(nn.Module, metaclass=ABCMeta):
                 DDP, it means the batch size on each GPU), which is used for
                 averaging the logs.
         """
+        # 進行訓練
+        # 進行向前傳遞並且計算損失
         losses = self.forward(**data_batch)
 
+        # 整理輸出的損失
         loss, log_vars = self._parse_losses(losses)
 
+        # 構建輸出
         outputs = dict(
             loss=loss,
             log_vars=log_vars,
             num_samples=len(next(iter(data_batch.values()))))
 
+        # 將結果回傳
         return outputs
 
     def val_step(self, data_batch, optimizer, **kwargs):

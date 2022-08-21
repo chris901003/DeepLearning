@@ -163,10 +163,10 @@ val_pipeline = [
 
 test_pipeline = val_pipeline
 
-data_root = 'data/coco'
+data_root = '/Volumes/Pytorch/coco'
 data = dict(
     workers_per_gpu=2,
-    train_dataloader=dict(samples_per_gpu=24),
+    train_dataloader=dict(samples_per_gpu=2),
     val_dataloader=dict(samples_per_gpu=1),
     test_dataloader=dict(samples_per_gpu=1),
     train=dict(

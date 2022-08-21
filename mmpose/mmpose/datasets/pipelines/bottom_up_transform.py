@@ -144,67 +144,88 @@ class HeatmapGenerator:
     """
 
     def __init__(self, output_size, num_joints, sigma=-1, use_udp=False):
+        """ 構建熱力圖資料，專門給bottom-up模型使用
+        Args:
+            output_size: 輸出的大小
+            num_joints: 關節點數量
+            sigma: 高斯分佈的超參數
+            use_udp: 是否使用udp
+        """
         if not isinstance(output_size, np.ndarray):
+            # 如果output_size不是ndarray，就將其轉成ndarray
             output_size = np.array(output_size)
         if output_size.size > 1:
+            # 如果output_size不是1就會檢查
             assert len(output_size) == 2
             self.output_size = output_size
         else:
-            self.output_size = np.array([output_size, output_size],
-                                        dtype=np.int)
+            # 將output_size變成[output_size, output_size]
+            self.output_size = np.array([output_size, output_size], dtype=np.int)
+        # 保存關節點數量
         self.num_joints = num_joints
         if sigma < 0:
+            # 獲取sigma值
             sigma = self.output_size.prod()**0.5 / 64
+        # 保存sigma值
         self.sigma = sigma
         size = 6 * sigma + 3
         self.use_udp = use_udp
         if use_udp:
+            # 如果使用udp就會到這裡
             self.x = np.arange(0, size, 1, np.float32)
             self.y = self.x[:, None]
         else:
+            # 如果沒有使用udp就會到這裡
+            # 構建x會是全為1，且shape = [size]
             x = np.arange(0, size, 1, np.float32)
+            # 構建y
             y = x[:, None]
             x0, y0 = 3 * sigma + 1, 3 * sigma + 1
             self.g = np.exp(-((x - x0)**2 + (y - y0)**2) / (2 * sigma**2))
 
     def __call__(self, joints):
         """Generate heatmaps."""
-        hms = np.zeros(
-            (self.num_joints, self.output_size[1], self.output_size[0]),
-            dtype=np.float32)
+        # 構建熱力圖資料，傳入的是關節點座標位置，joints shape [num_peoples, num_joints, 3]
 
+        # 構建一個全為0且shape為[num_joints, height, width]的ndarray
+        hms = np.zeros((self.num_joints, self.output_size[1], self.output_size[0]), dtype=np.float32)
+
+        # 獲取高斯分佈的sigma超參數
         sigma = self.sigma
+        # 遍歷每個人的關節點
         for p in joints:
+            # 遍歷當中每個座標
             for idx, pt in enumerate(p):
                 if pt[2] > 0:
+                    # 如果該點不是不可預測點就會到這裡
+                    # 將x與y座標提取出來
                     x, y = int(pt[0]), int(pt[1])
-                    if x < 0 or y < 0 or \
-                       x >= self.output_size[0] or y >= self.output_size[1]:
+                    if x < 0 or y < 0 or x >= self.output_size[0] or y >= self.output_size[1]:
+                        # 如果(x, y)座標在非法位置就會直接continue跳過
                         continue
 
                     if self.use_udp:
+                        # 如果使用udp就會到這裡
                         x0 = 3 * sigma + 1 + pt[0] - x
                         y0 = 3 * sigma + 1 + pt[1] - y
                         g = np.exp(-((self.x - x0)**2 + (self.y - y0)**2) /
                                    (2 * sigma**2))
                     else:
+                        # 否則就會到這裡，獲取g參數
                         g = self.g
 
-                    ul = int(np.round(x - 3 * sigma -
-                                      1)), int(np.round(y - 3 * sigma - 1))
-                    br = int(np.round(x + 3 * sigma +
-                                      2)), int(np.round(y + 3 * sigma + 2))
+                    # 以下開始將該點透過高斯分佈均勻的在點的周圍填上值
+                    ul = int(np.round(x - 3 * sigma - 1)), int(np.round(y - 3 * sigma - 1))
+                    br = int(np.round(x + 3 * sigma + 2)), int(np.round(y + 3 * sigma + 2))
 
-                    c, d = max(0,
-                               -ul[0]), min(br[0], self.output_size[0]) - ul[0]
-                    a, b = max(0,
-                               -ul[1]), min(br[1], self.output_size[1]) - ul[1]
+                    c, d = max(0, -ul[0]), min(br[0], self.output_size[0]) - ul[0]
+                    a, b = max(0, -ul[1]), min(br[1], self.output_size[1]) - ul[1]
 
                     cc, dd = max(0, ul[0]), min(br[0], self.output_size[0])
                     aa, bb = max(0, ul[1]), min(br[1], self.output_size[1])
-                    hms[idx, aa:bb,
-                        cc:dd] = np.maximum(hms[idx, aa:bb, cc:dd], g[a:b,
-                                                                      c:d])
+                    hms[idx, aa:bb, cc:dd] = np.maximum(hms[idx, aa:bb, cc:dd], g[a:b, c:d])
+        # hms = ndarray shape [num_joints, height, width]，每個關節點會有自己的一張圖，會在點的周圍給上準確率，中心點會是1
+        # 然後往外擴散，主要是透過高斯分佈進行擴散
         return hms
 
 
@@ -222,16 +243,24 @@ class JointsEncoder:
     """
 
     def __init__(self, max_num_people, num_joints, output_size, tag_per_joint):
+        """ 將可見的關節點變成(座標, 分數)，這裡座標以及分數會是int格式
+        Args:
+            max_num_people: 一張圖像最多人數
+            num_joints: 關節點數量
+            output_size: 輸出的大小
+            tag_per_joint: 每個關節點使用一張圖，也就是一張圖就只表示一個關節點
+        """
+        # 保存傳入的參數
         self.max_num_people = max_num_people
         self.num_joints = num_joints
+        # 處理輸入的output_size資料
         if not isinstance(output_size, np.ndarray):
             output_size = np.array(output_size)
         if output_size.size > 1:
             assert len(output_size) == 2
             self.output_size = output_size
         else:
-            self.output_size = np.array([output_size, output_size],
-                                        dtype=np.int)
+            self.output_size = np.array([output_size, output_size], dtype=np.int)
         self.tag_per_joint = tag_per_joint
 
     def __call__(self, joints):
@@ -247,21 +276,32 @@ class JointsEncoder:
         Returns:
             visible_kpts (np.ndarray[M,K,2]).
         """
-        visible_kpts = np.zeros((self.max_num_people, self.num_joints, 2),
-                                dtype=np.float32)
+        # joints = ndarray shape [num_peoples, num_joints, 3]，標記出每個人物的關節點座標位置
+        # 構建全為0的ndarray且shape = [最大偵測人數, 關節點數量, 2]
+        visible_kpts = np.zeros((self.max_num_people, self.num_joints, 2), dtype=np.float32)
+        # 遍歷圖像當中所有人
         for i in range(len(joints)):
+            # 將tot設定成0
             tot = 0
+            # 遍歷一個人的所有關節點
             for idx, pt in enumerate(joints[i]):
+                # 獲取關節點的x與y座標
                 x, y = int(pt[0]), int(pt[1])
                 if (pt[2] > 0 and 0 <= y < self.output_size[1]
                         and 0 <= x < self.output_size[0]):
+                    # 如果該關節點座標是合法的且該關節點是可預測的就會到這裡
                     if self.tag_per_joint:
+                        # 如果有啟用tag_per_joint就會到這裡
+                        # 保存第i個人物第tot個關節的座標位置，可是這裡會加上idx*output_size.prod()
                         visible_kpts[i][tot] = \
                             (idx * self.output_size.prod()
                              + y * self.output_size[0] + x, 1)
                     else:
+                        # 如果沒有啟用tag_per_joint就會到這裡
                         visible_kpts[i][tot] = (y * self.output_size[0] + x, 1)
+                    # 將tot加一
                     tot += 1
+        # 回傳
         return visible_kpts
 
 
@@ -365,35 +405,48 @@ class BottomUpRandomFlip:
     """
 
     def __init__(self, flip_prob=0.5):
+        # BottomUp的隨機翻轉
+        # 保存翻轉概率
         self.flip_prob = flip_prob
 
     def __call__(self, results):
         """Perform data augmentation with random image flip."""
-        image, mask, joints = results['img'], results['mask'], results[
-            'joints']
+        # 進行BottomUp的隨機翻轉
+        image, mask, joints = results['img'], results['mask'], results['joints']
+        # 獲取每個關節點對稱的關節點index
         self.flip_index = results['ann_info']['flip_index']
+        # 獲取輸出的熱力圖大小
         self.output_size = results['ann_info']['heatmap_size']
 
+        # 獲取mask與joints資料是否合法
         assert isinstance(mask, list)
         assert isinstance(joints, list)
         assert len(mask) == len(joints)
         assert len(mask) == len(self.output_size)
 
+        # 隨機翻轉
         if np.random.random() < self.flip_prob:
+            # 獲取翻轉後的圖像
             image = image[:, ::-1].copy() - np.zeros_like(image)
+            # 遍歷輸出的圖像數量
             for i, _output_size in enumerate(self.output_size):
                 if not isinstance(_output_size, np.ndarray):
+                    # 如果_output_size不是ndarray就轉成ndarray
                     _output_size = np.array(_output_size)
                 if _output_size.size > 1:
                     assert len(_output_size) == 2
                 else:
                     _output_size = np.array([_output_size, _output_size],
                                             dtype=np.int)
+                # 將mask資訊進行選轉
                 mask[i] = mask[i][:, ::-1].copy()
+                # 先將點的index換成對稱點的index
                 joints[i] = joints[i][:, self.flip_index]
+                # 將x方向變成左右轉換後的方向
                 joints[i][:, :, 0] = _output_size[0] - joints[i][:, :, 0] - 1
-        results['img'], results['mask'], results[
-            'joints'] = image, mask, joints
+        # 更新results當中資料
+        results['img'], results['mask'], results['joints'] = image, mask, joints
+        # 將更新後的results返回
         return results
 
 
@@ -417,7 +470,17 @@ class BottomUpRandomAffine:
                  scale_type,
                  trans_factor,
                  use_udp=False):
+        """ 進行圖像隨機旋轉以及縮放
+        Args:
+            rot_factor: 旋轉的角度範圍，會在[-rot_factor, rot_factor]之間
+            scale_factor: 縮放比例範圍
+            scale_type: 這裡會是long或是short
+            trans_factor:
+            use_udp: 是否使用使用無偏數據處理
+        """
+        # 保存傳入資料
         self.max_rotation = rot_factor
+        # 將縮放比例提取出來
         self.min_scale = scale_factor[0]
         self.max_scale = scale_factor[1]
         self.scale_type = scale_type
@@ -425,73 +488,111 @@ class BottomUpRandomAffine:
         self.use_udp = use_udp
 
     def _get_scale(self, image_size, resized_size):
+        """ 獲取縮放比例
+        Args:
+            image_size: 原圖像大小
+            resized_size: 透過resize後的圖像大小
+        """
+        # 將當前高寬提取出來
         w, h = image_size
+        # 將resize後圖像的高寬提取出來
         w_resized, h_resized = resized_size
         if w / w_resized < h / h_resized:
+            # 如果高度方向的縮小量較大就會到這裡
             if self.scale_type == 'long':
+                # 如果scale_type是long就會到這裡，這裡會以h為主，將h調整到h_resized時計算w的長度
                 w_pad = h / h_resized * w_resized
                 h_pad = h
             elif self.scale_type == 'short':
+                # 如果scale_type是short就會到這裡，這裡會以為主，將w調整到w_resized時計算h的長度
                 w_pad = w
                 h_pad = w / w_resized * h_resized
             else:
+                # 其他的scale_type就會報錯
                 raise ValueError(f'Unknown scale type: {self.scale_type}')
         else:
+            # 如果寬度方向的縮小量較大就會到這裡
             if self.scale_type == 'long':
+                # 如果scale_type是short就會到這裡，這裡會以為主，將w調整到w_resized時計算h的長度
                 w_pad = w
                 h_pad = w / w_resized * h_resized
             elif self.scale_type == 'short':
+                # 如果scale_type是long就會到這裡，這裡會以h為主，將h調整到h_resized時計算w的長度
                 w_pad = h / h_resized * w_resized
                 h_pad = h
             else:
+                # 其他的scale_type就會報錯
                 raise ValueError(f'Unknown scale type: {self.scale_type}')
 
+        # 將w_pad與h_pad包裝
         scale = np.array([w_pad, h_pad], dtype=np.float32)
 
+        # 回傳scale
         return scale
 
     def __call__(self, results):
         """Perform data augmentation with random scaling & rotating."""
-        image, mask, joints = results['img'], results['mask'], results[
-            'joints']
+        # 進行圖像隨機旋轉以及縮放
+        # 獲取results當中的img以及mask以及joints參數
+        image, mask, joints = results['img'], results['mask'], results['joints']
 
+        # 獲取anno_info當中指定的圖像大小
         self.input_size = results['ann_info']['image_size']
         if not isinstance(self.input_size, np.ndarray):
+            # 如果input_size不是ndarray型態就會轉成ndarray型態
             self.input_size = np.array(self.input_size)
         if self.input_size.size > 1:
+            # 如果input_size的size大於1就會是要2
             assert len(self.input_size) == 2
         else:
+            # 否則就擴大成[input_size, input_size]
             self.input_size = [self.input_size, self.input_size]
+        # 獲取heatmap_size作為output_size
         self.output_size = results['ann_info']['heatmap_size']
 
+        # 檢查mask需要是list
         assert isinstance(mask, list)
+        # 檢查joints是list
         assert isinstance(joints, list)
+        # 檢查mask的數量要與joints相同
         assert len(mask) == len(joints)
         assert len(mask) == len(self.output_size), (len(mask),
                                                     len(self.output_size),
                                                     self.output_size)
 
+        # 獲取當前圖像高寬
         height, width = image.shape[:2]
         if self.use_udp:
+            # 如果使用upd就會到這裡
             center = np.array(((width - 1.0) / 2, (height - 1.0) / 2))
         else:
+            # 如果沒有使用upd就會到這裡
+            # 獲取中心座標
             center = np.array((width / 2, height / 2))
 
+        # 構建img_scale會是ndarray且shape是[2]
         img_scale = np.array([width, height], dtype=np.float32)
+        # 隨機獲取數據增強的縮放比例，這裡會是在[min_scale, max_scale]之間
         aug_scale = np.random.random() * (self.max_scale - self.min_scale) \
             + self.min_scale
+        # 將原始圖像大小乘上aug_scale獲取縮放後的比例
         img_scale *= aug_scale
+        # 獲取數據增強使用的旋轉角度
         aug_rot = (np.random.random() * 2 - 1) * self.max_rotation
 
         if self.trans_factor > 0:
+            # 如果trans_factor大於0就會到這裡
+            # 這裡會隨機獲取dx與dy的值
             dx = np.random.randint(-self.trans_factor * img_scale[0] / 200.0,
                                    self.trans_factor * img_scale[0] / 200.0)
             dy = np.random.randint(-self.trans_factor * img_scale[1] / 200.0,
                                    self.trans_factor * img_scale[1] / 200.0)
 
+            # 將中心點加上dx與dy
             center[0] += dx
             center[1] += dy
         if self.use_udp:
+            # 如果有使用udp就會到這裡
             for i, _output_size in enumerate(self.output_size):
                 if not isinstance(_output_size, np.ndarray):
                     _output_size = np.array(_output_size)
@@ -530,38 +631,52 @@ class BottomUpRandomAffine:
                 mat_input, (int(self.input_size[0]), int(self.input_size[1])),
                 flags=cv2.INTER_LINEAR)
         else:
+            # 沒有使用udp就會到這裡，遍歷output_size的大小，這裡獲取的是mask以及joints的資料
             for i, _output_size in enumerate(self.output_size):
                 if not isinstance(_output_size, np.ndarray):
+                    # 如果當前的_output_size不是ndarray就會到這裡，將_output_size轉成ndarray
                     _output_size = np.array(_output_size)
                 if _output_size.size > 1:
+                    # 如果_output_size的size不是1就要是2
                     assert len(_output_size) == 2
                 else:
+                    # 將_output_size變成list且分成高寬兩個
                     _output_size = [_output_size, _output_size]
+                # 透過_get_scale獲取縮放比例，img_scale是透過隨機縮放後的圖像大小，_output_size是希望的圖像大小
+                # scale = 依據scale_type獲取最後的高寬
                 scale = self._get_scale(img_scale, _output_size)
+                # 獲取仿射變換矩陣
                 mat_output = get_affine_transform(
                     center=center,
                     scale=scale / 200.0,
                     rot=aug_rot,
                     output_size=_output_size)
+                # 透過cv2的warpAffine進行仿射變換，這裡會是對於mask進行
                 mask[i] = cv2.warpAffine(
                     (mask[i] * 255).astype(np.uint8), mat_output,
                     (int(_output_size[0]), int(_output_size[1]))) / 255
+                # 上面會先將True以及False轉成數字，這裡再轉回來
                 mask[i] = (mask[i] > 0.5).astype(np.float32)
 
-                joints[i][:, :, 0:2] = \
-                    warp_affine_joints(joints[i][:, :, 0:2], mat_output)
+                # 對關節點進行仿射變換
+                joints[i][:, :, 0:2] = warp_affine_joints(joints[i][:, :, 0:2], mat_output)
                 if results['ann_info']['scale_aware_sigma']:
+                    # 調整joints[:, :, 3]的值
                     joints[i][:, :, 3] = joints[i][:, :, 3] / aug_scale
 
+            # 獲取img_scale與input_size的縮放比例
             scale = self._get_scale(img_scale, self.input_size)
+            # 獲取仿射變換矩陣，這裡獲取的是傳入網路的圖像資料
             mat_input = get_affine_transform(
                 center=center,
                 scale=scale / 200.0,
                 rot=aug_rot,
                 output_size=self.input_size)
+            # 對圖像進行仿射變換，最終圖像會調整到self.input_size大小
             image = cv2.warpAffine(image, mat_input, (int(
                 self.input_size[0]), int(self.input_size[1])))
 
+        # 更新資料
         results['img'], results['mask'], results[
             'joints'] = image, mask, joints
 
@@ -621,41 +736,69 @@ class BottomUpGenerateTarget:
     """
 
     def __init__(self, sigma, max_num_people, use_udp=False):
+        """ 構建多尺度熱力圖標註，專門給關聯嵌入使用
+        Args:
+            sigma: 在熱力圖上的高斯分佈超參數
+            max_num_people: 最多一張圖像當中的人數
+            use_udp: 是否使用upd技術
+        """
+        # 保存傳入參數
         self.sigma = sigma
         self.max_num_people = max_num_people
         self.use_udp = use_udp
 
     def _generate(self, num_joints, heatmap_size):
         """Get heatmap generator and joint encoder."""
+        # num_joints = 該數據集總共有多少個關節點
+        # heatmap_size = 熱力圖大小，ndarray shape [2]
+
+        # 構建熱力圖資料
         heatmap_generator = [
+            # 使用HeatmapGenerator創建熱力圖資料
             HeatmapGenerator(output_size, num_joints, self.sigma, self.use_udp)
             for output_size in heatmap_size
         ]
+        # 構建關節點資料
         joints_encoder = [
+            # 使用JointsEncoder構建關節點資料
             JointsEncoder(self.max_num_people, num_joints, output_size, True)
             for output_size in heatmap_size
         ]
+        # 構建的熱力圖以及關節點實例對象
         return heatmap_generator, joints_encoder
 
     def __call__(self, results):
         """Generate multi-scale heatmap target for bottom-up."""
+        # 生成多尺度熱力圖標註，專門給bottom-up模型使用
+
+        # 透過_generate構建heatmap_generator以及joints_encoder
+        # 構建的熱力圖以及關節點實例對象
         heatmap_generator, joints_encoder = \
-            self._generate(results['ann_info']['num_joints'],
-                           results['ann_info']['heatmap_size'])
+            self._generate(results['ann_info']['num_joints'], results['ann_info']['heatmap_size'])
+        # 構建target_list，存放熱力圖資料的
         target_list = list()
+        # 取出results當中的mask以及joints資料，joints_list shape = [peoples, num_joints, 3]
         mask_list, joints_list = results['mask'], results['joints']
 
+        # 遍歷總共有多少總縮放比例
         for scale_id in range(results['ann_info']['num_scales']):
+            # 將joints_list放入到構建熱力圖的實例化對象當中，target_t shape = [num_joints, height, width]
             target_t = heatmap_generator[scale_id](joints_list[scale_id])
+            # 將joints_list放入到構建關節點的實例化對象當中，joints_t shape = [最大偵測人數, 關節點數量, 2]
             joints_t = joints_encoder[scale_id](joints_list[scale_id])
 
+            # 將target_t保存到target_list當中，這會是我們希望模型預測出來的熱力圖
             target_list.append(target_t.astype(np.float32))
+            # 將mask對應的scale_id變成float32型態
             mask_list[scale_id] = mask_list[scale_id].astype(np.float32)
+            # 將joints_list的對應scale_id變成joints_t的int32型態
             joints_list[scale_id] = joints_t.astype(np.int32)
 
+        # 將masks與joints與targets更新到results當中
         results['masks'], results['joints'] = mask_list, joints_list
         results['targets'] = target_list
 
+        # 將更新後的results返回
         return results
 
 

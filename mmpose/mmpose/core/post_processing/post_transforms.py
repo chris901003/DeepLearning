@@ -217,23 +217,42 @@ def get_affine_transform(center,
     Returns:
         np.ndarray: The transform matrix.
     """
+    # 獲取仿射變換矩陣
+    # center = 中心點座標
+    # scale = 縮放比例
+    # rot = 旋轉角度
+    # output_size = 輸出的圖像大小
+    # shift =
+    # inv = 反轉仿射變換方向的選項，可以是變過去的或是要變回來的
+
+    # 檢查center需要由兩個值組成
     assert len(center) == 2
+    # 檢查scale需要由兩個值組成
     assert len(scale) == 2
+    # 檢查output_size需要由兩個值組成
     assert len(output_size) == 2
+    # 檢查shift需要由兩個值組成
     assert len(shift) == 2
 
     # pixel_std is 200.
+    # 獲取縮放比例，這裡會是scale*200
     scale_tmp = scale * 200.0
 
+    # 將shift轉成ndarray格式
     shift = np.array(shift)
+    # 獲取寬度的縮放比例
     src_w = scale_tmp[0]
+    # 獲取輸出目標的高寬值
     dst_w = output_size[0]
     dst_h = output_size[1]
 
+    # 獲取度轉弧度的值，這裡就會是旋轉量
     rot_rad = np.pi * rot / 180
+    # 選轉中心點src_dir = (new_x, new_y)
     src_dir = rotate_point([0., src_w * -0.5], rot_rad)
     dst_dir = np.array([0., dst_w * -0.5])
 
+    # 剩下的就是一堆公式
     src = np.zeros((3, 2), dtype=np.float32)
     src[0, :] = center + scale_tmp * shift
     src[1, :] = center + src_dir + scale_tmp * shift
@@ -244,11 +263,15 @@ def get_affine_transform(center,
     dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5]) + dst_dir
     dst[2, :] = _get_3rd_point(dst[0, :], dst[1, :])
 
+    # 構建仿射變換矩陣
     if inv:
+        # 如果是要反轉的就是這裡
         trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
     else:
+        # 如果是要轉過去的就是這裡
         trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
 
+    # 回傳仿射變換矩陣
     return trans
 
 
@@ -300,12 +323,17 @@ def rotate_point(pt, angle_rad):
     Returns:
         list[float]: Rotated point.
     """
+    # 對一個點進行旋轉，傳入的是角度
+    # 檢查傳入的點是否為兩個(x, y)
     assert len(pt) == 2
+    # 獲取sin與cos值
     sn, cs = np.sin(angle_rad), np.cos(angle_rad)
+    # 透過公式獲取新的(x, y)座標
     new_x = pt[0] * cs - pt[1] * sn
     new_y = pt[0] * sn + pt[1] * cs
     rotated_pt = [new_x, new_y]
 
+    # 回傳新的(x, y)座標
     return rotated_pt
 
 
@@ -351,9 +379,17 @@ def warp_affine_joints(joints, mat):
     Returns:
         np.ndarray[..., 2]: Result coordinate of joints.
     """
+    # 進行仿射變換
+    # joints = 關節點座標
+    # mat = 仿射變換矩陣
+
+    # 將joints變成ndarray格式
     joints = np.array(joints)
+    # 獲取joints的shape
     shape = joints.shape
+    # 進行reshape，將batch維度進行融合
     joints = joints.reshape(-1, 2)
+    # 進行仿射變換
     return np.dot(
         np.concatenate((joints, joints[:, 0:1] * 0 + 1), axis=1),
         mat.T).reshape(shape)

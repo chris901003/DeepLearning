@@ -132,20 +132,32 @@ class _Params:
     """
 
     def __init__(self, cfg):
+        """ 一個clas的參數
+        Args:
+            cfg: 設定檔資料
+        """
+        # 獲取總共有多少關節點
         self.num_joints = cfg['num_joints']
+        # 總共可以偵測多少個人物
         self.max_num_people = cfg['max_num_people']
 
+        # 偵測的閾值
         self.detection_threshold = cfg['detection_threshold']
+        # 標註的閾值
         self.tag_threshold = cfg['tag_threshold']
+        # 是否使用偵測的值
         self.use_detection_val = cfg['use_detection_val']
+        # 當過多時是否忽略
         self.ignore_too_much = cfg['ignore_too_much']
 
         if self.num_joints == 17:
+            # 如果關節點數量是17就會到這裡，構建關節點的順序，這裡比較亂
             self.joint_order = [
                 i - 1 for i in
                 [1, 2, 3, 4, 5, 6, 7, 12, 13, 8, 9, 10, 11, 14, 15, 16, 17]
             ]
         else:
+            # 其他的話就會是依照順序來
             self.joint_order = list(np.arange(self.num_joints))
 
 
@@ -153,11 +165,20 @@ class HeatmapParser:
     """The heatmap parser for post processing."""
 
     def __init__(self, cfg):
+        """ 構建熱力圖
+        Args:
+            cfg: 設定參數值
+        """
+        # 透過Params將cfg整理
         self.params = _Params(cfg)
+        # 獲取是否tag每個關節點
         self.tag_per_joint = cfg['tag_per_joint']
+        # 構建池化層
         self.pool = torch.nn.MaxPool2d(cfg['nms_kernel'], 1,
                                        cfg['nms_padding'])
+        # 是否使用udp
         self.use_udp = cfg.get('use_udp', False)
+        # 是否使用score_per_joint
         self.score_per_joint = cfg.get('score_per_joint', False)
 
     def nms(self, heatmaps):

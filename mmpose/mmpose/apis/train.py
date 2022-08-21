@@ -77,16 +77,32 @@ def train_model(model,
         meta (dict | None): Meta dict to record some important information.
             Default: None
     """
+    # 準備進行訓練模式
+    # model = 模型實例化對象
+    # dataset = dataset實例化對象
+    # cfg = 對於訓練的config資料
+    # distributed = 是否為分布式訓練
+    # validate = 是否進行驗證
+    # timestamp = 當前時間戳
+    # meta = 保存訓練過程參數
+
+    # 創建logger
     logger = get_root_logger(cfg.log_level)
 
     # prepare data loaders
+    # 如果傳入的dataset不是list或是tuple就用list進行包裝
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
     # step 1: give default values and override (if exist) from cfg.data
+    # 構建DataLoader的實例化參數
     loader_cfg = {
         **dict(
+            # 種子碼
             seed=cfg.get('seed'),
+            # 是否需要將不滿足一個batch的資料丟棄
             drop_last=False,
+            # 是否為分布式訓練
             dist=distributed,
+            # 使用的gpu數量
             num_gpus=len(cfg.gpu_ids)),
         **({} if torch.__version__ != 'parrots' else dict(
                prefetch_num=2,
@@ -105,15 +121,19 @@ def train_model(model,
     }
 
     # step 2: cfg.data.train_dataloader has highest priority
+    # 將額外設定的config資料添加上去
     train_loader_cfg = dict(loader_cfg, **cfg.data.get('train_dataloader', {}))
 
+    # 構建DataLoader實例化對象
     data_loaders = [build_dataloader(ds, **train_loader_cfg) for ds in dataset]
 
     # determine whether use adversarial training precess or not
+    # 使否產生對抗性訓練，這裡現在都會是False
     use_adverserial_train = cfg.get('use_adversarial_train', False)
 
     # put model on gpus
     if distributed:
+        # 如果是分布式訓練就會到這裡設定
         find_unused_parameters = cfg.get('find_unused_parameters', True)
         # Sets the `find_unused_parameters` parameter in
         # torch.nn.parallel.DistributedDataParallel
@@ -132,6 +152,7 @@ def train_model(model,
                 broadcast_buffers=False,
                 find_unused_parameters=find_unused_parameters)
     else:
+        # 非分布式訓練就會到這裡設定
         if digit_version(mmcv.__version__) >= digit_version(
                 '1.4.4') or torch.cuda.is_available():
             model = MMDataParallel(model, device_ids=cfg.gpu_ids)
@@ -142,8 +163,10 @@ def train_model(model,
                 'details.')
 
     # build runner
+    # 構建優化器實例對象
     optimizer = build_optimizers(model, cfg.optimizer)
 
+    # 構建以epoch為主的runner
     runner = EpochBasedRunner(
         model,
         optimizer=optimizer,
@@ -151,6 +174,7 @@ def train_model(model,
         logger=logger,
         meta=meta)
     # an ugly workaround to make .log and .log.json filenames the same
+    # 將當前時間戳放到runner當中
     runner.timestamp = timestamp
 
     if use_adverserial_train:
@@ -168,8 +192,10 @@ def train_model(model,
         else:
             optimizer_config = cfg.optimizer_config
 
+    # 獲取用戶自定義的鉤子函數
     custom_hooks_cfg = cfg.get('custom_hooks', None)
     if custom_hooks_cfg is None:
+        # 如果有設定就會到這裡
         custom_hooks_cfg = cfg.get('custom_hooks_config', None)
         if custom_hooks_cfg is not None:
             warnings.warn(
@@ -177,6 +203,7 @@ def train_model(model,
                 '"custom_hooks" instead.', DeprecationWarning)
 
     # register hooks
+    # 將鉤子函數添加上去
     runner.register_training_hooks(
         cfg.lr_config,
         optimizer_config,
@@ -190,6 +217,7 @@ def train_model(model,
 
     # register eval hooks
     if validate:
+        # 如果有需要進行驗證就會到這裡，將驗證資料放入
         eval_cfg = cfg.get('evaluation', {})
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
         dataloader_setting = dict(
@@ -207,7 +235,10 @@ def train_model(model,
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
 
     if cfg.resume_from:
+        # 如果有需要載入上次未訓練完的結果就會到這裡
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
+        # 如果是要單純加載模型參數就會到這裡
         runner.load_checkpoint(cfg.load_from)
+    # 開始進行訓練
     runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
