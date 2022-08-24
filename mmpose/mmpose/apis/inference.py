@@ -34,20 +34,35 @@ def init_pose_model(config, checkpoint=None, device='cuda:0'):
     Returns:
         nn.Module: The constructed detector.
     """
+    """ 構建關節點檢測模型
+    Args:
+        config: 模型設定config資料
+        checkpoint: 模型權重資料
+        device: 推理設備
+    """
     if isinstance(config, str):
+        # 如果config資料是str格式就會到這裡，使用檔案方式進行讀取config當中資料
         config = mmcv.Config.fromfile(config)
     elif not isinstance(config, mmcv.Config):
+        # 否則就需要是mmcv.Config型態，也就是已經讀取好的config型態
         raise TypeError('config must be a filename or Config object, '
                         f'but got {type(config)}')
+    # 將原先config資料當中的預訓練資料設定成None，之後會統一加載模型權重
     config.model.pretrained = None
+    # 透過config資料構建模型實例化對象
     model = build_posenet(config.model)
     if checkpoint is not None:
+        # 如果有傳入指定的訓練權重就會到這裡進行加載
         # load model checkpoint
         load_checkpoint(model, checkpoint, map_location='cpu')
     # save the config in the model for convenience
+    # 將config資料放一份到model當中
     model.cfg = config
+    # 將模型放到指定設備上
     model.to(device)
+    # 將模型設定成驗證模式
     model.eval()
+    # 回傳實例化模型
     return model
 
 
@@ -452,73 +467,118 @@ def inference_bottom_up_pose_model(model,
             Output feature maps from layers specified in `outputs`. \
             Includes 'heatmap' if `return_heatmap` is True.
     """
+    """ 進行bottom-up的關節點單張檢測
+    Args:
+        model: 模型本身
+        img_or_path: 圖像資料或是圖像路徑資料
+        dataset: Dataset的性質
+        dataset_info: Dataset的詳細內容
+        pose_nms_thr: 閾值
+        return_heatmap: 是否需要回傳熱力圖
+        outputs: 有哪些層結構需要回傳
+    """
     # get dataset info
     if (dataset_info is None and hasattr(model, 'cfg')
             and 'dataset_info' in model.cfg):
+        # 如果dataset_info是None且model.cfg當中有dataset_info就會到這裡，將dataset_info用DatasetInfo包裝
         dataset_info = DatasetInfo(model.cfg.dataset_info)
 
     if dataset_info is not None:
+        # 如果dataset_info不是None就會到這裡
+        # 獲取dataset的名稱
         dataset_name = dataset_info.dataset_name
+        # 獲取每個關節點對稱的關節點index
         flip_index = dataset_info.flip_index
+        # 獲取sigmas超參數，如果沒有的話就用None代替
         sigmas = getattr(dataset_info, 'sigmas', None)
     else:
+        # 如果沒有dataset_info就會到這裡，會跳出警告表示dataset要被捨棄將dataset_info放到config當中
         warnings.warn(
             'dataset is deprecated.'
             'Please set `dataset_info` in the config.'
             'Check https://github.com/open-mmlab/mmpose/pull/663 for details.',
             DeprecationWarning)
+        # 檢查dataset是否為BottomUpCocoDataset
         assert (dataset == 'BottomUpCocoDataset')
+        # 將名稱放到dataset_name當中
         dataset_name = dataset
+        # 直接指定對稱點的關節點index
         flip_index = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+        # 將sigmas設定成None
         sigmas = None
 
+    # 最終pose的結果保存list
     pose_results = []
+    # 最終的outputs保存list
     returned_outputs = []
 
+    # 獲取config資訊
     cfg = model.cfg
+    # 獲取當前訓練設備
     device = next(model.parameters()).device
     if device.type == 'cpu':
+        # 如果當前設備是用cpu就會將device設定成-1
         device = -1
 
     # build the data pipeline
+    # 構建圖像資料要通過的圖像處理流
     test_pipeline = Compose(cfg.test_pipeline)
+    # 透過_pipeline_gpu_speedup讓圖像通過pipeline過程加速
     _pipeline_gpu_speedup(test_pipeline, next(model.parameters()).device)
 
     # prepare data
+    # 構建data設定
     data = {
+        # dataset = dataset名稱
         'dataset': dataset_name,
         'ann_info': {
+            # image_size = 輸入到網路的圖像大小
             'image_size': np.array(cfg.data_cfg['image_size']),
+            # num_joints = 預測的關節點數量
             'num_joints': cfg.data_cfg['num_joints'],
+            # flip_index = 每個關節點對稱點的關節點index
             'flip_index': flip_index,
         }
     }
     if isinstance(img_or_path, np.ndarray):
+        # 如果img_or_path已經是ndarray就直接保存到data['img']當中
         data['img'] = img_or_path
     else:
+        # 如果img_or_path是str格式就會在data當中保存檔案路徑
         data['image_file'] = img_or_path
 
+    # 將data通入test_pipeline當中進行圖像處理流
     data = test_pipeline(data)
+    # 使用collate將資料打包成一個batch
     data = collate([data], samples_per_gpu=1)
     data = scatter(data, [device])[0]
 
+    # 透過OutputHook會將指定的outputs層結構的值進行回傳，如果沒有設定就不會回傳中間層結構輸出
     with OutputHook(model, outputs=outputs, as_tensor=False) as h:
         # forward the model
+        # 將模型的反向傳遞關閉
         with torch.no_grad():
+            # 進行正向傳遞
             result = model(
                 img=data['img'],
                 img_metas=data['img_metas'],
+                # 將計算損失部分關閉
                 return_loss=False,
+                # 根據return_heatmap決定是否需要回傳熱力圖
                 return_heatmap=return_heatmap)
 
         if return_heatmap:
+            # 如果有需要輸出熱力圖就會將熱力圖存到h當中
             h.layer_outputs['heatmap'] = result['output_heatmap']
 
+        # 將h需要輸出的資料保存到returned_outputs當中
         returned_outputs.append(h.layer_outputs)
 
+        # 遍歷一張圖像當中所有檢測到的人物
         for idx, pred in enumerate(result['preds']):
-            area = (np.max(pred[:, 0]) - np.min(pred[:, 0])) * (
-                np.max(pred[:, 1]) - np.min(pred[:, 1]))
+            # 計算人物面積
+            area = (np.max(pred[:, 0]) - np.min(pred[:, 0])) * (np.max(pred[:, 1]) - np.min(pred[:, 1]))
+            # 將關節點以及置信度以及面積資訊進行保存
             pose_results.append({
                 'keypoints': pred[:, :3],
                 'score': result['scores'][idx],
@@ -526,6 +586,7 @@ def inference_bottom_up_pose_model(model,
             })
 
         # pose nms
+        # 將設定檔中的score_per_joint資訊取出
         score_per_joint = cfg.model.test_cfg.get('score_per_joint', False)
         keep = oks_nms(
             pose_results,

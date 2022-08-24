@@ -62,11 +62,22 @@ def oks_iou(g, d, a_g, a_d, sigmas=None, vis_thr=None):
     Returns:
         list: The oks ious.
     """
+    """ 計算oks的iou
+    Args:
+        g: 當前人物關節點資訊，ndarray shape [num_joints * 3]
+        d: 剩下的人物關節點資訊，ndarray shape [num_people, num_joints * 3]
+        a_g: 當前人物的面積
+        a_d: 剩下人物的面積
+        sigmas: 關鍵點標註的標準差
+        vis_thr: 關鍵點可見性閾值
+    """
     if sigmas is None:
+        # 如果沒有給定sigmas資訊就會是默認的值
         sigmas = np.array([
             .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
             .87, .87, .89, .89
         ]) / 10.0
+    # 進行計算iou值
     vars = (sigmas * 2)**2
     xg = g[0::3]
     yg = g[1::3]
@@ -99,32 +110,54 @@ def oks_nms(kpts_db, thr, sigmas=None, vis_thr=None, score_per_joint=False):
     Returns:
         np.ndarray: indexes to keep.
     """
+    """ OKS極大值抑制算法
+    Args:
+        kpts_db: 關節點資訊，包含關節點座標以及總體置信度以及面積
+        thr: 閾值
+        sigmas: 關鍵點標註的標準差
+        vis_thr: 讓關節點顯示出的閾值
+        score_per_joint: 輸入的score是每個關節點或是整體的score
+    """
     if len(kpts_db) == 0:
+        # 如果沒有檢測到關節點就會直接回傳空
         return []
 
     if score_per_joint:
+        # 如果輸入的score是依據每個關節點就會到這裡，進行整體的平均值
         scores = np.array([k['score'].mean() for k in kpts_db])
     else:
+        # 如果輸入的score是整體的平均就會到這裡，直接進行保存
         scores = np.array([k['score'] for k in kpts_db])
 
+    # 將關節點資訊進行攤平，kpts shape [num_people, num_joints * 3]
     kpts = np.array([k['keypoints'].flatten() for k in kpts_db])
+    # 將面積資訊提取出來
     areas = np.array([k['area'] for k in kpts_db])
 
+    # 將置信度進行排序
     order = scores.argsort()[::-1]
 
+    # 最終回傳的list
     keep = []
+    # 從置信度大的開始進行遍歷
     while len(order) > 0:
+        # 獲取還未處理中置信度最大的index
         i = order[0]
+        # 將該index保存到keep當中表示該人物是有效人物
         keep.append(i)
 
-        oks_ovr = oks_iou(kpts[i], kpts[order[1:]], areas[i], areas[order[1:]],
-                          sigmas, vis_thr)
+        # 透過oks_iou進行計算
+        oks_ovr = oks_iou(kpts[i], kpts[order[1:]], areas[i], areas[order[1:]], sigmas, vis_thr)
 
+        # 獲取與目前標註到不相同人的index
         inds = np.where(oks_ovr <= thr)[0]
+        # 將order進行更新
         order = order[inds + 1]
 
+    # 將keep轉成ndarray
     keep = np.array(keep)
 
+    # 將結果回傳，當中表示要使用哪些index的資料
     return keep
 
 

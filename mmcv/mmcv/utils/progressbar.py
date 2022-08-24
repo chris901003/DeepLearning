@@ -181,8 +181,7 @@ def track_parallel_progress(func,
 
 
 def track_iter_progress(tasks, bar_width=50, file=sys.stdout):
-    """Track the progress of tasks iteration or enumeration with a progress
-    bar.
+    """Track the progress of tasks iteration or enumeration with a progress bar.
 
     Tasks are yielded with a simple for-loop.
 
@@ -190,23 +189,40 @@ def track_iter_progress(tasks, bar_width=50, file=sys.stdout):
         tasks (list or tuple[Iterable, int]): A list of tasks or
             (tasks, total num).
         bar_width (int): Width of progress bar.
+        file
 
     Yields:
         list: The task results.
     """
+    """ 使用進度條跟踪任務迭代或枚舉的進度
+    Args:
+        tasks: 圖像名稱列表，list[str]，list長度就會是圖像數量
+        bar_width: 進度條的寬度
+    """
     if isinstance(tasks, tuple):
+        # 如果tasks是tuple型態就會到這裡
+        # tasks會有兩個資料
         assert len(tasks) == 2
+        # tasks的第一個資料要是可以遍歷的
         assert isinstance(tasks[0], Iterable)
+        # tasks的第二個資料要是正數型態
         assert isinstance(tasks[1], int)
+        # tasks[1]存放的是圖像數量
         task_num = tasks[1]
+        # tasks[0]會是可以遍歷的圖像集
         tasks = tasks[0]
     elif isinstance(tasks, Iterable):
+        # 如果tasks是可以遍歷的就會到這裡，透過len獲取圖像長度
         task_num = len(tasks)
     else:
-        raise TypeError(
-            '"tasks" must be an iterable object or a (iterator, int) tuple')
+        # 其他就直接報錯
+        raise TypeError('"tasks" must be an iterable object or a (iterator, int) tuple')
+    # 構建進度條
     prog_bar = ProgressBar(task_num, bar_width, file=file)
+    # 遍歷整個圖像資料
     for task in tasks:
+        # 使用yield將圖像回傳，節省記憶體空間
         yield task
+        # 更新進度條資訊
         prog_bar.update()
     prog_bar.file.write('\n')

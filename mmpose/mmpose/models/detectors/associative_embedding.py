@@ -253,61 +253,84 @@ class AssociativeEmbedding(BasePose):
             center (np.ndarray): center of image
             scale (np.ndarray): the scale of image
         """
+        """ 如果是測試模式就會到這裡進行正向傳遞
+        Args:
+            img: 原始圖像資料，tensor shape [batch_size, height, width, channel]
+            img_metas: 圖像詳細資料
+            return_heatmap: 是否需要回傳熱力圖
+            kwargs: 其他參數
+        """
+        # 這裡只允許單一圖像進行測試，所以batch_size部分需要是1
         assert img.size(0) == 1
+        # 同時img_metas也要是1
         assert len(img_metas) == 1
 
+        # 獲取圖像詳細資料
         img_metas = img_metas[0]
 
+        # 獲取圖像增強的資料
         aug_data = img_metas['aug_data']
 
+        # 獲取img_metas當中資訊
         test_scale_factor = img_metas['test_scale_factor']
         base_size = img_metas['base_size']
         center = img_metas['center']
         scale = img_metas['scale']
 
+        # 最終結果保存地方
         result = {}
 
+        # 獲取熱力圖list保存位置
         scale_heatmaps_list = []
         scale_tags_list = []
 
+        # 遍歷縮放倍率
         for idx, s in enumerate(sorted(test_scale_factor, reverse=True)):
+            # 獲取aud_data當中圖像資料，這裡會將圖像放到測試設備上
             image_resized = aug_data[idx].to(img.device)
 
+            # 進行特徵提取，features shape = [batch_size, channel, height, width]
             features = self.backbone(image_resized)
             if self.with_keypoint:
+                # 如果有關節點解碼頭就會到這裡，outputs = list[tensor]，tensor shape [batch_size, channel, height, width]
                 outputs = self.keypoint_head(features)
 
+            # 將tags以及熱力圖資料提取出來
             heatmaps, tags = split_ae_outputs(
                 outputs, self.test_cfg['num_joints'],
                 self.test_cfg['with_heatmaps'], self.test_cfg['with_ae'],
                 self.test_cfg.get('select_output_index', range(len(outputs))))
 
             if self.test_cfg.get('flip_test', True):
+                # 如果有需要flip_test就會到這裡，會將圖像進行左右翻轉後再次放到模型當中預測
                 # use flip test
-                features_flipped = self.backbone(
-                    torch.flip(image_resized, [3]))
+                # 透過torch.flip將圖像進行翻轉，之後放到backbone當中提取特徵
+                features_flipped = self.backbone(torch.flip(image_resized, [3]))
                 if self.with_keypoint:
+                    # 如果有關節點分類頭也需要進行傳遞
                     outputs_flipped = self.keypoint_head(features_flipped)
 
+                # 將翻轉後的圖像資料進行熱力圖以及tags的提取
                 heatmaps_flipped, tags_flipped = split_ae_outputs(
                     outputs_flipped, self.test_cfg['num_joints'],
                     self.test_cfg['with_heatmaps'], self.test_cfg['with_ae'],
-                    self.test_cfg.get('select_output_index',
-                                      range(len(outputs))))
+                    self.test_cfg.get('select_output_index', range(len(outputs))))
 
-                heatmaps_flipped = flip_feature_maps(
-                    heatmaps_flipped, flip_index=img_metas['flip_index'])
+                # 將熱力圖進行翻轉，這樣就可以翻轉回來
+                heatmaps_flipped = flip_feature_maps(heatmaps_flipped, flip_index=img_metas['flip_index'])
                 if self.test_cfg['tag_per_joint']:
-                    tags_flipped = flip_feature_maps(
-                        tags_flipped, flip_index=img_metas['flip_index'])
+                    # 如果有設定tag_per_joint就會到這裡
+                    tags_flipped = flip_feature_maps(tags_flipped, flip_index=img_metas['flip_index'])
                 else:
-                    tags_flipped = flip_feature_maps(
-                        tags_flipped, flip_index=None, flip_output=True)
+                    # 沒有設定tag_per_joint就會到這裡
+                    tags_flipped = flip_feature_maps(tags_flipped, flip_index=None, flip_output=True)
 
             else:
+                # 如果沒有需要將圖像進行左右變換後再次驗證就會到這裡，將flipped的資料設定成None
                 heatmaps_flipped = None
                 tags_flipped = None
 
+            # 將熱力圖翻轉的結果與原始圖像預測結果進行融合
             aggregated_heatmaps = aggregate_stage_flip(
                 heatmaps,
                 heatmaps_flipped,
@@ -318,6 +341,7 @@ class AssociativeEmbedding(BasePose):
                 aggregate_stage='average',
                 aggregate_flip='average')
 
+            # 將tags翻轉的結果與原始圖像預測結果進行融合
             aggregated_tags = aggregate_stage_flip(
                 tags,
                 tags_flipped,
@@ -329,46 +353,60 @@ class AssociativeEmbedding(BasePose):
                 aggregate_flip='concat')
 
             if s == 1 or len(test_scale_factor) == 1:
+                # 如果s==1或是test_scale_factor只有1個就會到這裡，將tag保存到scale_tags當中
                 if isinstance(aggregated_tags, list):
                     scale_tags_list.extend(aggregated_tags)
                 else:
                     scale_tags_list.append(aggregated_tags)
 
+            # 將熱力圖進行保存
             if isinstance(aggregated_heatmaps, list):
                 scale_heatmaps_list.extend(aggregated_heatmaps)
             else:
                 scale_heatmaps_list.append(aggregated_heatmaps)
 
+        # 將不同尺度的熱力圖進行融合，aggregated_heatmaps shape = [batch_size, num_joints, height, width]
         aggregated_heatmaps = aggregate_scale(
             scale_heatmaps_list,
             align_corners=self.test_cfg.get('align_corners', True),
             aggregate_scale='average')
 
+        # 將不同tags進行融合，aggregated_tags shape = [batch_size, num_joints, height, width, scale * 2]
         aggregated_tags = aggregate_scale(
             scale_tags_list,
             align_corners=self.test_cfg.get('align_corners', True),
             aggregate_scale='unsqueeze_concat')
 
+        # 獲取熱力圖的高寬資料
         heatmap_size = aggregated_heatmaps.shape[2:4]
+        # 獲取tag的高寬資料
         tag_size = aggregated_tags.shape[2:4]
         if heatmap_size != tag_size:
+            # 如果熱力圖的高寬與tag的高寬不同就會到這裡進行高寬調整
+            # 構建一個臨時list
             tmp = []
+            # 遍歷tags資料，這裡tags的資料數量會是保存在shape[-1]的地方
             for idx in range(aggregated_tags.shape[-1]):
                 tmp.append(
+                    # 透過差值方式進行調整，會將大小調整到與熱力圖相同
                     torch.nn.functional.interpolate(
                         aggregated_tags[..., idx],
                         size=heatmap_size,
                         mode='bilinear',
-                        align_corners=self.test_cfg.get('align_corners',
-                                                        True)).unsqueeze(-1))
+                        align_corners=self.test_cfg.get('align_corners', True)).unsqueeze(-1))
+            # 最後用concat進行拼接，會在最後一個維度進行
             aggregated_tags = torch.cat(tmp, dim=-1)
 
         # perform grouping
+        # 進行資料解析
+        # grouped = list[ndarray]，list長度會batch_size，ndarray shape [people, num_joints, (x, y, score, tag[0], tag[1])]
+        # scores = list[float32]，list長度會batch_size，值會是整體平均置信度
         grouped, scores = self.parser.parse(aggregated_heatmaps,
                                             aggregated_tags,
                                             self.test_cfg['adjust'],
                                             self.test_cfg['refine'])
 
+        # 透過get_group_preds獲取preds
         preds = get_group_preds(
             grouped,
             center,
@@ -376,14 +414,19 @@ class AssociativeEmbedding(BasePose):
                     aggregated_heatmaps.size(2)],
             use_udp=self.use_udp)
 
-        image_paths = []
+        # 構建image_paths資料
+        image_paths = list()
+        # 將原圖像的檔案位置保存進去
         image_paths.append(img_metas['image_file'])
 
         if return_heatmap:
+            # 如果有需要回傳熱力圖就會將預測的熱力圖轉成ndarray進行保存
             output_heatmap = aggregated_heatmaps.detach().cpu().numpy()
         else:
+            # 否則就會是None
             output_heatmap = None
 
+        # 保存資料到result當中
         result['preds'] = preds
         result['scores'] = scores
         result['image_paths'] = image_paths

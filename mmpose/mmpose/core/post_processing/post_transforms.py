@@ -172,25 +172,40 @@ def transform_preds(coords, center, scale, output_size, use_udp=False):
     Returns:
         np.ndarray: Predicted coordinates in the images.
     """
+    """ 獲取最終的關節點預測位置，透過縮放回到原始圖像的位置
+    Args:
+        coords: 關節點座標位置，ndarray shape [num_joints, (x, y, score, tag[0], tag[1])]
+        center: 標註匡中心點位置
+        scale: 標註匡縮放大小
+        output_size: 輸出圖像大小，也就是輸出的熱力圖大小
+        use_udp: 是否使用udp
+    """
+    # 檢查傳入的資料是否正確
     assert coords.shape[1] in (2, 4, 5)
     assert len(center) == 2
     assert len(scale) == 2
     assert len(output_size) == 2
 
     # Recover the scale which is normalized by a factor of 200.
+    # 將scale放大200倍，這裡是要調整回原本大小
     scale = scale * 200.0
 
     if use_udp:
+        # 如果有使用udp會到這裡
         scale_x = scale[0] / (output_size[0] - 1.0)
         scale_y = scale[1] / (output_size[1] - 1.0)
     else:
+        # 獲取x與y的縮放比例
         scale_x = scale[0] / output_size[0]
         scale_y = scale[1] / output_size[1]
 
+    # 構建target_coords的ndarray且shape與coords相同
     target_coords = np.ones_like(coords)
+    # 將傳入的coords進行調整後放到target_coords當中
     target_coords[:, 0] = coords[:, 0] * scale_x + center[0] - scale[0] * 0.5
     target_coords[:, 1] = coords[:, 1] * scale_y + center[1] - scale[1] * 0.5
 
+    # 回傳調整後的結果
     return target_coords
 
 

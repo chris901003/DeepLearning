@@ -10,6 +10,7 @@ from .shared_transform import Compose
 
 def _ceil_to_multiples_of(x, base=64):
     """Transform x to the integral multiple of the base."""
+    # 獲取離x最近且可以被base整除的值，如果需要調整只能選大於x的值
     return int(np.ceil(x / base)) * base
 
 
@@ -35,6 +36,14 @@ def _get_multi_scale_size(image,
         - (w_resized, h_resized) (tuple(int)): resized width/height
         - center (np.ndarray)image center
         - scale (np.ndarray): scales wrt width/height
+    """
+    """ 獲取多尺度圖像大小
+    Args:
+        image: 圖像資料，ndarray shape [height, width, channel]
+        input_size: 輸入到網路的圖像大小
+        current_scale: 當前的縮放比例
+        min_scale: 最小縮放比例
+        use_udp: 是否使用udp
     """
     assert len(input_size) == 2
     h, w, _ = image.shape
@@ -68,6 +77,7 @@ def _get_multi_scale_size(image,
         center = (scale_w / 2.0, scale_h / 2.0)
     else:
         center = np.array([round(w / 2.0), round(h / 2.0)])
+    # 返回(resize後的高寬, 中心點位置, 高寬縮放比例)
     return (w_resized, h_resized), center, np.array([scale_w, scale_h])
 
 
@@ -87,13 +97,24 @@ def _resize_align_multi_scale(image, input_size, current_scale, min_scale):
         - center (np.ndarray): center of image
         - scale (np.ndarray): scale
     """
+    """ 調整大小對齊多尺度
+    Args:
+        image: 當前圖像資訊，ndarray shape [height, width, channel]
+        input_size: 輸入到模型的圖像大小，ndarray shape [2]
+        current_scale: 當前的縮放比例
+        min_scale: 最小縮放比例
+    """
+    # 檢查input_size需要長度為2
     assert len(input_size) == 2
-    size_resized, center, scale = _get_multi_scale_size(
-        image, input_size, current_scale, min_scale)
+    # 將資料通過_get_multi_scale_size，獲取資料為(resize後的高寬, 中心點位置, 高寬縮放比例)
+    size_resized, center, scale = _get_multi_scale_size(image, input_size, current_scale, min_scale)
 
+    # 獲取仿射變換矩陣
     trans = get_affine_transform(center, scale, 0, size_resized)
+    # 進行仿射變換
     image_resized = cv2.warpAffine(image, trans, size_resized)
 
+    # 將結果回傳(變換後的圖像資料, 中心點, 高寬縮放比例)
     return image_resized, center, scale
 
 
@@ -860,28 +881,45 @@ class BottomUpGetImgSize:
     """
 
     def __init__(self, test_scale_factor, current_scale=1, use_udp=False):
+        """ 獲取多尺度圖像專門給bottom-up模型，保括基礎尺度以及測試的縮放尺度
+        Args:
+            test_scale_factor: 多尺度
+            current_scale: 預設為1
+            use_udp: 是否使用使用無偏置數據處理
+        """
+        # 將傳入的資料進行保存
         self.test_scale_factor = test_scale_factor
+        # 獲取test_scale_factor當中最小的倍率值
         self.min_scale = min(test_scale_factor)
         self.current_scale = current_scale
         self.use_udp = use_udp
 
     def __call__(self, results):
         """Get multi-scale image sizes for bottom-up."""
+        # 獲取多尺度圖像專門給bottom-up模型，保括基礎尺度以及測試的縮放尺度
+        # input_size = 輸入到模型當中的圖像大小
         input_size = results['ann_info']['image_size']
         if not isinstance(input_size, np.ndarray):
+            # 如果input_size不是ndarray就會到這裡，將input_size轉成ndarray型態
             input_size = np.array(input_size)
         if input_size.size > 1:
+            # 如果input_size的size大於1就一定要是2
             assert len(input_size) == 2
         else:
+            # 將input_size變成[input_size, input_size]型態
             input_size = np.array([input_size, input_size], dtype=np.int)
+        # 獲取當前圖像資料
         img = results['img']
 
+        # 獲取當前圖像高寬
         h, w, _ = img.shape
 
         # calculate the size for min_scale
+        # 獲取最小輸入高寬值，_ceil_to_multiples_of是獲取可以被64整除且離輸入的數字最近的函數
         min_input_w = _ceil_to_multiples_of(self.min_scale * input_size[0], 64)
         min_input_h = _ceil_to_multiples_of(self.min_scale * input_size[1], 64)
         if w < h:
+            # 如果寬度比高度短就會到這裡
             w_resized = int(min_input_w * self.current_scale / self.min_scale)
             h_resized = int(
                 _ceil_to_multiples_of(min_input_w / w * h, 64) *
@@ -893,25 +931,33 @@ class BottomUpGetImgSize:
                 scale_w = w / 200.0
                 scale_h = h_resized / w_resized * w / 200.0
         else:
+            # 如果高度比寬度短就會到這裡
+            # 獲取resize後的高寬值，這裡會將h_resize往min_input_h縮放
             h_resized = int(min_input_h * self.current_scale / self.min_scale)
             w_resized = int(
                 _ceil_to_multiples_of(min_input_h / h * w, 64) *
                 self.current_scale / self.min_scale)
             if self.use_udp:
+                # 如果有使用udp就會到這裡
                 scale_h = h - 1.0
                 scale_w = (w_resized - 1.0) / (h_resized - 1.0) * (h - 1.0)
             else:
+                # 如果沒有使用udp就會到這裡，計算scale_h與scale_w的值
                 scale_h = h / 200.0
                 scale_w = w_resized / h_resized * h / 200.0
         if self.use_udp:
+            # 如果有使用udp就會到這裡，獲取精確的center
             center = (scale_w / 2.0, scale_h / 2.0)
         else:
+            # 如果沒有使用udp就會到這裡
             center = np.array([round(w / 2.0), round(h / 2.0)])
+        # 將資料保存到ann_info當中
         results['ann_info']['test_scale_factor'] = self.test_scale_factor
         results['ann_info']['base_size'] = (w_resized, h_resized)
         results['ann_info']['center'] = center
         results['ann_info']['scale'] = np.array([scale_w, scale_h])
 
+        # 最終將results回傳
         return results
 
 
@@ -927,33 +973,54 @@ class BottomUpResizeAlign:
     """
 
     def __init__(self, transforms, use_udp=False):
+        """ 進行多尺度變換，同時進行對齊變換，這裡是專門給bottom-up模型
+        Args:
+            transforms: 一系列處理流
+            use_udp: 是否使用udp
+        """
+        # 將圖像處理流用Compose包裝
         self.transforms = Compose(transforms)
         if use_udp:
+            # 如果使用udp就會到這裏
             self._resize_align_multi_scale = _resize_align_multi_scale_udp
         else:
+            # 否則就會到這裡
             self._resize_align_multi_scale = _resize_align_multi_scale
 
     def __call__(self, results):
         """Resize multi-scale size and align transform for bottom-up."""
+        # 進行多尺度變換，同時進行對齊變換，這裡是專門給bottom-up模型
+        # 獲取輸入到模型當中的圖像大小
         input_size = results['ann_info']['image_size']
+        # 處理input_size資料
         if not isinstance(input_size, np.ndarray):
             input_size = np.array(input_size)
         if input_size.size > 1:
             assert len(input_size) == 2
         else:
             input_size = np.array([input_size, input_size], dtype=np.int)
+        # 獲取test的縮放比例
         test_scale_factor = results['ann_info']['test_scale_factor']
+        # 保存數據增強的資料
         aug_data = []
 
+        # 遍歷縮放比例，這裡會由大到小排序
         for _, s in enumerate(sorted(test_scale_factor, reverse=True)):
+            # 拷貝一份results到_results當中
             _results = results.copy()
-            image_resized, _, _ = self._resize_align_multi_scale(
-                _results['img'], input_size, s, min(test_scale_factor))
+            # 將資料傳到_resize_align_multi_scale當中，image_resized會是變換後的圖像，高寬會發生變化
+            image_resized, _, _ = self._resize_align_multi_scale(_results['img'], input_size, s, min(test_scale_factor))
+            # 將img資料更新到results當中
             _results['img'] = image_resized
+            # 將results通過一系列流
             _results = self.transforms(_results)
+            # 將_results當中圖像資料提取出來，並且在第0個維度擴圍
             transformed_img = _results['img'].unsqueeze(0)
+            # 保存到aug_data當中
             aug_data.append(transformed_img)
 
+        # 將經過數據增強的圖像放到results當中
         results['ann_info']['aug_data'] = aug_data
 
+        # 將更新好的results返回
         return results
