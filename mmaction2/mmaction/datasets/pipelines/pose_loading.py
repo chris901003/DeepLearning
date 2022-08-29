@@ -170,24 +170,30 @@ class PoseDecode:
         return [x[frame_inds].astype(np.float32) for x in kpscore]
 
     def __call__(self, results):
+        # 根據需要的index換成需要的數據
 
         if 'frame_inds' not in results:
+            # 如果results當中沒有指定frame_inds就用構建一個從0到總幀數的list
             results['frame_inds'] = np.arange(results['total_frames'])
 
         if results['frame_inds'].ndim != 1:
+            # 如果frame_inds的shape有多餘的1就去除
             results['frame_inds'] = np.squeeze(results['frame_inds'])
 
+        # 檢查results當中有沒有設定offset，如果沒有指定就會用0
         offset = results.get('offset', 0)
+        # 將所有幀的index添加上offset
         frame_inds = results['frame_inds'] + offset
 
         if 'keypoint_score' in results:
+            # 如果results當中有keypoint_score資訊就會到這裡，先將keypoint_score資訊提取出來
             kpscore = results['keypoint_score']
-            results['keypoint_score'] = kpscore[:,
-                                                frame_inds].astype(np.float32)
+            # 將關節點置信度資料進行擴展
+            results['keypoint_score'] = kpscore[:, frame_inds].astype(np.float32)
 
         if 'keypoint' in results:
-            results['keypoint'] = results['keypoint'][:, frame_inds].astype(
-                np.float32)
+            # 如果results當中有keypoint資訊就根據frame_inds進行擴展
+            results['keypoint'] = results['keypoint'][:, frame_inds].astype(np.float32)
 
         return results
 
@@ -648,21 +654,33 @@ class PaddingWithLoop:
     """
 
     def __init__(self, clip_len, num_clips=1):
+        """ 對影片進行取樣幀
+        Args:
+            clip_len: 每個clip的幀數
+            num_clips: 總共會需要多少clip
+        """
 
         self.clip_len = clip_len
         self.num_clips = num_clips
 
     def __call__(self, results):
+        # 獲取當前總共有多少幀
         num_frames = results['total_frames']
 
         start = 0
+        # 獲取從0到clip_len的list
         inds = np.arange(start, start + self.clip_len)
+        # 將inds對num_frames取mod，這樣超過總幀數的地方會變成loop
         inds = np.mod(inds, num_frames)
 
+        # 將frame_inds保存
         results['frame_inds'] = inds.astype(np.int)
+        # 保存每個clip的長度
         results['clip_len'] = self.clip_len
         results['frame_interval'] = None
+        # 保存總共有多少個clips
         results['num_clips'] = self.num_clips
+        # 將更新後的results回傳
         return results
 
 
@@ -680,16 +698,25 @@ class PoseNormalize:
                  mean=(960., 540., 0.5),
                  min_value=(0., 0., 0.),
                  max_value=(1920, 1080, 1.)):
+        """ 將關節點特徵進行標準化
+        Args:
+            mean: 均值
+            min_value: 關節點的最小值
+            max_value: 關節點的最大值
+        """
+        # 將傳入的值轉成ndarray同時調整通道順序
         self.mean = np.array(mean, dtype=np.float32).reshape(-1, 1, 1, 1)
-        self.min_value = np.array(
-            min_value, dtype=np.float32).reshape(-1, 1, 1, 1)
-        self.max_value = np.array(
-            max_value, dtype=np.float32).reshape(-1, 1, 1, 1)
+        self.min_value = np.array(min_value, dtype=np.float32).reshape(-1, 1, 1, 1)
+        self.max_value = np.array(max_value, dtype=np.float32).reshape(-1, 1, 1, 1)
 
     def __call__(self, results):
+        # 將keypoint資訊提取出來
         keypoint = results['keypoint']
+        # 對keypoint進行標準化，之後將絕對座標轉換成相對座標
         keypoint = (keypoint - self.mean) / (self.max_value - self.min_value)
+        # 將results當中的關節點進行更新
         results['keypoint'] = keypoint
-        results['keypoint_norm_cfg'] = dict(
-            mean=self.mean, min_value=self.min_value, max_value=self.max_value)
+        # 將標準化參數存入到results當中
+        results['keypoint_norm_cfg'] = dict(mean=self.mean, min_value=self.min_value, max_value=self.max_value)
+        # 回傳更新後results結果
         return results

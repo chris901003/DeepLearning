@@ -475,10 +475,17 @@ class FormatGCNInput:
     """
 
     def __init__(self, input_format, num_person=2):
+        """ 對於GCN的輸入進行通道調整
+        Args:
+            input_format: 輸入的格式
+            num_person: 最大人數
+        """
+        # 保存input_format
         self.input_format = input_format
+        # 這裡目前只支援NCTVM的格式
         if self.input_format not in ['NCTVM']:
-            raise ValueError(
-                f'The input format {self.input_format} is invalid.')
+            raise ValueError(f'The input format {self.input_format} is invalid.')
+        # 保存人數
         self.num_person = num_person
 
     def __call__(self, results):
@@ -488,29 +495,40 @@ class FormatGCNInput:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        # 調整資料的通道排列方式
+        # 將關節點資料提取出來，關節點資料是我們主要使用的資料
         keypoint = results['keypoint']
 
         if 'keypoint_score' in results:
+            # 如果results當中有關節點置信度分數就會到這裡，先將關節點置信度分數提取出來
             keypoint_confidence = results['keypoint_score']
+            # 添加一個維度在最後
             keypoint_confidence = np.expand_dims(keypoint_confidence, -1)
-            keypoint_3d = np.concatenate((keypoint, keypoint_confidence),
-                                         axis=-1)
+            # 將關節點資訊以及置信度分數在最後一個維度進行拼接
+            # keypoint_3d = [人數, 幀數, 關節點數量, ((x, y)座標, 置信度分數)]
+            keypoint_3d = np.concatenate((keypoint, keypoint_confidence), axis=-1)
         else:
             keypoint_3d = keypoint
 
-        keypoint_3d = np.transpose(keypoint_3d,
-                                   (3, 1, 2, 0))  # M T V C -> C T V M
+        # 調整通道順序 [座標以及置信度, 幀數, 關節點數量, 人數]
+        keypoint_3d = np.transpose(keypoint_3d, (3, 1, 2, 0))  # M T V C -> C T V M
 
         if keypoint_3d.shape[-1] < self.num_person:
+            # 如果獲取的人數小於設定的最大人數就會到這裡
+            # 獲取還差多少個人物資訊
             pad_dim = self.num_person - keypoint_3d.shape[-1]
-            pad = np.zeros(
-                keypoint_3d.shape[:-1] + (pad_dim, ), dtype=keypoint_3d.dtype)
+            # 構建一個全為0的pad
+            pad = np.zeros(keypoint_3d.shape[:-1] + (pad_dim, ), dtype=keypoint_3d.dtype)
+            # 最後拼接上去
             keypoint_3d = np.concatenate((keypoint_3d, pad), axis=-1)
         elif keypoint_3d.shape[-1] > self.num_person:
+            # 如果獲取的人數大於設定的最大人數就會只取前num_person個資訊
             keypoint_3d = keypoint_3d[:, :, :, :self.num_person]
 
+        # 更新資訊
         results['keypoint'] = keypoint_3d
         results['input_shape'] = keypoint_3d.shape
+        # 將更新後的results返回
         return results
 
     def __repr__(self):
