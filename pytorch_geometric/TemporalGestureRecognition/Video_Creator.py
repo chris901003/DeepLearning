@@ -32,6 +32,8 @@ def main():
                         video_writer.write(image)
                     imgs = list()
                     print('Finish write one video')
+            state = 'Recording' if recording else 'Not recording'
+            cv2.putText(img, state, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA)
             cv2.imshow('img', img)
 
 

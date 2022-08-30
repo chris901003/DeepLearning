@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 from Gesture_API import GestureRecognitionAPI
@@ -97,6 +98,8 @@ def AdjustVolume(gesture):
         else:
             pyautogui.press('KEYTYPE_SOUND_DOWN')
         return 2, 'Volume down'
+    elif gesture == 3:
+        os.system('pmset sleepnow')
     else:
         return 2, '1 => Volume up, 2 => Volume down, 5 => Back to choosing mode'
 
