@@ -6,4 +6,4 @@
 
 
 ### TemporalGestureRecognition
-嘗試辨識連續動作(估計會翻車)
+嘗試辨識連續動作(以翻車一次，接下來嘗試使用st-gcn方式辨識)
