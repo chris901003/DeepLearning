@@ -31,7 +31,7 @@ def main():
         {'frames': 300, 'start': 0, 'interval': 1, 'mode': 'loop'},
         {'type': 'PyAVDecode', 'to_img': False},
         {'max_num_hands': 1, 'min_detection_confidence': 0.5, 'min_tracking_confidence': 0.5, 'idx_to_keypoint': True},
-        {'targets': ['video_path', 'frames', 'keypoints', 'label']}
+        {'targets': ['video_path', 'frames', 'keypoints', 'label', 'z_axis']}
     ]
     process = Compose(pipeline_cls, pipeline_args)
     information = {
@@ -126,34 +126,50 @@ class HandKeypointExtract:
         assert imgs is not None, 'data當中沒有圖像資料'
         imgHeight, imgWidth = imgs[0].shape[:2]
         keypoints = list()
+        z_axis = list()
         for i, img in enumerate(imgs):
             results = self.hands.process(img)
             if results.multi_hand_landmarks:
                 keypoint = list()
+                z = list()
                 for lm in results.multi_hand_landmarks[0].landmark:
                     xPos = int(lm.x * imgWidth)
                     yPos = int(lm.y * imgHeight)
+                    # 添加上z座標，先將所有點進行標準化
                     keypoint.append([xPos, yPos])
+                    z.append(lm.z)
+                z = normalize_z_axis(z)
                 keypoint = torch.tensor(keypoint)
+                z = torch.tensor(z)
+                z = z.unsqueeze(dim=-1)
                 keypoints.append(keypoint)
+                z_axis.append(z)
             else:
                 keypoints.append(None)
+                z_axis.append(None)
         if self.idx_to_keypoint:
             frame_idx = data.get('frame_idx', None)
             assert frame_idx is not None, 'Data當中缺少frame_idx參數'
             result_keypoints = [keypoints[idx] for idx in frame_idx]
+            result_z_axis = [z_axis[idx] for idx in frame_idx]
         else:
             result_keypoints = keypoints
+            result_z_axis = z_axis
         total_frame = len(result_keypoints)
         result_keypoints = [x for x in result_keypoints if x is not None]
+        result_z_axis = [x for x in result_z_axis if x is not None]
         idx = 0
         while len(result_keypoints) < total_frame:
             result_keypoints.append(result_keypoints[idx])
+            result_z_axis.append(result_z_axis[idx])
             idx += 1
         result_keypoints = torch.stack(result_keypoints)
+        result_z_axis = torch.stack(result_z_axis)
         # 這裡我們先使用一隻手的關節點檢測，為了之後好擴展成多手檢測，所以先在最後添加上一個手的數量維度
         result_keypoints = result_keypoints.unsqueeze(dim=-1)
+        result_z_axis = result_z_axis.unsqueeze(dim=-1)
         data['keypoints'] = result_keypoints
+        data['z_axis'] = result_z_axis
         return data
 
 
@@ -211,6 +227,14 @@ def PyAVDecode(data, to_img=True):
     else:
         data['imgs'] = images
     return data
+
+
+def normalize_z_axis(z_axis):
+    min_z = min(z_axis)
+    z_axis = [z - min_z for z in z_axis]
+    max_z = max(z_axis)
+    z_axis = [z / max_z for z in z_axis]
+    return z_axis
 
 
 if __name__ == '__main__':

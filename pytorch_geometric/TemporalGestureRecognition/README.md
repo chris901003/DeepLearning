@@ -9,6 +9,10 @@
 第一次隨意嘗試手部練續動作檢測，目前已翻車
 
 
+### TemporalGestureRecognition_Train
+準備嘗試使用st-gcn架構進行訓練(目前訓練結果沒有翻車，接下來做實際測試)
+
+
 ### Video_Creator
 使用電腦攝影機獲取影片動作
 
