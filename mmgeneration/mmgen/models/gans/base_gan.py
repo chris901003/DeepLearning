@@ -168,35 +168,50 @@ class BaseGAN(nn.Module, metaclass=ABCMeta):
                 ``None`` indicates to use the default noise sampler.
             num_batches (int, optional):  The number of batch size.
                 Defaults to 0.
+            sample_model:
 
         Returns:
             torch.Tensor | dict: The output may be the direct synthesized
                 images in ``torch.Tensor``. Otherwise, a dict with queried
                 data, including generated images, will be returned.
         """
+        """ 透過噪聲進行圖像生成
+        Args:
+            noise: 噪聲，如果沒有設定就會是None
+            num_batches: 一個batch的大小
+            sample_model: 採樣方式
+        """
         if sample_model == 'ema':
+            # 如果sample_model是ema就會到這裡
             assert self.use_ema
             _model = self.generator_ema
         elif sample_model == 'ema/orig' and self.use_ema:
+            # 如果sample_model是ema/orig就會到這裡
             _model = self.generator_ema
         else:
+            # 其他就會到這裡，_model就直接會是生成器
             _model = self.generator
 
+        # 進行生成模型正向傳遞，outputs shape [batch_size, channel, height, width]
         outputs = _model(noise, num_batches=num_batches, **kwargs)
 
         if isinstance(outputs, dict) and 'noise_batch' in outputs:
+            # 如果outputs當中有返回最初始噪音值就會到這裡，將noise保存
             noise = outputs['noise_batch']
 
         if sample_model == 'ema/orig' and self.use_ema:
+            # 如果sample_model是ema/orig就會到這裡
             _model = self.generator
+            # 在創建一次圖像
             outputs_ = _model(noise, num_batches=num_batches, **kwargs)
 
             if isinstance(outputs_, dict):
-                outputs['fake_img'] = torch.cat(
-                    [outputs['fake_img'], outputs_['fake_img']], dim=0)
+                # 將兩次圖像都進行保存
+                outputs['fake_img'] = torch.cat([outputs['fake_img'], outputs_['fake_img']], dim=0)
             else:
                 outputs = torch.cat([outputs, outputs_], dim=0)
 
+        # 回傳結果，圖像方面的資料會是tensor shape [batch_size, channel, height, width]
         return outputs
 
     def forward_train(self, data, **kwargs):

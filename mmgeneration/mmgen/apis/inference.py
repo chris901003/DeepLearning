@@ -17,31 +17,47 @@ def init_model(config, checkpoint=None, device='cuda:0', cfg_options=None):
             object.
         checkpoint (str, optional): Checkpoint path. If left as None, the model
             will not load any weights.
+        device (str): Pretrained weight
         cfg_options (dict): Options to override some settings in the used
             config.
 
     Returns:
         nn.Module: The constructed unconditional model.
     """
+    """ 初始化模型
+    Args:
+        config: 模型設定資料config文件
+        checkpoint: 預訓練權重資料
+        device: 運行設備
+        cfg_options: 額外添加或是要更新到config資料當中的資料
+    """
 
     if isinstance(config, str):
+        # 將config資料進行讀入，如果給定的config是檔案路徑
         config = mmcv.Config.fromfile(config)
     elif not isinstance(config, mmcv.Config):
+        # 否則就會需要是mmcv的config格式
         raise TypeError('config must be a filename or Config object, '
                         f'but got {type(config)}')
     if cfg_options is not None:
+        # 如果有額外的config資料就會到這裡進行融合
         config.merge_from_dict(cfg_options)
 
-    model = build_model(
-        config.model, train_cfg=config.train_cfg, test_cfg=config.test_cfg)
+    # 構建模型
+    model = build_model(config.model, train_cfg=config.train_cfg, test_cfg=config.test_cfg)
 
     if checkpoint is not None:
+        # 將預訓練權重進行載入
         load_checkpoint(model, checkpoint, map_location='cpu')
 
+    # 將config資料保存一份到model當中
     model._cfg = config  # save the config in the model for convenience
+    # 將模型放到指定設備上
     model.to(device)
+    # 將模型轉成驗證模式
     model.eval()
 
+    # 回傳構建好的模型實例化對象
     return model
 
 
@@ -65,24 +81,40 @@ def sample_unconditional_model(model,
     Returns:
         Tensor: Generated image tensor.
     """
+    """ 對於沒有條件的模型進行創建圖像
+    Args:
+        model: 模型實例化對象
+        num_samples: 總共需要產生多少張圖像
+        num_batches: 每一次會產生多少張圖像
+        sample_model: 最一開始的噪聲產生方式
+    """
     # set eval mode
+    # 將模型轉成驗證模式
     model.eval()
     # construct sampling list for batches
+    # 計算總共需要生成多少次
     n_repeat = num_samples // num_batches
+    # 構建batches_list，在生成的時候就會根據這個決定一個batch的大小
     batches_list = [num_batches] * n_repeat
 
     if num_samples % num_batches > 0:
+        # 如果有少的話就會添加上去
         batches_list.append(num_samples % num_batches)
+    # 最終結果的list
     res_list = []
 
     # inference
+    # 遍歷需要生成的batch大小
     for batches in batches_list:
-        res = model.sample_from_noise(
-            None, num_batches=batches, sample_model=sample_model, **kwargs)
+        # 進行生成
+        res = model.sample_from_noise(None, num_batches=batches, sample_model=sample_model, **kwargs)
+        # 將生成結果轉到cpu上並且保存到res_list當中
         res_list.append(res.cpu())
 
+    # 將結果沿著dim=0進行拼接
     results = torch.cat(res_list, dim=0)
 
+    # 最後回傳結果，tensor shape [num_sample, channel, height, width]
     return results
 
 
