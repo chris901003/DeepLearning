@@ -70,6 +70,13 @@ MMAction2官方原始碼，目前是直接在官方原始碼上進行標注 \
 MMPose官方原始碼，目前是直接在官方原始碼上進行標注 \
 主要是文字方面處理
 
+### mmgeneration
+[官方Github](https://github.com/open-mmlab/mmgeneration) \
+[官方文檔](https://mmgeneration.readthedocs.io/en/1.x/overview.html) \
+MMGeneration官方原始碼，為了可以在cpu上進行debug有改動原始碼，不確定是否可以進行正常訓練 \
+不果可以進行debug，有需要可以自行重寫就行 \
+主要是文字方面處理
+
 ### learn_mmcv
 學習mmcv官方原始碼，將需要的部分擷取出來，同時學習mmcv框架\
 暫時停止更新
