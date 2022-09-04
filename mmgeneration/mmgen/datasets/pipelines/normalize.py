@@ -20,6 +20,13 @@ class Normalize:
     """
 
     def __init__(self, keys, mean, std, to_rgb=False):
+        """ 對指定資料進行標準化
+        Args:
+            keys: 指定的資料
+            mean: 均值
+            std: 方差
+            to_rgb: 是否需要轉成rgb
+        """
         self.keys = keys
         self.mean = np.array(mean, dtype=np.float32)
         self.std = np.array(std, dtype=np.float32)
@@ -34,18 +41,20 @@ class Normalize:
         Returns:
             dict: A dict containing the processed data and information.
         """
+        # 對圖像進行標準化
+        # 遍歷需要進行標準化的值
         for key in self.keys:
             if isinstance(results[key], list):
+                # 進行標準化
                 results[key] = [
                     mmcv.imnormalize(v, self.mean, self.std, self.to_rgb)
                     for v in results[key]
                 ]
             else:
-                results[key] = mmcv.imnormalize(results[key], self.mean,
-                                                self.std, self.to_rgb)
+                results[key] = mmcv.imnormalize(results[key], self.mean, self.std, self.to_rgb)
 
-        results['img_norm_cfg'] = dict(
-            mean=self.mean, std=self.std, to_rgb=self.to_rgb)
+        # 保存標準化資料
+        results['img_norm_cfg'] = dict(mean=self.mean, std=self.std, to_rgb=self.to_rgb)
         return results
 
     def __repr__(self):

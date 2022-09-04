@@ -118,23 +118,40 @@ class Resize:
                  max_size=None,
                  interpolation='bilinear',
                  backend=None):
+        """ 透過resize將圖像大小調整到模型需要的大小，主要是用在模型有大量的上採樣以及下採樣時會使用
+        Args:
+            keys: 需要被resize的資料在call時傳入的dict的key值
+            scale: 需要縮放到的指定大小
+            keep_ratio: 是否需要保持高寬比
+            size_factor: 指定通過resize後要是指定數字的倍數
+            max_size: 最長邊的大小
+            interpolation: 差值方式
+            backend: 調整圖像時使用的模組包
+        """
+        # 檢查keys不可為空，至少需要指定一個key進行調整
         assert keys, 'Keys should not be empty.'
         if size_factor:
+            # 如果使用size_factor就不可以設定scale
             assert scale is None, ('When size_factor is used, scale should ',
                                    f'be None. But received {scale}.')
+            # 如果使用size_factor就不可以使用keep_ratio
             assert keep_ratio is False, ('When size_factor is used, '
                                          'keep_ratio should be False.')
         if max_size:
+            # 使用max_size的同時也要使用size_factor
             assert size_factor is not None, (
                 'When max_size is used, '
                 f'size_factor should also be set. But received {size_factor}.')
         if isinstance(scale, float):
             if scale <= 0:
+                # scale的值不可以小於等於0
                 raise ValueError(f'Invalid scale {scale}, must be positive.')
         elif mmcv.is_tuple_of(scale, int):
+            # 獲取設定的scale的最大值以及最小值
             max_long_edge = max(scale)
             max_short_edge = min(scale)
             if max_short_edge == -1:
+                # 如果最短邊設定成-1就會到這裡
                 # assign np.inf to long edge for rescaling short edge later.
                 scale = (np.inf, max_long_edge)
         elif scale is not None:
@@ -186,15 +203,14 @@ class Resize:
         Returns:
             dict: A dict containing the processed data and information.
         """
+        # 進行圖像的resize
         if self.size_factor:
             h, w = results[self.keys[0]].shape[:2]
             new_h = h - (h % self.size_factor)
             new_w = w - (w % self.size_factor)
             if self.max_size:
-                new_h = min(self.max_size - (self.max_size % self.size_factor),
-                            new_h)
-                new_w = min(self.max_size - (self.max_size % self.size_factor),
-                            new_w)
+                new_h = min(self.max_size - (self.max_size % self.size_factor), new_h)
+                new_w = min(self.max_size - (self.max_size % self.size_factor), new_w)
             scale = (new_w, new_h)
         elif isinstance(self.scale, tuple) and (np.inf in self.scale):
             # find inf in self.scale, calculate ``scale`` manually
@@ -211,12 +227,17 @@ class Resize:
         for key in self.keys:
             results[key], scale_factor = self._resize(results[key], scale)
             if len(results[key].shape) == 2:
+                # 如果通道數量只有2表示為灰白圖像，這裡會在最後添加一個維度表示channel
                 results[key] = np.expand_dims(results[key], axis=2)
 
+        # 保存縮放比例
         results['scale_factor'] = scale_factor
+        # 保存是否保持高寬比
         results['keep_ratio'] = self.keep_ratio
+        # 保存差值方式
         results['interpolation'] = self.interpolation
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):

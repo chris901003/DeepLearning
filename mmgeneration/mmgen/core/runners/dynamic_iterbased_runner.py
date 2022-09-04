@@ -100,11 +100,15 @@ class IterLoader:
 
     def __next__(self):
         try:
+            # 嘗試獲取下一個資料
             data = next(self.iter_loader)
         except StopIteration:
+            # 如果無法獲取下個資料表示該epoch已經結束
+            # 將epoch加一
             self._epoch += 1
             if hasattr(self._dataloader.sampler, 'set_epoch'):
                 self._dataloader.sampler.set_epoch(self._epoch)
+            # 調整到下一個epoch
             self.iter_loader = iter(self._dataloader)
             data = next(self.iter_loader)
 
@@ -181,20 +185,33 @@ class DynamicIterBasedRunner(IterBasedRunner):
                 getattr(hook, fn_name)(self)
 
     def train(self, data_loader, **kwargs):
+        """ 進行訓練
+        Args:
+            data_loader: 訓練資料的Dataloader
+        """
         if is_module_wrapper(self.model):
+            # 將model提取出來
             _model = self.model.module
         else:
             _model = self.model
+        # 將模型設定成訓練模式
         self.model.train()
+        # 將當前的模式設定成train模式
         self.mode = 'train'
         # check if self.optimizer from model and track it
         if self.optimizer_from_model:
+            # 如果優化器放在model上就會將其拿取出來
             self.optimizer = _model.optimizer
 
+        # 將data_loader保存
         self.data_loader = data_loader
+        # 獲取當前遍歷到的epoch
         self._epoch = data_loader.epoch
+        # 執行獲取資料前的鉤子函數
         self.call_hook('before_fetch_train_data')
+        # 獲取一個batch的訓練資料
         data_batch = next(self.data_loader)
+        # 執行獲取資料後的鉤子函數
         self.call_hook('before_train_iter')
 
         # prepare input args for train_step
@@ -203,8 +220,12 @@ class DynamicIterBasedRunner(IterBasedRunner):
             running_status = dict(iteration=self.iter, epoch=self.epoch)
             kwargs['running_status'] = running_status
         # ddp reducer for tracking dynamic computational graph
-        if self.is_dynamic_ddp:
-            kwargs.update(dict(ddp_reducer=self.model.reducer))
+
+        # ************************************************ #
+        # 這裡我們先註解掉，這樣才可以跑通，反正我們不會用這裡進行訓練
+        # if self.is_dynamic_ddp:
+        #     kwargs.update(dict(ddp_reducer=self.model.reducer))
+        # ************************************************ #
 
         if self.with_fp16_grad_scaler:
             kwargs.update(dict(loss_scaler=self.loss_scaler))
@@ -212,6 +233,7 @@ class DynamicIterBasedRunner(IterBasedRunner):
         if self.use_apex_amp:
             kwargs.update(dict(use_apex_amp=True))
 
+        # 進行向前傳遞
         outputs = self.model.train_step(data_batch, self.optimizer, **kwargs)
 
         # the loss scaler should be updated after ``train_step``

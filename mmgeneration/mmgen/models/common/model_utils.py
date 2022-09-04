@@ -11,11 +11,16 @@ def set_requires_grad(nets, requires_grad=False):
             network.
         requires_grad (bool): Whether the networks require gradients or not
     """
+    # 將整個網路的反向傳遞根據傳入的requires_grad進行設定
     if not isinstance(nets, list):
+        # 如果傳入的網路不是list就會在外面添加一層list
         nets = [nets]
+    # 遍歷傳入的網路
     for net in nets:
         if net is not None:
+            # 遍歷網路的每一層結構
             for param in net.parameters():
+                # 將層結構的反向傳遞依據指定的進行調整
                 param.requires_grad = requires_grad
 
 

@@ -43,15 +43,22 @@ class BaseGAN(nn.Module, metaclass=ABCMeta):
         # computational graph, you have to add 'loss' in its name. Otherwise,
         # items without 'loss' in their name will just be used to print
         # information.
-        losses_dict = {}
+        # 計算鑑別器損失，傳入的outputs_dict有大量資料
+
+        # 保存損失字典
+        losses_dict = dict()
         # gan loss
+        # is_disc的意思表示，計算的損失是否為鑑別器的
+        # 計算預測假圖的損失，tensor float
         losses_dict['loss_disc_fake'] = self.gan_loss(
             outputs_dict['disc_pred_fake'], target_is_real=False, is_disc=True)
+        # 計算預測真圖的損失，tensor float
         losses_dict['loss_disc_real'] = self.gan_loss(
             outputs_dict['disc_pred_real'], target_is_real=True, is_disc=True)
 
         # disc auxiliary loss
         if self.with_disc_auxiliary_loss:
+            # 如果有使用輔助損失計算就會到這裡
             for loss_module in self.disc_auxiliary_losses:
                 loss_ = loss_module(outputs_dict)
                 if loss_ is None:
@@ -63,8 +70,12 @@ class BaseGAN(nn.Module, metaclass=ABCMeta):
                     )] = losses_dict[loss_module.loss_name()] + loss_
                 else:
                     losses_dict[loss_module.loss_name()] = loss_
+        # 將損失字典進行解碼
         loss, log_var = self._parse_losses(losses_dict)
 
+        # 最終回傳
+        # loss = 最終損失總和，會是一個tensor float
+        # log_var = 保存個別損失資訊，會是一個dict
         return loss, log_var
 
     def _get_gen_loss(self, outputs_dict):
@@ -72,15 +83,18 @@ class BaseGAN(nn.Module, metaclass=ABCMeta):
         # computational graph, you have to add 'loss' in its name. Otherwise,
         # items without 'loss' in their name will just be used to print
         # information.
-        losses_dict = {}
+        # 計算生成器損失，傳入的outputs_dict有大量資料
+
+        # 構建存放損失的字典
+        losses_dict = dict()
         # gan loss
+        # 進行損失計算，這裡的is_disc就會是False
         losses_dict['loss_disc_fake_g'] = self.gan_loss(
-            outputs_dict['disc_pred_fake_g'],
-            target_is_real=True,
-            is_disc=False)
+            outputs_dict['disc_pred_fake_g'], target_is_real=True, is_disc=False)
 
         # gen auxiliary loss
         if self.with_gen_auxiliary_loss:
+            # 如果有使用輔助損失計算就會到這裡
             for loss_module in self.gen_auxiliary_losses:
                 loss_ = loss_module(outputs_dict)
                 if loss_ is None:
@@ -92,8 +106,12 @@ class BaseGAN(nn.Module, metaclass=ABCMeta):
                     )] = losses_dict[loss_module.loss_name()] + loss_
                 else:
                     losses_dict[loss_module.loss_name()] = loss_
+        # 將損失資料進行整理
         loss, log_var = self._parse_losses(losses_dict)
 
+        # 最終回傳
+        # loss = 最終損失總和，會是一個tensor float
+        # log_var = 保存個別損失資訊，會是一個dict
         return loss, log_var
 
     @abstractmethod

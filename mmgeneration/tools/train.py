@@ -25,15 +25,20 @@ cv2.setNumThreads(0)
 
 
 def parse_args():
+    # GAN模型的初始化參數
     parser = argparse.ArgumentParser(description='Train a GAN model')
+    # 指定的模型配置文件
     parser.add_argument('config', help='train config file path')
+    # 訓練過程資料保存位置
     parser.add_argument('--work-dir', help='the dir to save logs and models')
-    parser.add_argument(
-        '--resume-from', help='the checkpoint file to resume from')
+    # 從上次訓練到的地方繼續訓練
+    parser.add_argument('--resume-from', help='the checkpoint file to resume from')
+    # 是否在訓練中間進行驗證
     parser.add_argument(
         '--no-validate',
         action='store_true',
         help='whether not to evaluate the checkpoint during training')
+    # 設定gpu相關資料
     group_gpus = parser.add_mutually_exclusive_group()
     group_gpus.add_argument(
         '--gpus',
@@ -52,26 +57,32 @@ def parse_args():
         default=0,
         help='id of gpu to use '
         '(only applicable to non-distributed training)')
+    # 亂數種子
     parser.add_argument('--seed', type=int, default=2021, help='random seed')
+    # 是否需要在不同gpu上使用不同亂數種子
     parser.add_argument(
         '--diff_seed',
         action='store_true',
         help='Whether or not set different seeds for different ranks')
+    # CUDNN相關設定
     parser.add_argument(
         '--deterministic',
         action='store_true',
         help='whether to set deterministic options for CUDNN backend.')
+    # 是否需要額外添加config配置
     parser.add_argument(
         '--cfg-options',
         nargs='+',
         action=DictAction,
         help='override some settings in the used config, the key-value pair '
         'in xxx=yyy format will be merged into config file.')
+    # 分布式訓練相關資料
     parser.add_argument(
         '--launcher',
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
+    # 分布式訓練相關資料
     parser.add_argument('--local_rank', type=int, default=0)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
@@ -113,47 +124,58 @@ def setup_multi_processes(cfg):
 
 
 def main():
+    # 獲取啟動時傳入的參數
     args = parse_args()
 
+    # 讀取config資料
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
 
+    # 設定多線程資料
     setup_multi_processes(cfg)
 
     # import modules from string list.
+    # 如果有需要額外添加config資料就會到這裡添加
     if cfg.get('custom_imports', None):
         from mmcv.utils import import_modules_from_strings
         import_modules_from_strings(**cfg['custom_imports'])
     # set cudnn_benchmark
+    # 如果有啟用cudnn_benchmark就會到這裡
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
 
     # work_dir is determined in this priority: CLI > segment in file > filename
     if args.work_dir is not None:
+        # 將指定的保存目錄放到cfg當中
         # update configs according to CLI args if args.work_dir is not None
         cfg.work_dir = args.work_dir
     elif cfg.get('work_dir', None) is None:
+        # 如果沒有自行指定保存目錄就會用預設的
         # use config filename as default work_dir if cfg.work_dir is None
-        cfg.work_dir = osp.join('./work_dirs',
-                                osp.splitext(osp.basename(args.config))[0])
+        cfg.work_dir = osp.join('./work_dirs', osp.splitext(osp.basename(args.config))[0])
     if args.resume_from is not None:
+        # 如果有指定上次訓練進行繼續訓練就會到這裡
         cfg.resume_from = args.resume_from
     if args.gpus is not None:
+        # 設定gpu資料
         cfg.gpu_ids = range(1)
         warnings.warn('`--gpus` is deprecated because we only support '
                       'single GPU mode in non-distributed training. '
                       'Use `gpus=1` now.')
     if args.gpu_ids is not None:
+        # 設定gpu資料
         cfg.gpu_ids = args.gpu_ids[0:1]
         warnings.warn('`--gpu-ids` is deprecated, please use `--gpu-id`. '
                       'Because we only support single GPU mode in '
                       'non-distributed training. Use the first GPU '
                       'in `gpu_ids` now.')
     if args.gpus is None and args.gpu_ids is None:
+        # 設定gpu資料
         cfg.gpu_ids = [args.gpu_id]
 
     # init distributed env first, since logger depends on the dist info.
+    # 分布式訓練相關資料
     if args.launcher == 'none':
         distributed = False
     else:
@@ -164,20 +186,25 @@ def main():
         cfg.gpu_ids = range(world_size)
 
     # create work_dir
+    # 檢查保存目錄是否存在，如果不存在就會進行創建
     mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
     # dump config
+    # 將config資料進行保存
     cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
     # init the logger before other steps
+    # 獲取當前時間作為檔案名稱
     timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    # 構建log資料
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
 
     # init the meta dict to record some important information such as
     # environment info and seed, which will be logged
+    # 紀錄訓練過程相關資訊
     meta = dict()
     # log env info
     env_info_dict = collect_env()
-    env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
+    env_info = '\n'.join([f'{k}: {v}' for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
     logger.info('Environment info:\n' + dash_line + env_info + '\n' +
                 dash_line)
@@ -188,6 +215,7 @@ def main():
     logger.info(f'Config:\n{cfg.pretty_text}')
 
     # set random seeds
+    # 設定亂數種子
     if args.seed is not None:
         logger.info(f'Set random seed to {args.seed}, '
                     f'deterministic: {args.deterministic}, '
@@ -200,9 +228,10 @@ def main():
     meta['seed'] = args.seed
     meta['exp_name'] = osp.basename(args.config)
 
-    model = build_model(
-        cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
+    # 實例化模型
+    model = build_model(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
 
+    # 構建dataset
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -211,9 +240,9 @@ def main():
     if cfg.checkpoint_config is not None:
         # save mmgen version, config file content and class names in
         # checkpoints as meta data
-        cfg.checkpoint_config.meta = dict(mmgen_version=__version__ +
-                                          get_git_hash()[:7])
+        cfg.checkpoint_config.meta = dict(mmgen_version=__version__ + get_git_hash()[:7])
 
+    # 開始訓練
     train_model(
         model,
         datasets,

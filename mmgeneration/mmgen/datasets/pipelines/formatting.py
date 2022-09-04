@@ -70,6 +70,11 @@ class ImageToTensor:
     """
 
     def __init__(self, keys, to_float32=True):
+        """ 將指定的資料轉成tensor格式
+        Args:
+            keys: 指定的資料
+            to_float32: 是否要轉成float32格式
+        """
         self.keys = keys
         self.to_float32 = to_float32
 
@@ -114,6 +119,7 @@ class Collect:
     """
 
     def __init__(self, keys, meta_keys=None):
+        # 進行蒐集需要的資料
         self.keys = keys
         self.meta_keys = meta_keys
 

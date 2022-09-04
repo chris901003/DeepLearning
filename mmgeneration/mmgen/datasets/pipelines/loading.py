@@ -33,6 +33,16 @@ class LoadImageFromFile:
                  backend=None,
                  save_original_img=False,
                  **kwargs):
+        """ 將圖像從檔案中讀取出來
+        Args:
+            io_backend: 圖像存放的地方
+            key: 獲取檔案路徑的key值，因為在call時傳入的會是dict，所以需要指定的key值獲取路徑資料
+            flag: 圖像的類型
+            channel_order: 顏色的排列順序
+            backend: 圖像解碼使用的模組
+            save_original_img: 是否需要保存原始圖像
+        """
+        # 將傳入資料進行保存
         self.io_backend = io_backend
         self.key = key
         self.flag = flag
@@ -52,22 +62,30 @@ class LoadImageFromFile:
         Returns:
             dict: A dict containing the processed data and information.
         """
+        # 將圖像從檔案讀取出來
         if self.file_client is None:
             self.file_client = FileClient(self.io_backend, **self.kwargs)
+        # 獲取檔案路徑
         filepath = str(results[f'{self.key}_path'])
+        # 獲取二進制格式圖像
         img_bytes = self.file_client.get(filepath)
+        # 轉成ndarray
         img = mmcv.imfrombytes(
             img_bytes,
             flag=self.flag,
             channel_order=self.channel_order,
             backend=self.backend)  # HWC
 
+        # 更新圖像資料
         results[self.key] = img
         results[f'{self.key}_path'] = filepath
+        # 將圖像原始高寬存入
         results[f'{self.key}_ori_shape'] = img.shape
         if self.save_original_img:
+            # 如果有需要保存原始圖像就會保存一份
             results[f'ori_{self.key}'] = img.copy()
 
+        # 回傳更新後的results
         return results
 
     def __repr__(self):

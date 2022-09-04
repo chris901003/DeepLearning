@@ -42,12 +42,25 @@ def train_model(model,
                 validate=False,
                 timestamp=None,
                 meta=None):
+    """ 進行訓練
+    Args:
+        model: 模型本身
+        dataset: 訓練資料集
+        cfg: 模型config資料
+        distributed: 是否使用分布式訓練
+        validate: 是否需要進行驗證
+        timestamp: 時間戳
+        meta: 保存訓練過程資料
+    """
+    # 構建logger
     logger = get_root_logger(cfg.log_level)
 
     # prepare data loaders
+    # 將dataset包裝上list
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
 
     # default loader config
+    # 構建Dataloader的參數
     loader_cfg = dict(
         samples_per_gpu=cfg.data.samples_per_gpu,
         workers_per_gpu=cfg.data.workers_per_gpu,
@@ -58,6 +71,7 @@ def train_model(model,
         seed=cfg.seed)
 
     # The overall dataloader settings
+    # 添加上額外的Dataloader設定
     loader_cfg.update({
         k: v
         for k, v in cfg.data.items() if k not in [
@@ -67,6 +81,7 @@ def train_model(model,
     })
 
     # The specific datalaoder settings
+    # 構建Dataloader
     train_loader_cfg = {**loader_cfg, **cfg.data.get('train_dataloader', {})}
 
     data_loaders = [build_dataloader(ds, **train_loader_cfg) for ds in dataset]
@@ -81,20 +96,22 @@ def train_model(model,
 
     # build optimizer
     if cfg.optimizer:
+        # 構建優化器，在GAN當中會有兩個優化器，一個會是給生成器用的另一個是給鑑別器用的
         optimizer = build_optimizers(model, cfg.optimizer)
     # In GANs, we allow building optimizer in GAN model.
     else:
         optimizer = None
 
+    # 設定amp相關資料
     _use_apex_amp = False
     if cfg.get('apex_amp', None):
-        model, optimizer = apex_amp_initialize(model, optimizer,
-                                               **cfg.apex_amp)
+        model, optimizer = apex_amp_initialize(model, optimizer, **cfg.apex_amp)
         _use_apex_amp = True
 
     # put model on gpus
 
     if distributed:
+        # 如果是在分布式訓練就會到這裡
         find_unused_parameters = cfg.get('find_unused_parameters', False)
         use_ddp_wrapper = cfg.get('use_ddp_wrapper', False)
         # Sets the `find_unused_parameters` parameter in
@@ -113,6 +130,8 @@ def train_model(model,
                 broadcast_buffers=False,
                 find_unused_parameters=find_unused_parameters)
     else:
+        # 否則就會到這裡
+        pass
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
 
     # allow users to define the runner
