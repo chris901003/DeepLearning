@@ -29,7 +29,8 @@ train_pipeline = [
 # you must set `samples_per_gpu` and `imgs_root`
 data = dict(
     samples_per_gpu=4,
-    train=dict(imgs_root='/Users/huanghongyan/Downloads/archive/trainingSample', pipeline=train_pipeline),
+    train=dict(imgs_root='/Users/huanghongyan/Documents/DeepLearning/mmgeneration/data/trainingSample',
+               pipeline=train_pipeline),
     val=None)
 
 # adjust running config
@@ -43,7 +44,7 @@ custom_hooks = [
 ]
 
 log_config = dict(
-    interval=100, hooks=[
+    interval=5, hooks=[
         dict(type='TextLoggerHook'),
     ])
 

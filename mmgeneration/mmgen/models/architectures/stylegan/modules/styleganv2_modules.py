@@ -61,34 +61,51 @@ class EqualLinearActModule(nn.Module):
                  bias_init=0.,
                  act_cfg=None,
                  **kwargs):
+        """ 均衡的學習率的全連接層以及激活函數，主要是用在StyleGan2上
+        Args:
+            args: 要傳入到EqualizedLRLinearModule的參數
+            equalized_lr_cfg: 設定學習率參數的設定
+            bias: 是否使用偏置
+            bias_init: 偏置初始化值
+            act_cfg: 激活函數設定
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 如果有設定激活函數參數就會放入
         self.with_activation = act_cfg is not None
         # w/o bias in linear layer
-        self.linear = EqualizedLRLinearModule(
-            *args, bias=False, equalized_lr_cfg=equalized_lr_cfg, **kwargs)
+        # 構建全連接層實例化對象
+        self.linear = EqualizedLRLinearModule(*args, bias=False, equalized_lr_cfg=equalized_lr_cfg, **kwargs)
 
         if equalized_lr_cfg is not None:
+            # 如果有設定lr_cfg就會到這裡，獲取過一段時間後需要下降的學習率
             self.lr_mul = equalized_lr_cfg.get('lr_mul', 1.)
         else:
+            # 沒有設定就會是1表示保持不變
             self.lr_mul = 1.
 
         # define bias outside linear layer
         if bias:
-            self.bias = nn.Parameter(
-                torch.zeros(self.linear.out_features).fill_(bias_init))
+            # 如果要使用偏置就會產生可學習參數，這裡會預先將值設定成偏置初始值
+            self.bias = nn.Parameter(torch.zeros(self.linear.out_features).fill_(bias_init))
         else:
             self.bias = None
 
         if self.with_activation:
+            # 如果有設定激活函數設定就會到這裡
             act_cfg = deepcopy(act_cfg)
             if act_cfg['type'] == 'fused_bias':
+                # 如果選擇的type是fused_bias就會到這裡
                 self.act_type = act_cfg.pop('type')
                 assert self.bias is not None
+                # 構建激活函數實例化對象，使用partial函數可以在每次呼叫self.activate時將act_cfg的內容傳入
                 self.activate = partial(fused_bias_leakyrelu, **act_cfg)
             else:
+                # 構建普通激活函數
                 self.act_type = 'normal'
                 self.activate = build_activation_layer(act_cfg)
         else:
+            # 如果沒有設定激活函數就會是None
             self.act_type = None
 
     def forward(self, x):
@@ -446,16 +463,24 @@ class ConstantInput(nn.Module):
     """
 
     def __init__(self, channel, size=4):
+        """ 構建最一開始輸入到生成器當中的圖像
+        Args:
+            channel: 輸出的圖像channel深度
+            size: 輸出圖像的大小
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
         if isinstance(size, int):
+            # 如果size是單一個int就會用list進行包裝
             size = [size, size]
         elif mmcv.is_seq_of(size, int):
-            assert len(
-                size
-            ) == 2, f'The length of size should be 2 but got {len(size)}'
+            # 檢查size的len是否為2，分別表示高寬
+            assert len(size) == 2, f'The length of size should be 2 but got {len(size)}'
         else:
+            # 其他的狀態就會直接報錯
             raise ValueError(f'Got invalid value in size, {size}')
 
+        # 構建可學習參數，這裡會是隨機初始化參數shape [batch_size=1, channel, height, width]
         self.input = nn.Parameter(torch.randn(1, channel, *size))
 
     def forward(self, x):
@@ -701,12 +726,29 @@ class ModulatedStyleConv(nn.Module):
                  style_bias=0.,
                  fp16_enabled=False,
                  conv_clamp=256):
+        """ 這裡我們整合調製過的卷積以及噪聲添加以及激活函數層
+        Args:
+            in_channels: 輸入的channel深度
+            out_channels: 輸出的channel深度
+            kernel_size: 使用的卷積核大小
+            style_channels: 輸入風格的channel深度
+            upsample: 是否進行上採樣
+            blur_kernel: 模糊卷積核設定
+            demodulate: 是否進行解耦
+            style_mod_cfg: 風格的解耦config設定
+            style_bias: 風格的偏置
+            fp16_enabled: 是否使用fp16
+            conv_clamp: 限制卷積過後的結果，避免梯度爆炸
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
 
         # add support for fp16
+        # 保存傳入參數
         self.fp16_enabled = fp16_enabled
         self.conv_clamp = float(conv_clamp)
 
+        # 構建卷積層
         self.conv = ModulatedConv2d(
             in_channels,
             out_channels,
@@ -718,7 +760,9 @@ class ModulatedStyleConv(nn.Module):
             style_mod_cfg=style_mod_cfg,
             style_bias=style_bias)
 
+        # 實例化噪聲實例對象
         self.noise_injector = NoiseInjection()
+        # 實例化激活函數
         self.activate = _FusedBiasLeakyReLU(out_channels)
 
         # if self.fp16_enabled:

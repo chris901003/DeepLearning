@@ -9,9 +9,9 @@ _base_ = [
 model = dict(generator=dict(out_size=256), discriminator=dict(in_size=256))
 
 data = dict(
-    samples_per_gpu=4,
-    train=dict(dataset=dict(imgs_root='./data/ffhq/ffhq_imgs/ffhq_256')),
-    val=dict(imgs_root='./data/ffhq/ffhq_imgs/ffhq_256'))
+    samples_per_gpu=2,
+    train=dict(dataset=dict(imgs_root='/Users/huanghongyan/Documents/DeepLearning/mmgeneration/data/ffhq')),
+    val=dict(imgs_root='/Users/huanghongyan/Documents/DeepLearning/mmgeneration/data/ffhq'))
 
 ema_half_life = 10.  # G_smoothing_kimg
 
@@ -32,7 +32,7 @@ checkpoint_config = dict(interval=10000, by_epoch=False, max_keep_ckpts=30)
 lr_config = None
 
 log_config = dict(
-    interval=100,
+    interval=5,
     hooks=[
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook'),
@@ -43,8 +43,8 @@ total_iters = 800002
 metrics = dict(
     fid50k=dict(
         type='FID',
-        num_images=50000,
-        inception_pkl='work_dirs/inception_pkl/ffhq-256-50k-rgb.pkl',
+        num_images=102,
+        inception_pkl=None,
         bgr2rgb=True),
     pr50k3=dict(type='PR', num_images=50000, k=3),
     ppl_wend=dict(type='PPL', space='W', sampling='end', num_images=50000))
@@ -54,7 +54,7 @@ evaluation = dict(
     interval=10000,
     metrics=dict(
         type='FID',
-        num_images=50000,
-        inception_pkl='work_dirs/inception_pkl/ffhq-256-50k-rgb.pkl',
+        num_images=102,
+        inception_pkl=None,
         bgr2rgb=True),
     sample_kwargs=dict(sample_model='ema'))

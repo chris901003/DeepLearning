@@ -84,6 +84,9 @@ MMGeneration官方原始碼，為了可以在cpu上進行debug有改動原始碼
 ### pytorch_geometric
 主要是在做圖相關的學習，目前是透過關節點的資訊辨識行為
 
+### pytorch_gan
+主要是進行圖像生成相關學習
+
 ### some_utils
 有存放一些轉換用的程式工具
 

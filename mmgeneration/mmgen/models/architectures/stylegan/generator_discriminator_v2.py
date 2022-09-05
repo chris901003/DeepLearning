@@ -101,7 +101,24 @@ class StyleGANv2Generator(nn.Module):
                  num_fp16_scales=0,
                  fp16_enabled=False,
                  pretrained=None):
+        """ StyleGan2初始化函數
+        Args:
+            out_size: 生成器輸出的圖像大小
+            style_channels: 風格向量的維度
+            num_mlps: 將z映射到w需要通過的全連接層數量，多層感知機的數量
+            channel_multiplier: 每通過一個上採樣層後channel深度的倍數變化
+            blur_kernel: 模糊卷積核大小，目前不確定作用
+            lr_mlp: 風格映射的學習率，也就是z映射到w的學習率
+            default_style_mode: 預設風格的模式，在訓練時會使用融合的方式
+            eval_style_mode: 驗證時的風格模式，這裡就只會使用單一的風格
+            mix_prob: 混合的概率，該值會在[0, 1]之間
+            num_fp16_scales: 進行雙精度浮點運算時的縮放倍率
+            fp16_enabled: 是否使用fp16
+            pretrained: 預訓練權重相關資料
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 保存傳入參數
         self.out_size = out_size
         self.style_channels = style_channels
         self.num_mlps = num_mlps
@@ -115,18 +132,26 @@ class StyleGANv2Generator(nn.Module):
         self.fp16_enabled = fp16_enabled
 
         # define style mapping layers
+        # 構建風格映射層，最一開始會先有PixelNorm層結構，主要是先將原始z進行標準化
         mapping_layers = [PixelNorm()]
 
+        # 構建多層mlp映射層結構
         for _ in range(num_mlps):
             mapping_layers.append(
+                # 這裡每層mlp是由EqualLinearActModule構建
                 EqualLinearActModule(
+                    # 輸入以及輸出的channel深度不會發生變化
                     style_channels,
                     style_channels,
+                    # 將學習率參數傳入
                     equalized_lr_cfg=dict(lr_mul=lr_mlp, gain=1.),
+                    # 設定激活函數使用
                     act_cfg=dict(type='fused_bias')))
 
+        # 將一系列mlp層結構用Sequential包裝起來
         self.style_mapping = nn.Sequential(*mapping_layers)
 
+        # 構建每個不同大小圖像的輸出channel深度
         self.channels = {
             4: 512,
             8: 512,
@@ -140,13 +165,19 @@ class StyleGANv2Generator(nn.Module):
         }
 
         # constant input layer
+        # 構建最一開始的輸入圖像，這裡使用的會是常數的輸入，這裡會指定輸出的channel深度
+        # 在呼叫ConstantInput時就會給出隨機的圖像
         self.constant_input = ConstantInput(self.channels[4])
         # 4x4 stage
+        # 構建第一層卷積層，這裡使用的是ModulatedStyleConv類
         self.conv1 = ModulatedStyleConv(
+            # 輸入以及輸出的channel深度不會發生變化
             self.channels[4],
             self.channels[4],
             kernel_size=3,
+            # 將會輸入的風格channel深度傳入
             style_channels=style_channels,
+            # 將blur_kernel傳入
             blur_kernel=blur_kernel)
         self.to_rgb1 = ModulatedToRGB(
             self.channels[4],

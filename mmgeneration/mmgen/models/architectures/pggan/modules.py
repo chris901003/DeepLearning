@@ -36,6 +36,7 @@ class EqualizedLR:
     """
 
     def __init__(self, name='weight', gain=2**0.5, mode='fan_in', lr_mul=1.0):
+        # 將傳入的值進行保存
         self.name = name
         self.mode = mode
         self.gain = gain
@@ -84,30 +85,46 @@ class EqualizedLR:
         Returns:
             nn.Module: Module that is registered with equalized lr hook.
         """
+        """ 構建鉤子到模型上，會在對應時間點進行調整
+        Args:
+            module: 模型本身
+            name: 要調整的權重名稱
+            gain: 增益
+            mode: 初始化方式
+            lr_mul: 每次調整學習率乘上的倍數
+        """
         # sanity check for duplicated hooks.
         for _, hook in module._forward_pre_hooks.items():
+            # 檢查整個模型的鉤子函數，看是否已經有添加過EqualizedLR函數
             if isinstance(hook, EqualizedLR):
+                # 如果已經有添加過了就會報錯
                 raise RuntimeError(
                     'Cannot register two equalized_lr hooks on the same '
                     f'parameter {name} in {module} module.')
 
+        # 構建EqualizedLR實例化對象
         fn = EqualizedLR(name, gain=gain, mode=mode, lr_mul=lr_mul)
+        # 將模型當中對應名稱的權重取出
         weight = module._parameters[name]
 
+        # 將模型當中對應名稱權重刪除
         delattr(module, name)
+        # 給一個新的名稱放回到模型當中
         module.register_parameter(name + '_orig', weight)
 
         # We still need to assign weight back as fn.name because all sorts of
         # things may assume that it exists, e.g., when initializing weights.
-        # However, we can't directly assign as it could be an nn.Parameter and
+        # However, we can't directly assign as it could be a nn.Parameter and
         # gets added as a parameter. Instead, we register weight.data as a
         # plain attribute.
 
         setattr(module, name, weight.data)
+        # 將鉤子函數放到模型上
         module.register_forward_pre_hook(fn)
 
         # TODO: register load state dict hook
 
+        # 將學習率調整實例化對象回傳
         return fn
 
 
@@ -130,12 +147,23 @@ def equalized_lr(module, name='weight', gain=2**0.5, mode='fan_in', lr_mul=1.):
         mode (str, optional): The mode of computing ``fan`` which is the
             same as ``kaiming_init`` in pytorch. You can choose one from
             ['fan_in', 'fan_out']. Defaults to 'fan_in'.
+        gain:
+        lr_mul:
 
     Returns:
         nn.Module: Module that is registered with equalized lr hook.
     """
+    """ 均衡學習率
+    Args:
+        module: 模型本身
+        name: 權重名稱
+        gain: 增益
+        mode: 初始化模式，fan_in就是和凱明初始化方式
+        lr_mul: 每次調整會將學習率乘上多少倍
+    """
     EqualizedLR.apply(module, name, gain=gain, mode=mode, lr_mul=lr_mul)
 
+    # 回傳設定好的模型
     return module
 
 
@@ -178,7 +206,10 @@ class PixelNorm(nn.Module):
     _abbr_ = 'pn'
 
     def __init__(self, in_channels=None, eps=1e-6):
+        # 進行像素點標準化
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # eps會是一個很小的值，避免除以0的作用
         self.eps = eps
 
     def forward(self, x):
@@ -361,16 +392,28 @@ class EqualizedLRLinearModule(nn.Linear):
     """
 
     def __init__(self, *args, equalized_lr_cfg=dict(mode='fan_in'), **kwargs):
+        """ 全連接層加上可調整學習率
+        Args:
+            args: 傳入到nn.Linear的參數，會是輸入channel以及輸出channel
+            equalized_lr_cfg: 設定學習率相關資料
+            kwargs: 其他需要傳入到nn.Linear的參數，這裡會設定是否需要使用bias
+        """
+        # 繼承自nn.Linear，對繼承對象進行初始化
         super().__init__(*args, **kwargs)
+        # 將學習率相關資料進行保存
         self.with_equalized_lr = equalized_lr_cfg is not None
         if self.with_equalized_lr:
+            # 獲取調整學習率倍率
             self.lr_mul = equalized_lr_cfg.get('lr_mul', 1.)
         else:
             # In fact, lr_mul will only be used in EqualizedLR for
             # initialization
+            # 如果沒有設定就是不會進行調整
             self.lr_mul = 1.
         if self.with_equalized_lr:
+            # 如果有設定with_equalized_lr就會到這裡
             equalized_lr(self, **equalized_lr_cfg)
+            # 進行權重初始化
             self._init_linear_weights()
 
     def _init_linear_weights(self):
