@@ -1,5 +1,6 @@
 dataset_type = 'UnconditionalImageDataset'
 
+
 train_pipeline = [
     dict(type='LoadImageFromFile', key='real_img', io_backend='disk'),
     dict(type='Resize', keys=['real_img'], scale=(256, 256)),
@@ -18,4 +19,11 @@ train_pipeline = [
 data = dict(
     samples_per_gpu=None,
     workers_per_gpu=4,
-    train=dict(type=dataset_type, imgs_root=None, pipeline=train_pipeline))
+    train=dict(type=dataset_type, imgs_root=None, pipeline=train_pipeline),
+    val=dict(type=dataset_type, imgs_root=None, pipeline=train_pipeline))
+
+
+
+
+
+
