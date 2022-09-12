@@ -35,9 +35,23 @@ class Focus(nn.Module):
                  conv_cfg=None,
                  norm_cfg=dict(type='BN', momentum=0.03, eps=0.001),
                  act_cfg=dict(type='Swish')):
+        """ 注意力模塊
+        Args:
+            in_channels: 輸入的channel深度
+            out_channels: 輸出的channel深度
+            kernel_size: 卷積核大小
+            stride: 步距
+            conv_cfg: 卷積層設定
+            norm_cfg: 標準化層設定
+            act_cfg: 激活函數層設定
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 構建卷積標準化激活函數模塊
         self.conv = ConvModule(
+            # 這裡進行正向傳遞時輸入的channel會放大成四倍
             in_channels * 4,
+            # 輸出channel不變
             out_channels,
             kernel_size,
             stride,
@@ -47,11 +61,18 @@ class Focus(nn.Module):
             act_cfg=act_cfg)
 
     def forward(self, x):
-        # shape of x (b,c,w,h) -> y(b,4c,w/2,h/2)
+        # Focus的forward函數部分，這裡會先對圖像進行注意力機制
+        # shape of x [batch_size, channel, height, width]
+        # 以下的每個都是shape [batch_size, channel, height / 2, width / 2]
+        # 獲取左上角部分資訊
         patch_top_left = x[..., ::2, ::2]
+        # 獲取右上角資訊
         patch_top_right = x[..., ::2, 1::2]
+        # 獲取左下角資訊
         patch_bot_left = x[..., 1::2, ::2]
+        # 獲取右下角資訊
         patch_bot_right = x[..., 1::2, 1::2]
+        # 使用concat在第二個維度上進行拼接，x shape [batch_size, channel * 4, height / 2, width / 2]
         x = torch.cat(
             (
                 patch_top_left,
@@ -61,6 +82,7 @@ class Focus(nn.Module):
             ),
             dim=1,
         )
+        # 通過卷積進行，也就是通過focus層後圖像高寬會減半
         return self.conv(x)
 
 
@@ -90,24 +112,46 @@ class SPPBottleneck(BaseModule):
                  norm_cfg=dict(type='BN', momentum=0.03, eps=0.001),
                  act_cfg=dict(type='Swish'),
                  init_cfg=None):
+        """ 構建SPP層結構，初始化函數
+        Args:
+            in_channels: 輸入channel深度
+            out_channels: 輸出channel深度
+            kernel_sizes: 使用的卷積核大小
+            conv_cfg: 卷積核設定
+            norm_cfg: 標準化層設定
+            act_cfg: 激活函數層設定
+            init_cfg: 初始化設定
+        """
+        # 繼承自BaseModule，對繼承對象進行初始化
         super().__init__(init_cfg)
+        # 獲取中間層channel深度
         mid_channels = in_channels // 2
+        # 進入時使用的卷積層
         self.conv1 = ConvModule(
+            # 將channel調整到影層的channel深度
             in_channels,
             mid_channels,
+            # 使用1x1卷積核大小
             1,
             stride=1,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             act_cfg=act_cfg)
+        # 中間會有3種不同池化下採樣方式
         self.poolings = nn.ModuleList([
+            # 這裡會遍歷不同池化核大小
             nn.MaxPool2d(kernel_size=ks, stride=1, padding=ks // 2)
             for ks in kernel_sizes
         ])
+        # 獲取最終卷積時的channel深度，這裡會將池化後的結果用concat進行融合
         conv2_channels = mid_channels * (len(kernel_sizes) + 1)
+        # 最後輸出時通過的卷積核
         self.conv2 = ConvModule(
+            # 從池化後的結果concat後的channel深度
             conv2_channels,
+            # 將channel深度調整到指定輸出channel深度
             out_channels,
+            # 使用1x1卷積核
             1,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
@@ -194,68 +238,118 @@ class CSPDarknet(BaseModule):
                      distribution='uniform',
                      mode='fan_in',
                      nonlinearity='leaky_relu')):
+        """ CSPDarknet特徵提取模型，專門給yoloV5以及yolox使用
+        Args:
+            arch: 選擇CSPDarknet的架構，這裡可以選擇P5或是P6
+            deepen_factor: 模型當中堆疊模塊的深度，這裡會是基礎深度乘上的倍率，也就是可以透過此參數調整模型大小
+            widen_factor: 模型當中channel的深度，這裡會是基礎channel深度乘上的倍率，也是用來控制模型大小的參數
+            out_indices: 在backbone當中的哪些模塊結果需要輸出出去
+            frozen_stages: 選擇哪些層需要進行凍結，如果設定成-1就全部都會進行訓練
+            use_depthwise: 是否使用dw卷積，如果使用dw卷積可以降低參數量，但是會多少引響到正確率
+            arch_ovewrite: 如果有需要更改預設的模型架構就會寫在這裡
+            spp_kernal_sizes: spp層結構的卷積核大小
+            conv_cfg: 卷積層設定
+            act_cfg: 激活函數設定
+            norm_cfg: 標準化層設定
+            norm_eval: 是否需要凍結標準化的均值以及方差
+            init_cfg: 初始化設定方式
+        """
+        # 繼承自BaseModule，將繼承對象進行初始化
         super().__init__(init_cfg)
+        # 根據指定的模型架構獲取對應的配置
         arch_setting = self.arch_settings[arch]
         if arch_ovewrite:
+            # 如果要使用自己的架構就會到這裡進行覆蓋
             arch_setting = arch_ovewrite
-        assert set(out_indices).issubset(
-            i for i in range(len(arch_setting) + 1))
+        # 輸出的層數需要符合
+        assert set(out_indices).issubset(i for i in range(len(arch_setting) + 1))
         if frozen_stages not in range(-1, len(arch_setting) + 1):
+            # 檢查指定的凍結層是否合法
             raise ValueError('frozen_stages must be in range(-1, '
                              'len(arch_setting) + 1). But received '
                              f'{frozen_stages}')
 
+        # 將傳入參數進行保存
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
         self.use_depthwise = use_depthwise
         self.norm_eval = norm_eval
+        # 如果有指定需要使用dw卷積就會指定成dw卷積模塊，否則就會使用普通的卷積模塊
         conv = DepthwiseSeparableConvModule if use_depthwise else ConvModule
 
+        # 這裡會構建注意力模塊
         self.stem = Focus(
+            # 輸入channel深度
             3,
+            # 輸出的深度會是下個模塊輸入channel的深度
             int(arch_setting[0][0] * widen_factor),
+            # 使用3x3的卷積核
             kernel_size=3,
+            # 使用指定的卷積核
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             act_cfg=act_cfg)
+        # 構建層結構名稱，方便在正向傳遞時調用
         self.layers = ['stem']
 
-        for i, (in_channels, out_channels, num_blocks, add_identity,
-                use_spp) in enumerate(arch_setting):
+        # 構建剩下的層結構
+        for i, (in_channels, out_channels, num_blocks, add_identity, use_spp) in enumerate(arch_setting):
+            # 獲取輸入的channel深度，這裡的深度會是基礎深度乘上縮放倍率
             in_channels = int(in_channels * widen_factor)
+            # 獲取輸出的channel深度，這裡的深度會是基礎深度乘上縮放倍率
             out_channels = int(out_channels * widen_factor)
+            # 獲取會堆疊多少模塊，這裡也會有堆疊數量的倍率，最少會堆疊一塊
             num_blocks = max(round(num_blocks * deepen_factor), 1)
+            # 保存一個dark_block當中的每個模塊
             stage = []
+            # 使用指定的卷積模塊，這裡會有普通卷積或是dw卷積兩種
             conv_layer = conv(
+                # 輸入的channel深度
                 in_channels,
+                # 輸出的channel深度
                 out_channels,
+                # 卷積核大小
                 3,
+                # 步距
                 stride=2,
+                # 填充大小
                 padding=1,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg)
+            # 將實例化後的結果保存到stage當中
             stage.append(conv_layer)
             if use_spp:
+                # 如果有需要使用spp就會到這裡，構建SPPBottleneck實例化對象
                 spp = SPPBottleneck(
+                    # 輸入channel深度
                     out_channels,
+                    # 輸出channel深度
                     out_channels,
+                    # 傳入在spp當中會使用到的卷積核大小
                     kernel_sizes=spp_kernal_sizes,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg)
+                # 將spp實例化對象保存到stage當中
                 stage.append(spp)
+            # 構建CSP層結構
             csp_layer = CSPLayer(
+                # 輸入channel深度與輸出channel深度相同
                 out_channels,
                 out_channels,
+                # 傳入總共需要重複多少次
                 num_blocks=num_blocks,
                 add_identity=add_identity,
                 use_depthwise=use_depthwise,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg)
+            # 添加到stage當中
             stage.append(csp_layer)
+            # 使用add_module方式添加到模型當中
             self.add_module(f'stage{i + 1}', nn.Sequential(*stage))
+            # 這裡需要保存模型名稱，之後才可以在正向傳遞時進行呼叫
             self.layers.append(f'stage{i + 1}')
 
     def _freeze_stages(self):
@@ -275,10 +369,17 @@ class CSPDarknet(BaseModule):
                     m.eval()
 
     def forward(self, x):
+        # CSPDarknet的forward函數，對輸入的圖像提取特徵
+        # 保存指定層結構輸出結果
         outs = []
+        # 遍歷每層層結構
         for i, layer_name in enumerate(self.layers):
+            # 使用名稱獲取對應的層結構實例對象
             layer = getattr(self, layer_name)
+            # 進行正向傳遞
             x = layer(x)
             if i in self.out_indices:
+                # 如果該層是需要進行回傳的就保存到outs當中
                 outs.append(x)
+        # 回傳結果
         return tuple(outs)

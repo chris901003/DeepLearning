@@ -25,8 +25,11 @@ def multi_apply(func, *args, **kwargs):
         tuple(list): A tuple containing multiple list, each list contains \
             a kind of returned results by the function
     """
+    # 如果有指定的參數kwargs就會讓每次調用func時代入
     pfunc = partial(func, **kwargs) if kwargs else func
+    # 將args傳入到pfunc當中
     map_results = map(pfunc, *args)
+    # 回傳結果，假設在yolox的話就會進行3次的forward，因為總共有3個分類頭
     return tuple(map(list, zip(*map_results)))
 
 

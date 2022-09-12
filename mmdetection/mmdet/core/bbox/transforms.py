@@ -14,8 +14,8 @@ def find_inside_bboxes(bboxes, img_h, img_w):
     Returns:
         Tensor: Index of the remaining bboxes.
     """
-    inside_inds = (bboxes[:, 0] < img_w) & (bboxes[:, 2] > 0) \
-        & (bboxes[:, 1] < img_h) & (bboxes[:, 3] > 0)
+    # 獲取哪些標註匡有在圖像裡面
+    inside_inds = (bboxes[:, 0] < img_w) & (bboxes[:, 2] > 0) & (bboxes[:, 1] < img_h) & (bboxes[:, 3] > 0)
     return inside_inds
 
 

@@ -55,10 +55,27 @@ class YOLOX(SingleStageDetector):
                  random_size_range=(15, 25),
                  random_size_interval=10,
                  init_cfg=None):
-        super(YOLOX, self).__init__(backbone, neck, bbox_head, train_cfg,
-                                    test_cfg, pretrained, init_cfg)
+        """ YOLOX初始化設定
+        Args:
+            backbone: 特徵提取設定
+            neck: 從特徵提取回傳進行加工
+            bbox_head: 預測匡的解碼頭
+            train_cfg: 訓練流程設定
+            test_cfg: 測試流程設定
+            pretrained: 預訓練權重資料
+            input_size: 輸入圖像大小
+            size_multiplier: 輸入圖像大小會是多少的倍數
+            random_size_range: 多尺度訓練時的尺度隨機範圍
+            random_size_interval: 多少個epoch後會改變多尺度的尺度
+            init_cfg: 初始化設定資料
+        """
+        # 繼承自SingleStageDetector，將繼承對象進行初始化
+        super(YOLOX, self).__init__(backbone, neck, bbox_head, train_cfg, test_cfg, pretrained, init_cfg)
+        # 保存資料到log當中
         log_img_scale(input_size, skip_square=True)
+        # 獲取多gpu相關資訊
         self.rank, self.world_size = get_dist_info()
+        # 將傳入資料進行保存
         self._default_input_size = input_size
         self._input_size = input_size
         self._random_size_range = random_size_range
@@ -89,11 +106,21 @@ class YOLOX(SingleStageDetector):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        """ YOLOX進行向前訓練
+        Args:
+            img: 圖像資訊，tensor shape [batch_size, channel, height, width]
+            img_metas: 每張圖的詳細資訊
+            gt_bboxes: 標註匡資訊，list[tensor]，tensor shape [num_object, 4]，list長度會是batch_size
+                這裡保存的會是[xmin. ymin, xmax, ymax]且為絕對座標
+            gt_labels: 標註匡對應的類別，list[tensor]，tensor shape [num_object]，list長度以及tensor的長度會與gt_bboxes相同
+            gt_bboxes_ignore: 被忽略掉的標註匡，這裡會是一些標註有問題或是難以偵測的標註匡
+        """
         # Multi-scale training
+        # 將圖像資料以及標註匡資料放到_preprocess當中，進行預處理，將圖像調整到指定的輸入大小，如果原先傳入已經是符合大小就不會改變
         img, gt_bboxes = self._preprocess(img, gt_bboxes)
 
-        losses = super(YOLOX, self).forward_train(img, img_metas, gt_bboxes,
-                                                  gt_labels, gt_bboxes_ignore)
+        # 進行向前傳遞
+        losses = super(YOLOX, self).forward_train(img, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore)
 
         # random resizing
         if (self._progress_in_iter + 1) % self._random_size_interval == 0:
@@ -103,17 +130,27 @@ class YOLOX(SingleStageDetector):
         return losses
 
     def _preprocess(self, img, gt_bboxes):
+        """ 進行訓練前的預處理
+        Args:
+            img: 圖像資料
+            gt_bboxes: 標註匡資料，型態可以往上面看
+        """
+        # 這裡理論上scale_y與scale_x會是1因為在初始化時兩個給的值相同，除非有特別更改
         scale_y = self._input_size[0] / self._default_input_size[0]
         scale_x = self._input_size[1] / self._default_input_size[1]
         if scale_x != 1 or scale_y != 1:
+            # 如果有不是1的情況就需要透過差值進行更改大小
+            # 先使用雙線性差值方式將img大小調整到input_size
             img = F.interpolate(
                 img,
                 size=self._input_size,
                 mode='bilinear',
                 align_corners=False)
+            # 再將標註匡訊息調整到input_size大小上
             for gt_bbox in gt_bboxes:
                 gt_bbox[..., 0::2] = gt_bbox[..., 0::2] * scale_x
                 gt_bbox[..., 1::2] = gt_bbox[..., 1::2] * scale_y
+        # 回傳調整後的結果
         return img, gt_bboxes
 
     def _random_resize(self, device):

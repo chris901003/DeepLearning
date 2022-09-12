@@ -62,31 +62,57 @@ class DepthwiseSeparableConvModule(nn.Module):
                  pw_norm_cfg: Union[Dict, str] = 'default',
                  pw_act_cfg: Union[Dict, str] = 'default',
                  **kwargs):
+        """ DW卷積初始化，也就是深度可分卷積的初始化函數
+        Args:
+            in_channels: 輸入的channel深度
+            out_channels: 輸出的channel深度
+            kernel_size: 卷積核大小
+            stride: 步距
+            padding: 填充大小
+            dilation: 膨脹係數
+            norm_cfg: 標準化層設定資料
+            act_cfg: 激活函數設定
+            dw_norm_cfg: dw當中標準化設定
+            dw_act_cfg: dw當中激活函數設定
+            pw_norm_cfg: pw當中標準化設定
+            pw_act_cfg: pw當中激活函數設定
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super().__init__()
+        # 在dw卷積當中不可以指定在卷積時的groups設定，因為這裡就會直接分成in_channel組
         assert 'groups' not in kwargs, 'groups should not be specified'
 
         # if norm/activation config of depthwise/pointwise ConvModule is not
         # specified, use default config.
+        # 如果沒有特殊設定標準化層或是激活函數層，就會直接使用傳入的norm_cfg與act_cfg
         dw_norm_cfg = dw_norm_cfg if dw_norm_cfg != 'default' else norm_cfg  # type: ignore # noqa E501
         dw_act_cfg = dw_act_cfg if dw_act_cfg != 'default' else act_cfg
         pw_norm_cfg = pw_norm_cfg if pw_norm_cfg != 'default' else norm_cfg  # type: ignore # noqa E501
         pw_act_cfg = pw_act_cfg if pw_act_cfg != 'default' else act_cfg
 
         # depthwise convolution
+        # 首先進行depth-wise卷積
         self.depthwise_conv = ConvModule(
+            # 將傳入的channel深度
             in_channels,
+            # 輸出的channel深度不會發生變化
             in_channels,
+            # 卷積核大小
             kernel_size,
             stride=stride,
             padding=padding,
+            # 膨脹係數
             dilation=dilation,
+            # 這裡的組數就會是in_channel，這樣就是dw卷積
             groups=in_channels,
             norm_cfg=dw_norm_cfg,  # type: ignore
             act_cfg=dw_act_cfg,  # type: ignore
             **kwargs)
 
+        # 構建point-wise卷積，需要將dw出來的結果通過point-wise卷積
         self.pointwise_conv = ConvModule(
             in_channels,
+            # 輸出的channel深度會發生變化
             out_channels,
             1,
             norm_cfg=pw_norm_cfg,  # type: ignore

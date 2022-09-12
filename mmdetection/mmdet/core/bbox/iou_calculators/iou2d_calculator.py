@@ -225,17 +225,24 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         bboxes2[..., 3] - bboxes2[..., 1])
 
     if is_aligned:
+        # 如果要計算的只有對應index的iou值就會到這裡
+        # 獲取左上角點
         lt = torch.max(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
+        # 獲取右下角點
         rb = torch.min(bboxes1[..., 2:], bboxes2[..., 2:])  # [B, rows, 2]
 
+        # 計算高寬，如果沒有交合就會是0
         wh = fp16_clamp(rb - lt, min=0)
+        # 計算疊合面積
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:
+            # 如果是計算iou或是giou就會到這裡
             union = area1 + area2 - overlap
         else:
             union = area1
         if mode == 'giou':
+            # 如果要計算的是giou就需要再多計算整個的面積
             enclosed_lt = torch.min(bboxes1[..., :2], bboxes2[..., :2])
             enclosed_rb = torch.max(bboxes1[..., 2:], bboxes2[..., 2:])
     else:

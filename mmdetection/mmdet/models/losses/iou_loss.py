@@ -38,7 +38,9 @@ def iou_loss(pred, target, linear=False, mode='log', eps=1e-6):
         warnings.warn('DeprecationWarning: Setting "linear=True" in '
                       'iou_loss is deprecated, please use "mode=`linear`" '
                       'instead.')
+    # 這裡只需要計算對應index的iou值，ious shape [num_pos]
     ious = bbox_overlaps(pred, target, is_aligned=True).clamp(min=eps)
+    # 根據不同模式計算結果
     if mode == 'linear':
         loss = 1 - ious
     elif mode == 'square':
@@ -47,6 +49,7 @@ def iou_loss(pred, target, linear=False, mode='log', eps=1e-6):
         loss = -ious.log()
     else:
         raise NotImplementedError
+    # 回傳loss
     return loss
 
 
@@ -259,13 +262,24 @@ class IoULoss(nn.Module):
                  reduction='mean',
                  loss_weight=1.0,
                  mode='log'):
+        """ 計算IOU損失
+        Args:
+            linear: 如果設定成True，使用其他由模式確定的線性損失比例
+            eps: 一個極小的值
+            reduction: 統計方式
+            loss_weight: 損失權重
+            mode: 計算方式
+        """
+        # 繼承自nn.Module，將繼承對象進行初始化
         super(IoULoss, self).__init__()
+        # 檢查指定的mode需要是以下其中之一
         assert mode in ['linear', 'square', 'log']
         if linear:
             mode = 'linear'
             warnings.warn('DeprecationWarning: Setting "linear=True" in '
                           'IOULoss is deprecated, please use "mode=`linear`" '
                           'instead.')
+        # 保存傳入參數
         self.mode = mode
         self.linear = linear
         self.eps = eps
@@ -292,11 +306,18 @@ class IoULoss(nn.Module):
                 override the original reduction method of the loss.
                 Defaults to None. Options are "none", "mean" and "sum".
         """
+        """ 計算IOU損失
+        Args:
+            pred: 預測出來的標註匡位置，tensor shape [pos, 4]，這裡會是[xmin, ymin, xmax, ymax]
+            target: 預測匡對應真實匡位置，tensor shape [pos, 4]
+            weight: 權重
+            avg_factor: 計算平均損失
+            reduction_override: loss結果處理
+        """
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
-        if (weight is not None) and (not torch.any(weight > 0)) and (
-                reduction != 'none'):
+        # 如果有需要更改reduction就會更改
+        reduction = (reduction_override if reduction_override else self.reduction)
+        if (weight is not None) and (not torch.any(weight > 0)) and (reduction != 'none'):
             if pred.dim() == weight.dim() + 1:
                 weight = weight.unsqueeze(1)
             return (pred * weight).sum()  # 0
@@ -306,6 +327,7 @@ class IoULoss(nn.Module):
             # iou_loss of shape (n,)
             assert weight.shape == pred.shape
             weight = weight.mean(-1)
+        # 計算損失，先計算iou損失之後再乘上權重
         loss = self.loss_weight * iou_loss(
             pred,
             target,

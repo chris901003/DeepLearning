@@ -633,6 +633,14 @@ class FilterAnnotations:
                  by_box=True,
                  by_mask=False,
                  keep_empty=True):
+        """ 過濾掉不合法的標註訊息
+        Args:
+            min_gt_bbox_wh: 最小的標註匡寬高
+            min_gt_mask_area: 最小的標註匡面積
+            by_box: 透過標註匡過濾instances資訊
+            by_mask: 透過mask過濾instances資訊
+            keep_empty: 如果經過過濾後沒有任何標註匡是否需要回傳None
+        """
         # TODO: add more filter options
         assert by_box or by_mask
         self.min_gt_bbox_wh = min_gt_bbox_wh
@@ -642,39 +650,66 @@ class FilterAnnotations:
         self.keep_empty = keep_empty
 
     def __call__(self, results):
+        # 過濾過小的點或是不合法的點
+        instance_num = 0
+        gt_bboxes = None
         if self.by_box:
+            # 如果是需要對標註匡進行處理就會到這裡
+            # 檢查results當中有沒有gt_bboxes參數
             assert 'gt_bboxes' in results
+            # 將標註匡資訊提取出來
             gt_bboxes = results['gt_bboxes']
+            # 獲取總共有多少個標註匡
             instance_num = gt_bboxes.shape[0]
         if self.by_mask:
+            # 如果有需要對mask進行處理就會到這裡
+            # 檢查results當中有沒有gt_masks資訊
             assert 'gt_masks' in results
+            # 將gt_masks資訊提取出來
             gt_masks = results['gt_masks']
+            # 獲取總共有多少個masks資料
             instance_num = len(gt_masks)
 
         if instance_num == 0:
+            # 如果都沒有任何相關資料就直接回傳results
             return results
 
+        # 存放過濾後的結果
         tests = []
         if self.by_box:
+            # 如果是要對標註匡進行處理的就會到這裡
+            # 獲取所有標註匡的寬度
             w = gt_bboxes[:, 2] - gt_bboxes[:, 0]
+            # 獲取所有標註匡的高度
             h = gt_bboxes[:, 3] - gt_bboxes[:, 1]
+            # 如果高寬都有超過指定的長度就會將標註匡添加到tests當中
             tests.append((w > self.min_gt_bbox_wh[0])
                          & (h > self.min_gt_bbox_wh[1]))
         if self.by_mask:
+            # 如果是要過濾mask就會到這裡
+            # 將masks資訊提取出來
             gt_masks = results['gt_masks']
+            # 如果masks的面積有大於設定值就會保存到tests當中
             tests.append(gt_masks.areas >= self.min_gt_mask_area)
 
+        # 如果同時對標註匡以及mask進行處理就會有兩個資料
         keep = tests[0]
+        # 這裡需要兩個資料都是True才表示通過過濾，keep = list(ndarray)，ndarray shape = [num_targets]，這裡會是True或是False
         for t in tests[1:]:
             keep = keep & t
 
+        # 需要遍歷的對象
         keys = ('gt_bboxes', 'gt_labels', 'gt_masks')
         for key in keys:
+            # 如果指定key有在results當中就會往下
             if key in results:
+                # 對指定的key進行過濾，只會留下True的部分
                 results[key] = results[key][keep]
         if not keep.any():
+            # 這裡如果最後沒有半個標註匡就會回傳None
             if self.keep_empty:
                 return None
+        # 回傳更新後的results資訊
         return results
 
     def __repr__(self):

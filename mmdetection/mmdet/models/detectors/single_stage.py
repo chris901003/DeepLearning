@@ -46,11 +46,14 @@ class SingleStageDetector(BaseDetector):
         # 透過build_backbone進行構建特徵提取骨幹
         self.backbone = build_backbone(backbone)
         if neck is not None:
+            # 如果有使用neck層結構就會到這裡進行構建實例對象
             self.neck = build_neck(neck)
         # 將訓練以及驗證的bbox_head相關參數放入
         bbox_head.update(train_cfg=train_cfg)
         bbox_head.update(test_cfg=test_cfg)
+        # 構建標註匡解碼頭
         self.bbox_head = build_head(bbox_head)
+        # 保存train以及test的流程
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
@@ -105,8 +108,8 @@ class SingleStageDetector(BaseDetector):
         x = self.extract_feat(img)
         # 透過bbox_head進行解碼並且計算loss
         # losses = dict，key就會是表示哪種的損失，value就會是損失值
-        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
-                                              gt_labels, gt_bboxes_ignore)
+        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore)
+        # 回傳損失結果
         return losses
 
     def simple_test(self, img, img_metas, rescale=False):

@@ -43,6 +43,7 @@ def parse_args():
         action='store_true',
         help='whether not to evaluate the checkpoint during training')
     group_gpus = parser.add_mutually_exclusive_group()
+    # gpu相關設定，這裡如果直接使用train.py進行訓練就整能使用單gpu進行
     group_gpus.add_argument(
         '--gpus',
         type=int,
@@ -60,15 +61,19 @@ def parse_args():
         default=0,
         help='id of gpu to use '
         '(only applicable to non-distributed training)')
+    # 設定亂數種子碼，可以讓訓練復現
     parser.add_argument('--seed', type=int, default=None, help='random seed')
+    # 是否需要在不同gpu上用不同的seed
     parser.add_argument(
         '--diff-seed',
         action='store_true',
         help='Whether or not set different seeds for different ranks')
+    # 是否使用CUDNN對模型進行預先優化
     parser.add_argument(
         '--deterministic',
         action='store_true',
         help='whether to set deterministic options for CUDNN backend.')
+    # 額外添加config資料
     parser.add_argument(
         '--options',
         nargs='+',
@@ -76,6 +81,7 @@ def parse_args():
         help='override some settings in the used config, the key-value pair '
         'in xxx=yyy format will be merged into config file (deprecate), '
         'change to --cfg-options instead.')
+    # 添加額外config資料
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -86,11 +92,13 @@ def parse_args():
         'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
         'Note that the quotation marks are necessary and that no white space '
         'is allowed.')
+    # 分布式訓練需設定的資訊
     parser.add_argument(
         '--launcher',
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
+    # 多gpu相關設定
     parser.add_argument('--local_rank', type=int, default=0)
     parser.add_argument(
         '--auto-scale-lr',
@@ -207,7 +215,7 @@ def main():
     meta = dict()
     # log env info
     env_info_dict = collect_env()
-    env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
+    env_info = '\n'.join([f'{k}: {v}' for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
     logger.info('Environment info:\n' + dash_line + env_info + '\n' +
                 dash_line)

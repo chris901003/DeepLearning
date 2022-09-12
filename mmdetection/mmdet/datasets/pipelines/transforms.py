@@ -553,8 +553,7 @@ class RandomFlip:
                 # exclude non-flip
                 single_ratio = self.flip_ratio / (len(direction_list) - 1)
                 # 構建翻轉概率的list
-                flip_ratio_list = [single_ratio] * (len(direction_list) -
-                                                    1) + [non_flip_ratio]
+                flip_ratio_list = [single_ratio] * (len(direction_list) - 1) + [non_flip_ratio]
 
             # choice = 從direction_list當中選出一個，flip_ratio_list就會是每一個被選中的概率
             # cur_dir = 選出的那個，如果選到的是None表示不進行翻轉
@@ -570,8 +569,7 @@ class RandomFlip:
             # flip image，遍歷img_fields當中的內容
             for key in results.get('img_fields', ['img']):
                 # 將指定的key的value進行翻轉
-                results[key] = mmcv.imflip(
-                    results[key], direction=results['flip_direction'])
+                results[key] = mmcv.imflip(results[key], direction=results['flip_direction'])
             # flip bboxes，遍歷bbox_fields當中的內容
             for key in results.get('bbox_fields', []):
                 # 將指定的key的value進行翻轉，這裡會是標註匡的翻轉
@@ -584,8 +582,7 @@ class RandomFlip:
 
             # flip seg，seg翻轉
             for key in results.get('seg_fields', []):
-                results[key] = mmcv.imflip(
-                    results[key], direction=results['flip_direction'])
+                results[key] = mmcv.imflip(results[key], direction=results['flip_direction'])
         # 將調整過後的results回傳
         return results
 
@@ -2203,11 +2200,25 @@ class Mosaic:
                  skip_filter=True,
                  pad_val=114,
                  prob=1.0):
+        """ Mosaic圖像增強方式
+        Args:
+            img_scale: 最終圖像輸出大小
+            center_ratio_range: 中心點範圍
+            min_bbox_size: 經過mosaic後當標註匡小於多少像素會認定為無效匡
+            bbox_clip_border: 是否需要對超出圖像的標註匡進行剪裁
+            skip_filter: 是否需要跳過過濾器規則
+            pad_val: padding的值
+            prob: 使用mosaic的概率
+        """
+        # 檢查img_scale是否為tuple格式
         assert isinstance(img_scale, tuple)
+        # 檢查觸發概率是否設定正確
         assert 0 <= prob <= 1.0, 'The probability should be in range [0,1]. '\
             f'got {prob}.'
 
+        # 紀錄log資料
         log_img_scale(img_scale, skip_square=True)
+        # 保存傳入資料
         self.img_scale = img_scale
         self.center_ratio_range = center_ratio_range
         self.min_bbox_size = min_bbox_size
@@ -2225,10 +2236,13 @@ class Mosaic:
         Returns:
             dict: Result dict with mosaic transformed.
         """
+        # 圖像增強Mosaic的call函數
 
         if random.uniform(0, 1) > self.prob:
+            # 隨機決定是否進行mosaic增強，如果不需要進行增強就直接回傳results
             return results
 
+        # 否則就進行mosaic圖像增強
         results = self._mosaic_transform(results)
         return results
 
@@ -2242,7 +2256,9 @@ class Mosaic:
             list: indexes.
         """
 
+        # 隨機獲取dataset當中的圖像，這裡是要給mosaic使用，因為需要四張圖像進行混合，所以還需要挑出隨機三張圖像
         indexes = [random.randint(0, len(dataset)) for _ in range(3)]
+        # 將挑出的圖像index回傳
         return indexes
 
     def _mosaic_transform(self, results):
@@ -2254,92 +2270,120 @@ class Mosaic:
         Returns:
             dict: Updated result dict.
         """
+        # 進行mosaic圖像增強
 
+        # 這裡會需要其他三張圖像進行融合，所以需要獲取mix_results資訊，在mix_results當中會有其他三張圖像的資訊
         assert 'mix_results' in results
+        # 保存四張圖像的標籤
         mosaic_labels = []
+        # 保存四張圖像的標註匡
         mosaic_bboxes = []
         if len(results['img'].shape) == 3:
+            # 如果圖像是RGB三通道的就會到這裡
+            # 構建一個高寬為指定圖像大小兩倍的空圖像，這裡會先用指定的顏色進行填充，這裡會構建的是三通道的圖像
             mosaic_img = np.full(
                 (int(self.img_scale[0] * 2), int(self.img_scale[1] * 2), 3),
                 self.pad_val,
                 dtype=results['img'].dtype)
         else:
+            # 如果圖像是Gray單通道的就會到這裡
+            # 構建一個高寬為指定圖像大小兩倍的空圖像，這裡會先用指定的顏色進行填充，這裡會構建的是單通道的圖像
             mosaic_img = np.full(
                 (int(self.img_scale[0] * 2), int(self.img_scale[1] * 2)),
                 self.pad_val,
                 dtype=results['img'].dtype)
 
         # mosaic center x, y
-        center_x = int(
-            random.uniform(*self.center_ratio_range) * self.img_scale[1])
-        center_y = int(
-            random.uniform(*self.center_ratio_range) * self.img_scale[0])
+        # 這裡會隨機選取中心點位置，會從指定的範圍內進行隨機選取並且縮放到絕對位置上
+        center_x = int(random.uniform(*self.center_ratio_range) * self.img_scale[1])
+        center_y = int(random.uniform(*self.center_ratio_range) * self.img_scale[0])
+        # 將指定的中心點位置做成tuple格式
         center_position = (center_x, center_y)
 
+        # 在mosaic當中會將圖像分成四個部分(左上角, 右上角, 左下角, 右下角)
         loc_strs = ('top_left', 'top_right', 'bottom_left', 'bottom_right')
+        # 遍歷四個地方
         for i, loc in enumerate(loc_strs):
             if loc == 'top_left':
+                # 如果是左上角就會是當前主圖像
                 results_patch = copy.deepcopy(results)
             else:
+                # 其他位置就是額外挑出來的圖像
                 results_patch = copy.deepcopy(results['mix_results'][i - 1])
 
+            # 獲取圖像ndarray shape [height, width, channel]
             img_i = results_patch['img']
+            # 獲取圖像高寬資料
             h_i, w_i = img_i.shape[:2]
             # keep_ratio resize
-            scale_ratio_i = min(self.img_scale[0] / h_i,
-                                self.img_scale[1] / w_i)
-            img_i = mmcv.imresize(
-                img_i, (int(w_i * scale_ratio_i), int(h_i * scale_ratio_i)))
+            # 獲取將較長的邊縮放到指定長度時需縮放的大小，這裡主要是為了進行高寬比例不變的縮放
+            scale_ratio_i = min(self.img_scale[0] / h_i, self.img_scale[1] / w_i)
+            # 使用resize將圖像縮放到指定的高寬
+            img_i = mmcv.imresize(img_i, (int(w_i * scale_ratio_i), int(h_i * scale_ratio_i)))
 
             # compute the combine parameters
-            paste_coord, crop_coord = self._mosaic_combine(
-                loc, center_position, img_i.shape[:2][::-1])
+            # 獲取需要剪裁的大小，將當前圖像要放的位置以及中心點位置以及當前圖像高寬傳入
+            # paste_coord = 當前圖像要貼在mosaic圖像的哪個位置中
+            # crop_coord = 要使用當前圖像的哪個位置
+            paste_coord, crop_coord = self._mosaic_combine(loc, center_position, img_i.shape[:2][::-1])
+            # 將座標解出來
             x1_p, y1_p, x2_p, y2_p = paste_coord
             x1_c, y1_c, x2_c, y2_c = crop_coord
 
             # crop and paste image
+            # 在mosaic上的指定位置貼上指定圖像
             mosaic_img[y1_p:y2_p, x1_p:x2_p] = img_i[y1_c:y2_c, x1_c:x2_c]
 
             # adjust coordinate
+            # 獲取當前圖像的標註匡訊息以及標註訊息
             gt_bboxes_i = results_patch['gt_bboxes']
             gt_labels_i = results_patch['gt_labels']
 
             if gt_bboxes_i.shape[0] > 0:
+                # 如果該圖像有標註訊息就會到這裡
+                # 獲取經過剪裁後圖像在高寬上偏移多少距離
                 padw = x1_p - x1_c
                 padh = y1_p - y1_c
-                gt_bboxes_i[:, 0::2] = \
-                    scale_ratio_i * gt_bboxes_i[:, 0::2] + padw
-                gt_bboxes_i[:, 1::2] = \
-                    scale_ratio_i * gt_bboxes_i[:, 1::2] + padh
+                # 將原始標註資訊經過與圖像相同縮放後進行偏移
+                gt_bboxes_i[:, 0::2] = scale_ratio_i * gt_bboxes_i[:, 0::2] + padw
+                gt_bboxes_i[:, 1::2] = scale_ratio_i * gt_bboxes_i[:, 1::2] + padh
 
+            # 將標註匡資料以及標註類別保存，這裡先暫時不處理標註匡跑到圖外的問題
             mosaic_bboxes.append(gt_bboxes_i)
             mosaic_labels.append(gt_labels_i)
 
         if len(mosaic_labels) > 0:
+            # 如果進融合結果有標註資訊就會到這裡
+            # 將標註資訊進行拼接，這裡會在第一個維度進行拼接
             mosaic_bboxes = np.concatenate(mosaic_bboxes, 0)
             mosaic_labels = np.concatenate(mosaic_labels, 0)
 
             if self.bbox_clip_border:
-                mosaic_bboxes[:, 0::2] = np.clip(mosaic_bboxes[:, 0::2], 0,
-                                                 2 * self.img_scale[1])
-                mosaic_bboxes[:, 1::2] = np.clip(mosaic_bboxes[:, 1::2], 0,
-                                                 2 * self.img_scale[0])
+                # 將標註匡資訊限縮在圖像當中，會將超出去的部分限制到圖像邊緣上
+                mosaic_bboxes[:, 0::2] = np.clip(mosaic_bboxes[:, 0::2], 0, 2 * self.img_scale[1])
+                mosaic_bboxes[:, 1::2] = np.clip(mosaic_bboxes[:, 1::2], 0, 2 * self.img_scale[0])
 
             if not self.skip_filter:
-                mosaic_bboxes, mosaic_labels = \
-                    self._filter_box_candidates(mosaic_bboxes, mosaic_labels)
+                # 如果沒有要跳過過濾器就會到這裡，這裡會過濾掉標註匡過小的部分
+                mosaic_bboxes, mosaic_labels = self._filter_box_candidates(mosaic_bboxes, mosaic_labels)
 
         # remove outside bboxes
-        inside_inds = find_inside_bboxes(mosaic_bboxes, 2 * self.img_scale[0],
-                                         2 * self.img_scale[1])
+        # 獲取哪些標註匡在圖像裡面
+        inside_inds = find_inside_bboxes(mosaic_bboxes, 2 * self.img_scale[0], 2 * self.img_scale[1])
+        # 將在圖像當中的標註匡過濾出來，更新資訊
         mosaic_bboxes = mosaic_bboxes[inside_inds]
         mosaic_labels = mosaic_labels[inside_inds]
 
+        # 將融合後的圖像保存到img當中
         results['img'] = mosaic_img
+        # 更新圖像大小
         results['img_shape'] = mosaic_img.shape
+        # 更新標註匡訊息
         results['gt_bboxes'] = mosaic_bboxes
+        # 更新標註對象類別
         results['gt_labels'] = mosaic_labels
 
+        # 回傳更新後的results資訊
         return results
 
     def _mosaic_combine(self, loc, center_position_xy, img_shape_wh):
@@ -2359,48 +2403,67 @@ class Mosaic:
                 - paste_coord (tuple): paste corner coordinate in mosaic image.
                 - crop_coord (tuple): crop corner coordinate in mosaic image.
         """
+        # 計算圖像放到mosaic指定位置時的剪裁大小
+        # loc = 當前圖像要放的位置
+        # center_position_xy = 拼接圖像的中心點座標
+        # img_shape_wh = 圖像的寬高
+
+        # 檢查loc需要使以下幾種，其他就會直接報錯
         assert loc in ('top_left', 'top_right', 'bottom_left', 'bottom_right')
         if loc == 'top_left':
+            # 如果是要放在左上角就會到這裡
             # index0 to top left part of image
+            # 計算當前圖像要從mosaic圖像的哪個位置貼到哪個位置
             x1, y1, x2, y2 = max(center_position_xy[0] - img_shape_wh[0], 0), \
                              max(center_position_xy[1] - img_shape_wh[1], 0), \
                              center_position_xy[0], \
                              center_position_xy[1]
+            # 獲取我們需要圖像的哪個部分，這裡會選出的是圖像當中哪個部分是我們需要的
             crop_coord = img_shape_wh[0] - (x2 - x1), img_shape_wh[1] - (
                 y2 - y1), img_shape_wh[0], img_shape_wh[1]
 
         elif loc == 'top_right':
+            # 如果是要放在右上角就會到這裡
             # index1 to top right part of image
+            # 計算當前圖像要從mosaic圖像的哪個位置貼到哪個位置
             x1, y1, x2, y2 = center_position_xy[0], \
                              max(center_position_xy[1] - img_shape_wh[1], 0), \
                              min(center_position_xy[0] + img_shape_wh[0],
                                  self.img_scale[1] * 2), \
                              center_position_xy[1]
+            # 獲取我們需要圖像的哪個部分，這裡會選出的是圖像當中哪個部分是我們需要的
             crop_coord = 0, img_shape_wh[1] - (y2 - y1), min(
                 img_shape_wh[0], x2 - x1), img_shape_wh[1]
 
         elif loc == 'bottom_left':
+            # 如果是要放在左下角就會到這裡
             # index2 to bottom left part of image
+            # 計算當前圖像要從mosaic圖像的哪個位置貼到哪個位置
             x1, y1, x2, y2 = max(center_position_xy[0] - img_shape_wh[0], 0), \
                              center_position_xy[1], \
                              center_position_xy[0], \
                              min(self.img_scale[0] * 2, center_position_xy[1] +
                                  img_shape_wh[1])
+            # 獲取我們需要圖像的哪個部分，這裡會選出的是圖像當中哪個部分是我們需要的
             crop_coord = img_shape_wh[0] - (x2 - x1), 0, img_shape_wh[0], min(
                 y2 - y1, img_shape_wh[1])
 
         else:
+            # 如果是要放在右下角就會到這裡
             # index3 to bottom right part of image
+            # 計算當前圖像要從mosaic圖像的哪個位置貼到哪個位置
             x1, y1, x2, y2 = center_position_xy[0], \
                              center_position_xy[1], \
                              min(center_position_xy[0] + img_shape_wh[0],
                                  self.img_scale[1] * 2), \
                              min(self.img_scale[0] * 2, center_position_xy[1] +
                                  img_shape_wh[1])
+            # 獲取我們需要圖像的哪個部分，這裡會選出的是圖像當中哪個部分是我們需要的
             crop_coord = 0, 0, min(img_shape_wh[0],
                                    x2 - x1), min(y2 - y1, img_shape_wh[1])
 
         paste_coord = x1, y1, x2, y2
+        # 回傳結果
         return paste_coord, crop_coord
 
     def _filter_box_candidates(self, bboxes, labels):
@@ -2490,8 +2553,24 @@ class MixUp:
                  max_aspect_ratio=20,
                  bbox_clip_border=True,
                  skip_filter=True):
+        """ 在原始圖像的左上角再隨機添加上一張圖像
+        Args:
+            img_scale: 輸出圖像的大小
+            ratio_range: 對於要插入的圖像的縮放比率
+            flip_ratio: 對於要插入的圖像的翻轉概率
+            pad_val: 填充的值
+            max_iters: 最多可以重新獲取多少次圖像
+            min_bbox_size: 最小標註匡的面積
+            min_area_ratio: 經過圖像變換後，標註匡需要是原始標註匡最小多少倍
+            max_aspect_ratio: 最大高寬比
+            bbox_clip_border: 是否需要將超過圖像的標註匡進行限縮
+            skip_filter: 是否要跳過，過濾過小標註匡
+        """
+        # 檢查img_scale要是tuple格式
         assert isinstance(img_scale, tuple)
+        # 記錄到log當中
         log_img_scale(img_scale, skip_square=True)
+        # 將傳入資料進行保存
         self.dynamic_scale = img_scale
         self.ratio_range = ratio_range
         self.flip_ratio = flip_ratio
@@ -2512,8 +2591,11 @@ class MixUp:
         Returns:
             dict: Result dict with mixup transformed.
         """
+        # 將獲取的圖像添加到左上角當中
 
+        # 透過_mixup_transform進行融合
         results = self._mixup_transform(results)
+        # 將結果回傳
         return results
 
     def get_indexes(self, dataset):
@@ -2525,13 +2607,19 @@ class MixUp:
         Returns:
             list: indexes.
         """
+        # 隨機獲取要額外添加的圖像
+        index = 0
 
         for i in range(self.max_iters):
+            # 從資料集當中隨機獲取一張圖像
             index = random.randint(0, len(dataset))
+            # 將圖像經過圖像處理流
             gt_bboxes_i = dataset.get_ann_info(index)['bboxes']
             if len(gt_bboxes_i) != 0:
+                # 如果當中有獲取到標註匡資訊就表示成功，跳出迴圈
                 break
 
+        # 回傳選中的圖像index
         return index
 
     def _mixup_transform(self, results):
@@ -2543,118 +2631,145 @@ class MixUp:
         Returns:
             dict: Updated result dict.
         """
+        # 進行圖像增強融合
 
+        # 檢查results當中需要有mix_results才可以進行融合
         assert 'mix_results' in results
-        assert len(
-            results['mix_results']) == 1, 'MixUp only support 2 images now !'
+        # 這裡目前只能將一張圖像添加到左上角當中
+        assert len(results['mix_results']) == 1, 'MixUp only support 2 images now !'
 
         if results['mix_results'][0]['gt_bboxes'].shape[0] == 0:
+            # 如果獲取的圖像沒有任何標註匡就直接回傳results不進行融合
             # empty bbox
             return results
 
+        # 獲取要融合進的圖像資訊
         retrieve_results = results['mix_results'][0]
+        # 獲取圖像
         retrieve_img = retrieve_results['img']
 
+        # 獲取要縮放的倍率
         jit_factor = random.uniform(*self.ratio_range)
+        # 獲取是否需要對圖像進行旋轉
         is_filp = random.uniform(0, 1) > self.flip_ratio
 
         if len(retrieve_img.shape) == 3:
+            # 如果插入圖像是彩色圖像就會到這裡，構建3通道且全為填充值的ndarray
             out_img = np.ones(
                 (self.dynamic_scale[0], self.dynamic_scale[1], 3),
                 dtype=retrieve_img.dtype) * self.pad_val
         else:
-            out_img = np.ones(
-                self.dynamic_scale, dtype=retrieve_img.dtype) * self.pad_val
+            # 如果是灰度圖像就會到這裡
+            out_img = np.ones(self.dynamic_scale, dtype=retrieve_img.dtype) * self.pad_val
 
         # 1. keep_ratio resize
+        # 獲取原圖需要進行多少倍的縮放才可以讓最長邊貼合到指定長度
         scale_ratio = min(self.dynamic_scale[0] / retrieve_img.shape[0],
                           self.dynamic_scale[1] / retrieve_img.shape[1])
+        # 透過resize進行圖像縮放，這裡進行的會是保持高寬不變的縮放
         retrieve_img = mmcv.imresize(
             retrieve_img, (int(retrieve_img.shape[1] * scale_ratio),
                            int(retrieve_img.shape[0] * scale_ratio)))
 
         # 2. paste
+        # 將縮放後的圖像貼到剛生成的空圖上，這裡是沿著左上角進行貼合
         out_img[:retrieve_img.shape[0], :retrieve_img.shape[1]] = retrieve_img
 
         # 3. scale jit
+        # 最後一步進行縮放
         scale_ratio *= jit_factor
-        out_img = mmcv.imresize(out_img, (int(out_img.shape[1] * jit_factor),
-                                          int(out_img.shape[0] * jit_factor)))
+        # 透過resize將圖像縮放到指定大小
+        out_img = mmcv.imresize(out_img, (int(out_img.shape[1] * jit_factor), int(out_img.shape[0] * jit_factor)))
 
         # 4. flip
         if is_filp:
+            # 如果有需要進行翻轉就會沿著寬度方向進行左右翻轉
             out_img = out_img[:, ::-1, :]
 
         # 5. random crop
+        # 獲取原始圖像
         ori_img = results['img']
+        # 獲取當前要貼上的圖像高寬資訊
         origin_h, origin_w = out_img.shape[:2]
+        # 獲取原始圖像的高寬資訊
         target_h, target_w = ori_img.shape[:2]
-        padded_img = np.zeros(
-            (max(origin_h, target_h), max(origin_w,
-                                          target_w), 3)).astype(np.uint8)
+        # 構建一個空圖，這裡的高寬會是兩個圖像取大的，也就是空圖會大於等於原始圖像以及當前要貼上的圖像
+        padded_img = np.zeros((max(origin_h, target_h), max(origin_w, target_w), 3)).astype(np.uint8)
+        # 將要添加上去的圖像放到padded_img上
         padded_img[:origin_h, :origin_w] = out_img
 
+        # 先將x與y方向的偏移量設定成0
         x_offset, y_offset = 0, 0
         if padded_img.shape[0] > target_h:
+            # 如果padded_img的高度比原始圖像高就會到這裡
+            # 隨機獲取y方向上的偏移量，因為padded_img高度較高，所以會有可以移動的空間
             y_offset = random.randint(0, padded_img.shape[0] - target_h)
         if padded_img.shape[1] > target_w:
+            # # 如果padded_img的寬度比原始圖像寬就會到這裡
+            # 隨機獲取x方向上的偏移量，因為padded_img寬度較寬，所以會有可以移動的空間
             x_offset = random.randint(0, padded_img.shape[1] - target_w)
-        padded_cropped_img = padded_img[y_offset:y_offset + target_h,
-                                        x_offset:x_offset + target_w]
+        # 這裡會將padded_img的高寬限縮到與原始圖像大小相同
+        padded_cropped_img = padded_img[y_offset:y_offset + target_h, x_offset:x_offset + target_w]
 
         # 6. adjust bbox
+        # 調整標註匡資訊
         retrieve_gt_bboxes = retrieve_results['gt_bboxes']
+        # 先將標註匡也進行與圖像相同的縮放
         retrieve_gt_bboxes[:, 0::2] = retrieve_gt_bboxes[:, 0::2] * scale_ratio
         retrieve_gt_bboxes[:, 1::2] = retrieve_gt_bboxes[:, 1::2] * scale_ratio
         if self.bbox_clip_border:
-            retrieve_gt_bboxes[:, 0::2] = np.clip(retrieve_gt_bboxes[:, 0::2],
-                                                  0, origin_w)
-            retrieve_gt_bboxes[:, 1::2] = np.clip(retrieve_gt_bboxes[:, 1::2],
-                                                  0, origin_h)
+            # 將超出圖像的標註匡進行限縮
+            retrieve_gt_bboxes[:, 0::2] = np.clip(retrieve_gt_bboxes[:, 0::2], 0, origin_w)
+            retrieve_gt_bboxes[:, 1::2] = np.clip(retrieve_gt_bboxes[:, 1::2], 0, origin_h)
 
         if is_filp:
-            retrieve_gt_bboxes[:, 0::2] = (
-                origin_w - retrieve_gt_bboxes[:, 0::2][:, ::-1])
+            # 如果圖像有進行翻轉則標註匡也需要進行翻轉
+            retrieve_gt_bboxes[:, 0::2] = (origin_w - retrieve_gt_bboxes[:, 0::2][:, ::-1])
 
         # 7. filter
+        # 先拷貝一份標註匡資訊
         cp_retrieve_gt_bboxes = retrieve_gt_bboxes.copy()
-        cp_retrieve_gt_bboxes[:, 0::2] = \
-            cp_retrieve_gt_bboxes[:, 0::2] - x_offset
-        cp_retrieve_gt_bboxes[:, 1::2] = \
-            cp_retrieve_gt_bboxes[:, 1::2] - y_offset
+        # 將要貼上的標註匡進行調整，根據偏移量進行調整
+        cp_retrieve_gt_bboxes[:, 0::2] = cp_retrieve_gt_bboxes[:, 0::2] - x_offset
+        cp_retrieve_gt_bboxes[:, 1::2] = cp_retrieve_gt_bboxes[:, 1::2] - y_offset
         if self.bbox_clip_border:
-            cp_retrieve_gt_bboxes[:, 0::2] = np.clip(
-                cp_retrieve_gt_bboxes[:, 0::2], 0, target_w)
-            cp_retrieve_gt_bboxes[:, 1::2] = np.clip(
-                cp_retrieve_gt_bboxes[:, 1::2], 0, target_h)
+            # 如果需要將超出去的部分限縮就會到這裡
+            cp_retrieve_gt_bboxes[:, 0::2] = np.clip(cp_retrieve_gt_bboxes[:, 0::2], 0, target_w)
+            cp_retrieve_gt_bboxes[:, 1::2] = np.clip(cp_retrieve_gt_bboxes[:, 1::2], 0, target_h)
 
         # 8. mix up
+        # 將原始圖像轉成float32格式
         ori_img = ori_img.astype(np.float32)
+        # 進行圖像融合，這裡就直接進行圖像相加
         mixup_img = 0.5 * ori_img + 0.5 * padded_cropped_img.astype(np.float32)
 
+        # 獲取疊加上去的圖像標註分類類別
         retrieve_gt_labels = retrieve_results['gt_labels']
         if not self.skip_filter:
-            keep_list = self._filter_box_candidates(retrieve_gt_bboxes.T,
-                                                    cp_retrieve_gt_bboxes.T)
+            # 如果需要將較小的標註匡過濾就會到這裡
+            keep_list = self._filter_box_candidates(retrieve_gt_bboxes.T, cp_retrieve_gt_bboxes.T)
 
+            # 進行過濾
             retrieve_gt_labels = retrieve_gt_labels[keep_list]
             cp_retrieve_gt_bboxes = cp_retrieve_gt_bboxes[keep_list]
 
-        mixup_gt_bboxes = np.concatenate(
-            (results['gt_bboxes'], cp_retrieve_gt_bboxes), axis=0)
-        mixup_gt_labels = np.concatenate(
-            (results['gt_labels'], retrieve_gt_labels), axis=0)
+        # 將標註匡與標註分類類別進行融合
+        mixup_gt_bboxes = np.concatenate((results['gt_bboxes'], cp_retrieve_gt_bboxes), axis=0)
+        mixup_gt_labels = np.concatenate((results['gt_labels'], retrieve_gt_labels), axis=0)
 
         # remove outside bbox
+        # 獲取哪些標註匡有在圖像內
         inside_inds = find_inside_bboxes(mixup_gt_bboxes, target_h, target_w)
         mixup_gt_bboxes = mixup_gt_bboxes[inside_inds]
         mixup_gt_labels = mixup_gt_labels[inside_inds]
 
+        # 更新圖像資訊
         results['img'] = mixup_img.astype(np.uint8)
         results['img_shape'] = mixup_img.shape
         results['gt_bboxes'] = mixup_gt_bboxes
         results['gt_labels'] = mixup_gt_labels
 
+        # 回傳更新後的圖像
         return results
 
     def _filter_box_candidates(self, bbox1, bbox2):
@@ -2738,9 +2853,25 @@ class RandomAffine:
                  max_aspect_ratio=20,
                  bbox_clip_border=True,
                  skip_filter=True):
+        """ 對圖像進行隨機仿射變換
+        Args:
+            max_rotate_degree: 最大旋轉角度
+            max_translate_ratio: 最大平移比例
+            scaling_ratio_range: 圖像縮放比例
+            max_shear_degree: 最大剪切變換度
+            border: 與輸入圖像的高度和寬度邊的距離以調整輸出形狀
+            border_val: 邊緣填充值
+            min_bbox_size: 最小的標註匡大小，如果小於該值就會拋棄
+            min_area_ratio: 最小面積比例，這裡是與原圖進行大小計算比例
+            max_aspect_ratio: 最大高寬比
+            bbox_clip_border: 是否需要將超過圖像的標註匡進行剪裁
+            skip_filter: 是否需要跳過過濾
+        """
+        # 檢查比例是否正確
         assert 0 <= max_translate_ratio <= 1
         assert scaling_ratio_range[0] <= scaling_ratio_range[1]
         assert scaling_ratio_range[0] > 0
+        # 將傳入的值進行保存
         self.max_rotate_degree = max_rotate_degree
         self.max_translate_ratio = max_translate_ratio
         self.scaling_ratio_range = scaling_ratio_range
@@ -2754,37 +2885,44 @@ class RandomAffine:
         self.skip_filter = skip_filter
 
     def __call__(self, results):
+        # 對圖像進行隨機仿射變換
+
+        # 從results當中獲取圖像資訊
         img = results['img']
+        # 獲取輸出時的圖像大小，這裡會是原始圖像大小加上border，這裡如果border是正數就會填充否則就會裁減
         height = img.shape[0] + self.border[0] * 2
         width = img.shape[1] + self.border[1] * 2
 
         # Rotation
-        rotation_degree = random.uniform(-self.max_rotate_degree,
-                                         self.max_rotate_degree)
+        # 獲取隨機選轉的角度，這裡會從指定的角度範圍當中隨機選取
+        rotation_degree = random.uniform(-self.max_rotate_degree, self.max_rotate_degree)
+        # 透過_get_rotation_matrix獲取旋轉使用的矩陣
         rotation_matrix = self._get_rotation_matrix(rotation_degree)
 
         # Scaling
-        scaling_ratio = random.uniform(self.scaling_ratio_range[0],
-                                       self.scaling_ratio_range[1])
+        # 獲取隨機縮放比例，這裡會從指定的縮放範圍挑取一個縮放大小值
+        scaling_ratio = random.uniform(self.scaling_ratio_range[0], self.scaling_ratio_range[1])
+        # 透過_get_scaling_matrix獲取縮放使用的矩陣
         scaling_matrix = self._get_scaling_matrix(scaling_ratio)
 
         # Shear
-        x_degree = random.uniform(-self.max_shear_degree,
-                                  self.max_shear_degree)
-        y_degree = random.uniform(-self.max_shear_degree,
-                                  self.max_shear_degree)
+        # 獲取裁切資訊
+        # 分別獲取對於x與y的裁切度
+        x_degree = random.uniform(-self.max_shear_degree, self.max_shear_degree)
+        y_degree = random.uniform(-self.max_shear_degree, self.max_shear_degree)
+        # 獲取對應的矩陣
         shear_matrix = self._get_shear_matrix(x_degree, y_degree)
 
         # Translation
-        trans_x = random.uniform(-self.max_translate_ratio,
-                                 self.max_translate_ratio) * width
-        trans_y = random.uniform(-self.max_translate_ratio,
-                                 self.max_translate_ratio) * height
+        # 獲取變換矩陣
+        trans_x = random.uniform(-self.max_translate_ratio, self.max_translate_ratio) * width
+        trans_y = random.uniform(-self.max_translate_ratio, self.max_translate_ratio) * height
         translate_matrix = self._get_translation_matrix(trans_x, trans_y)
 
-        warp_matrix = (
-            translate_matrix @ shear_matrix @ rotation_matrix @ scaling_matrix)
+        # 將所有變換矩陣透過矩陣乘法進行融合
+        warp_matrix = (translate_matrix @ shear_matrix @ rotation_matrix @ scaling_matrix)
 
+        # 透過cv2進行對應變換
         img = cv2.warpPerspective(
             img,
             warp_matrix,
@@ -2793,47 +2931,60 @@ class RandomAffine:
         results['img'] = img
         results['img_shape'] = img.shape
 
+        # 以下要對標註匡進行仿射變換
         for key in results.get('bbox_fields', []):
+            # 獲取標註匡資料
             bboxes = results[key]
+            # 獲取總共有多少個標註匡
             num_bboxes = len(bboxes)
             if num_bboxes:
+                # 如果有標註匡資料就會到這裡
                 # homogeneous coordinates
+                # 這裡因為經過仿射變換後可能原先的[xmin, ymin, xmax, ymax]不會是原先轉換過去的
+                # 也就是原先的(xmin, ymax)可能變成新的標註匡的(xmin, ymin)所以四個角我們都需要進行搜集，這裡將x與y分開
                 xs = bboxes[:, [0, 0, 2, 2]].reshape(num_bboxes * 4)
                 ys = bboxes[:, [1, 3, 3, 1]].reshape(num_bboxes * 4)
+                # 構建一個全為1的ndarray且shape與xs相同
                 ones = np.ones_like(xs)
+                # 將x與y與ones進行堆疊，shape [3, num_bboxes * 4]
                 points = np.vstack([xs, ys, ones])
 
+                # 進行仿射變換
                 warp_points = warp_matrix @ points
+                # 這裡不會發生任何變化，因為warp_points[2]是1
                 warp_points = warp_points[:2] / warp_points[2]
+                # 將shape進行調整，shape [num_bboxes, 4]
                 xs = warp_points[0].reshape(num_bboxes, 4)
                 ys = warp_points[1].reshape(num_bboxes, 4)
 
-                warp_bboxes = np.vstack(
-                    (xs.min(1), ys.min(1), xs.max(1), ys.max(1))).T
+                # 獲取新的[xmin, ymin, xmax, ymax]
+                warp_bboxes = np.vstack((xs.min(1), ys.min(1), xs.max(1), ys.max(1))).T
 
                 if self.bbox_clip_border:
-                    warp_bboxes[:, [0, 2]] = \
-                        warp_bboxes[:, [0, 2]].clip(0, width)
-                    warp_bboxes[:, [1, 3]] = \
-                        warp_bboxes[:, [1, 3]].clip(0, height)
+                    # 如果有需要將標註匡限縮到圖像當中就會到這裡
+                    warp_bboxes[:, [0, 2]] = warp_bboxes[:, [0, 2]].clip(0, width)
+                    warp_bboxes[:, [1, 3]] = warp_bboxes[:, [1, 3]].clip(0, height)
 
                 # remove outside bbox
+                # 獲取哪些標註匡有在圖像當中
                 valid_index = find_inside_bboxes(warp_bboxes, height, width)
                 if not self.skip_filter:
                     # filter bboxes
-                    filter_index = self.filter_gt_bboxes(
-                        bboxes * scaling_ratio, warp_bboxes)
+                    # 如果有需要將面積過小的標註匡過濾掉就會到這裡
+                    filter_index = self.filter_gt_bboxes(bboxes * scaling_ratio, warp_bboxes)
                     valid_index = valid_index & filter_index
 
+                # 過濾出標註匡資料
                 results[key] = warp_bboxes[valid_index]
                 if key in ['gt_bboxes']:
                     if 'gt_labels' in results:
-                        results['gt_labels'] = results['gt_labels'][
-                            valid_index]
+                        # 將標註匡對應上的分類類別進行過濾
+                        results['gt_labels'] = results['gt_labels'][valid_index]
 
                 if 'gt_masks' in results:
-                    raise NotImplementedError(
-                        'RandomAffine only supports bbox.')
+                    # 這裡不支持masks資訊進行變換
+                    raise NotImplementedError('RandomAffine only supports bbox.')
+        # 回傳更新後的results資訊
         return results
 
     def filter_gt_bboxes(self, origin_bboxes, wrapped_bboxes):
@@ -2867,18 +3018,25 @@ class RandomAffine:
 
     @staticmethod
     def _get_rotation_matrix(rotate_degrees):
+        # 獲取對圖像進行旋轉需要的變換矩陣
+        # 將角度換成度
         radian = math.radians(rotate_degrees)
+        # 構建轉換矩陣，這裡會生成的是ndarray
         rotation_matrix = np.array(
             [[np.cos(radian), -np.sin(radian), 0.],
              [np.sin(radian), np.cos(radian), 0.], [0., 0., 1.]],
             dtype=np.float32)
+        # 回傳變換矩陣
         return rotation_matrix
 
     @staticmethod
     def _get_scaling_matrix(scale_ratio):
+        # 獲取縮放矩陣
+        # 這裡會在高寬上面進行縮放，不會在channel發生變化
         scaling_matrix = np.array(
             [[scale_ratio, 0., 0.], [0., scale_ratio, 0.], [0., 0., 1.]],
             dtype=np.float32)
+        # 回傳縮放矩陣
         return scaling_matrix
 
     @staticmethod
@@ -2890,15 +3048,18 @@ class RandomAffine:
 
     @staticmethod
     def _get_shear_matrix(x_shear_degrees, y_shear_degrees):
+        # 根據傳入的裁切度獲取對應的變換矩陣
         x_radian = math.radians(x_shear_degrees)
         y_radian = math.radians(y_shear_degrees)
         shear_matrix = np.array([[1, np.tan(x_radian), 0.],
                                  [np.tan(y_radian), 1, 0.], [0., 0., 1.]],
                                 dtype=np.float32)
+        # 將變換矩陣回傳
         return shear_matrix
 
     @staticmethod
     def _get_translation_matrix(x, y):
+        # 獲取變換矩陣
         translation_matrix = np.array([[1, 0., x], [0., 1, y], [0., 0., 1.]],
                                       dtype=np.float32)
         return translation_matrix
@@ -2917,27 +3078,37 @@ class YOLOXHSVRandomAug:
     """
 
     def __init__(self, hue_delta=5, saturation_delta=30, value_delta=30):
+        """ 對圖像進行HSV轉換
+        """
+        # 將傳入的值進行保存
         self.hue_delta = hue_delta
         self.saturation_delta = saturation_delta
         self.value_delta = value_delta
 
     def __call__(self, results):
+        # 進行圖像HSV轉換
+        # 獲取當前圖像
         img = results['img']
-        hsv_gains = np.random.uniform(-1, 1, 3) * [
-            self.hue_delta, self.saturation_delta, self.value_delta
-        ]
+        # 獲取hsv變換矩陣
+        hsv_gains = np.random.uniform(-1, 1, 3) * [self.hue_delta, self.saturation_delta, self.value_delta]
         # random selection of h, s, v
+        # 隨機獲取增益
         hsv_gains *= np.random.randint(0, 2, 3)
         # prevent overflow
         hsv_gains = hsv_gains.astype(np.int16)
+        # 將原先圖像的BGR通道轉成HSV通道
         img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.int16)
 
+        # 進行一系列變換
         img_hsv[..., 0] = (img_hsv[..., 0] + hsv_gains[0]) % 180
         img_hsv[..., 1] = np.clip(img_hsv[..., 1] + hsv_gains[1], 0, 255)
         img_hsv[..., 2] = np.clip(img_hsv[..., 2] + hsv_gains[2], 0, 255)
+        # 將圖像從HSV轉回BGR通道格式
         cv2.cvtColor(img_hsv.astype(img.dtype), cv2.COLOR_HSV2BGR, dst=img)
 
+        # 保存轉換後的圖像
         results['img'] = img
+        # 回傳結過
         return results
 
     def __repr__(self):

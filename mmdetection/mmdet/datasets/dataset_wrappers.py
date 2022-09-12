@@ -375,82 +375,114 @@ class MultiImageMixDataset:
                  dynamic_scale=None,
                  skip_type_keys=None,
                  max_refetch=15):
+        """ 將dataset當中圖像進行混合的初始化函數
+        Args:
+            dataset: 目標資料集實例化對象
+            pipeline: 圖像處理流
+            dynamic_scale: 動態調整輸入圖像尺度，已廢棄
+            skip_type_keys: 在pipeline當中需要過的部分
+            max_refetch: 因為會融合圖像，所以可能會造成沒有目標對象，所以這裡當發生沒有目標對象時會重新製圖，這裡是設定最大重新製圖上線
+        """
+        # 如果有設定dynamic_scale會報錯，因為這裡已經將該參數廢棄
         if dynamic_scale is not None:
-            raise RuntimeError(
-                'dynamic_scale is deprecated. Please use Resize pipeline '
-                'to achieve similar functions')
+            raise RuntimeError('dynamic_scale is deprecated. Please use Resize pipeline to achieve similar functions')
         assert isinstance(pipeline, collections.abc.Sequence)
         if skip_type_keys is not None:
             assert all([
                 isinstance(skip_type_key, str)
                 for skip_type_key in skip_type_keys
             ])
+        # 保存傳入skip_type_keys參數
         self._skip_type_keys = skip_type_keys
 
+        # pipeline保存list
         self.pipeline = []
+        # 保存pipeline名稱
         self.pipeline_types = []
+        # 遍歷pipeline結構
         for transform in pipeline:
             if isinstance(transform, dict):
+                # 將名稱保存下來
                 self.pipeline_types.append(transform['type'])
+                # 構建實例化對象
                 transform = build_from_cfg(transform, PIPELINES)
+                # 保存實力化對象
                 self.pipeline.append(transform)
             else:
+                # 其他就會直接報錯
                 raise TypeError('pipeline must be a dict')
 
+        # 保存傳入dataset
         self.dataset = dataset
+        # 獲取dataset當中CLASSES參數
         self.CLASSES = dataset.CLASSES
+        # 獲取dataset當中PALETTE參數
         self.PALETTE = getattr(dataset, 'PALETTE', None)
         if hasattr(self.dataset, 'flag'):
             self.flag = dataset.flag
+        # 獲取dataset的圖像數量
         self.num_samples = len(dataset)
+        # 保存最多可以嘗試生成多少次
         self.max_refetch = max_refetch
 
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
+        # 獲取一張圖像資料，這裡使用dataset[idx]時會呼叫指定dataset的__getitem__函數進行獲取
         results = copy.deepcopy(self.dataset[idx])
-        for (transform, transform_type) in zip(self.pipeline,
-                                               self.pipeline_types):
-            if self._skip_type_keys is not None and \
-                    transform_type in self._skip_type_keys:
+        # 遍歷構建的資料處理流
+        for (transform, transform_type) in zip(self.pipeline, self.pipeline_types):
+            # 如果有指定要跳過的處理流對象就會進行跳過
+            if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
                 continue
 
             if hasattr(transform, 'get_indexes'):
+                # 如果transform當中有get_indexes參數就會到這裡，最多可以嘗試max_refetch次，超過就會直接報錯
                 for i in range(self.max_refetch):
                     # Make sure the results passed the loading pipeline
                     # of the original dataset is not None.
+                    # 使用當前的transform當中的get_indexes函數，同時將當前dataset傳入
+                    # 這裡是隨機獲取dataset當中其他圖像的index，如果是mosaic就是為了要進行混合
                     indexes = transform.get_indexes(self.dataset)
                     if not isinstance(indexes, collections.abc.Sequence):
+                        # 如果不是Sequence類型就在外面加上list
                         indexes = [indexes]
-                    mix_results = [
-                        copy.deepcopy(self.dataset[index]) for index in indexes
-                    ]
+                    # 獲取指定圖像經過第一次pipeline後的結果，這裡的結果會與results相同，都是經過相同的pipeline
+                    mix_results = [copy.deepcopy(self.dataset[index]) for index in indexes]
                     if None not in mix_results:
+                        # 如果mix_results不是None表示取出的是合法的，這裡就會直接跳出，並且將mix_results放到results當中
+                        # 之後進行加工
                         results['mix_results'] = mix_results
                         break
                 else:
+                    # 在經過max_refetch次的隨機提取失敗後就會直接報錯
                     raise RuntimeError(
                         'The loading pipeline of the original dataset'
                         ' always return None. Please check the correctness '
                         'of the dataset and its pipeline.')
 
+            # 這裡會嘗試max_refetch次獲取融合後的圖像
             for i in range(self.max_refetch):
                 # To confirm the results passed the training pipeline
                 # of the wrapper is not None.
                 updated_results = transform(copy.deepcopy(results))
                 if updated_results is not None:
+                    # 如果融合結果是合法的就會保存到results當中，並且跳出迴圈
                     results = updated_results
                     break
             else:
+                # 否則就會報錯
                 raise RuntimeError(
                     'The training pipeline of the dataset wrapper'
                     ' always return None.Please check the correctness '
                     'of the dataset and its pipeline.')
 
             if 'mix_results' in results:
+                # 如果results當中有mix_results就刪除
                 results.pop('mix_results')
 
+        # 回傳results
         return results
 
     def update_skip_type_keys(self, skip_type_keys):

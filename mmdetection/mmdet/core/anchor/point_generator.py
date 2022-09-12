@@ -53,6 +53,12 @@ class MlvlPointGenerator:
     """
 
     def __init__(self, strides, offset=0.5):
+        """ 對於多尺度特徵圖進行生成標準點
+        Args:
+            strides: 與原圖的縮小倍率
+            offset: 偏移量
+        """
+        # 將傳入的strides保存且這裡會是[(stride, stride)]進行保存
         self.strides = [_pair(stride) for stride in strides]
         self.offset = offset
 
@@ -68,7 +74,9 @@ class MlvlPointGenerator:
         return [1 for _ in range(len(self.strides))]
 
     def _meshgrid(self, x, y, row_major=True):
+        # 使用meshgrid獲取二維座標
         yy, xx = torch.meshgrid(y, x)
+        # 壓平後回傳
         if row_major:
             # warning .flatten() would cause error in ONNX exporting
             # have to use reshape here
@@ -103,17 +111,30 @@ class MlvlPointGenerator:
             and the last dimension 4 represent
             (coord_x, coord_y, stride_w, stride_h).
         """
+        """ 生成多尺度特徵圖的網格點
+        Args:
+            featmap_sizes: 特徵圖大小，list[torch.Size]，list長度就是不同尺度的大小
+            dtype: 數據類型
+            device: 訓練設備
+            with_stride: 是否將步幅連接到點的最後一個維度
+        """
 
+        # 初始化時設定的層數要與傳入的相同
         assert self.num_levels == len(featmap_sizes)
+        # 保存結果的list
         multi_level_priors = []
+        # 遍歷多層的特徵圖
         for i in range(self.num_levels):
+            # 透過single_level_grid_priors構建
             priors = self.single_level_grid_priors(
                 featmap_sizes[i],
                 level_idx=i,
                 dtype=dtype,
                 device=device,
                 with_stride=with_stride)
+            # 將結果保存
             multi_level_priors.append(priors)
+        # 回傳結果，list[tensor]，list長度就會是不同尺度的特徵圖，tensor shape [feat_height * feat_height, 2或是4]
         return multi_level_priors
 
     def single_level_grid_priors(self,
@@ -147,30 +168,44 @@ class MlvlPointGenerator:
             and the last dimension 4 represent
             (coord_x, coord_y, stride_w, stride_h).
         """
+        """ 對於單一一個特徵圖尺度構建網格圖
+        Args:
+            featmap_size: 特徵圖大小
+            level_idx: 層數的index
+            dtype: 數據類型
+            device: 訓練設備
+            with_stride: 是否將步幅連接到點的最後一個維度
+        """
+        # 獲取特徵圖的高寬資訊
         feat_h, feat_w = featmap_size
+        # 獲取該層的特徵圖對於原圖的縮放比率
         stride_w, stride_h = self.strides[level_idx]
-        shift_x = (torch.arange(0, feat_w, device=device) +
-                   self.offset) * stride_w
+        # 構建範圍[0, feat_w]的數組並且放大stride_w倍，這樣就可以映射回原圖上的座標點
+        shift_x = (torch.arange(0, feat_w, device=device) + self.offset) * stride_w
         # keep featmap_size as Tensor instead of int, so that we
         # can convert to ONNX correctly
+        # 將數值型態進行轉換
         shift_x = shift_x.to(dtype)
 
-        shift_y = (torch.arange(0, feat_h, device=device) +
-                   self.offset) * stride_h
+        # 構建範圍[0, feat_h]的數組並且放大stride_h倍，這樣就可以映射回原圖上的座標點
+        shift_y = (torch.arange(0, feat_h, device=device) + self.offset) * stride_h
         # keep featmap_size as Tensor instead of int, so that we
         # can convert to ONNX correctly
+        # 將數值進行轉換
         shift_y = shift_y.to(dtype)
+        # 使用meshgrid變成2維座標，shift_xx與shift_yy shape [width * height]，對應index配對可以獲取從左至右從上往下的座標
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         if not with_stride:
             shifts = torch.stack([shift_xx, shift_yy], dim=-1)
         else:
             # use `shape[0]` instead of `len(shift_xx)` for ONNX export
-            stride_w = shift_xx.new_full((shift_xx.shape[0], ),
-                                         stride_w).to(dtype)
-            stride_h = shift_xx.new_full((shift_yy.shape[0], ),
-                                         stride_h).to(dtype)
-            shifts = torch.stack([shift_xx, shift_yy, stride_w, stride_h],
-                                 dim=-1)
+            # 構建與shift_xx相同的tensor且全部填充為stride_w
+            stride_w = shift_xx.new_full((shift_xx.shape[0], ), stride_w).to(dtype)
+            # 構建與shift_yy相同的tensor且全部填充為stride_h
+            stride_h = shift_xx.new_full((shift_yy.shape[0], ), stride_h).to(dtype)
+            # 將資料進行拼接，這裡會在最後一個維度進行拼接，tensor shape [height * width, 4]
+            shifts = torch.stack([shift_xx, shift_yy, stride_w, stride_h], dim=-1)
+        # 將資料放到設備上
         all_points = shifts.to(device)
         return all_points
 

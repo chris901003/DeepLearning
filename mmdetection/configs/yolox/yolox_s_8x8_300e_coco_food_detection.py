@@ -15,14 +15,14 @@ model = dict(
         out_channels=128,
         num_csp_blocks=1),
     bbox_head=dict(
-        type='YOLOXHead', num_classes=80, in_channels=128, feat_channels=128),
+        type='YOLOXHead', num_classes=4, in_channels=128, feat_channels=128),
     train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
     # In order to align the source code, the threshold of the val phase is
     # 0.01, and the threshold of the test phase is 0.001.
     test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)))
 
 # dataset settings
-data_root = '/Volumes/Pytorch/coco/'
+data_root = '/Users/huanghongyan/Documents/DeepLearning/mmdetection/data/FoodDetection/'
 dataset_type = 'CocoDataset'
 
 train_pipeline = [

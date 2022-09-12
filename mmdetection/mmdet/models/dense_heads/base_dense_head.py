@@ -327,17 +327,31 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
                 losses: (dict[str, Tensor]): A dictionary of loss components.
                 proposal_list (list[Tensor]): Proposals of each image.
         """
+        """ 通過最終分類頭後計算損失的forward函數
+        Args:
+            x: 特徵提取結果，tuple(tensor)，tuple長度會是特徵圖數量，tensor shape [batch_size, channel, height, width]
+            img_metas: 每張圖像的詳細資訊
+            gt_bboxes: 標註匡資訊，list[tensor]，list長度會是batch_size，tensor shape [num_object, 4]
+            gt_labels: 每個標註框對應的類別，list[tensor]，list長度與gt_bboxes相同，tensor shape [num_object]
+            gt_bboxes_ignore: 因為不合法或是過難檢測的標註匡
+            proposal_cfg: 候選匡的設定資料，如果是有anchor為基底的就會有
+        """
+        # 將輸入的特徵先進行分類頭的forward部分
+        # outs = tuple(list)，tuple會是(分類結果, 回歸結果, 是否為正樣本)，list長度會是不同尺度的特徵圖預測結果
         outs = self(x)
         if gt_labels is None:
+            # 如果給定的標註類別是None就會到這裡
             loss_inputs = outs + (gt_bboxes, img_metas)
         else:
+            # 如果有給定標註類別就會到這了
             loss_inputs = outs + (gt_bboxes, gt_labels, img_metas)
+        # 將loss_inputs傳入計算損失，這裡也會把忽略掉的標註匡傳入
         losses = self.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         if proposal_cfg is None:
+            # 如果沒有候選匡config就直接回傳loss
             return losses
         else:
-            proposal_list = self.get_bboxes(
-                *outs, img_metas=img_metas, cfg=proposal_cfg)
+            proposal_list = self.get_bboxes(*outs, img_metas=img_metas, cfg=proposal_cfg)
             return losses, proposal_list
 
     def simple_test(self, feats, img_metas, rescale=False):

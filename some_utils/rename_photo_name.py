@@ -2,11 +2,11 @@ import os
 
 
 # 照片檔案路徑
-data_path = '/Volumes/Pytorch/traffic_red_line/image2'
+data_path = '/Users/huanghongyan/Downloads/data/img'
 files_name = os.listdir(data_path)
 # 會先依據原始圖像名稱進行排序
 files_name.sort()
-start = 235
+start = 0
 total = 0
 
 for index, file_name in enumerate(files_name):

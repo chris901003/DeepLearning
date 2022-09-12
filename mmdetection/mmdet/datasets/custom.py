@@ -80,6 +80,7 @@ class CustomDataset(Dataset):
             filter_empty_gt: 是否過濾掉沒有gt的圖像，預設為True
             file_client_args: 讀取檔案的位置
         """
+        # coco數據集當中的bbox資訊會是[xmin, ymin, width, height]
 
         # 將傳入的資料進行保存
         self.ann_file = ann_file

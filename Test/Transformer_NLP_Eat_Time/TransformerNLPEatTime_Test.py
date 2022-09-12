@@ -32,7 +32,7 @@ def main():
     ans = [29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
     print(ans)
     with torch.no_grad():
-        for idx in range(1, eat_time + 2, 5):
+        for idx in range(1, eat_time + 1, 1):
             input_left = input_left_total[:idx]
             # print(idx, input_left[-1])
             # print(len(input_left))

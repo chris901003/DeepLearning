@@ -270,8 +270,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         loss, log_vars = self._parse_losses(losses)
 
         # 構建回傳的字典
-        outputs = dict(
-            loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
+        outputs = dict(loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
 
         return outputs
 
