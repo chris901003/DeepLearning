@@ -34,3 +34,7 @@ _background_
 
 ### heic_to_jpg
 可以將iphone拍攝出來的HEIC格式的圖片批量轉成jpg格式
+
+### labelImg2coco
+獲取labelImg在yolo格式下標註的資料，輸出coco使用的annotation的json文件\
+獲取annotation文件後還是需要自行將資料夾格式調整到coco樣式
