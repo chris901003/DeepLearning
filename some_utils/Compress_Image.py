@@ -5,8 +5,8 @@ from tqdm import tqdm
 
 
 def main():
-    file_path = '/Users/huanghongyan/Downloads/Milk'
-    target_path = '/Users/huanghongyan/Downloads/Milk_downsample'
+    file_path = '/Users/huanghongyan/Downloads/background'
+    target_path = '/Users/huanghongyan/Downloads/background_downsample'
     assert os.path.exists(file_path)
     if not os.path.exists(target_path):
         os.mkdir(target_path)
