@@ -22,10 +22,12 @@ from mmdet.utils import (build_ddp, build_dp, compat_cfg, get_device,
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='MMDet test (and eval) a model')
+    parser = argparse.ArgumentParser(description='MMDet test (and eval) a model')
+    # 使用模型的config資料
     parser.add_argument('config', help='test config file path')
+    # 預訓練權重文件位置
     parser.add_argument('checkpoint', help='checkpoint file')
+    # 過程資料保存位置
     parser.add_argument(
         '--work-dir',
         help='the directory to save the file containing evaluation metrics')
@@ -53,12 +55,14 @@ def parse_args():
         help='Format the output results without perform evaluation. It is'
         'useful when you want to format the result to a specific format and '
         'submit it to the test server')
+    # 驗證指標
     parser.add_argument(
         '--eval',
         type=str,
         nargs='+',
         help='evaluation metrics, which depends on the dataset, e.g., "bbox",'
         ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
+    # 是否需要將驗證的每張圖像結果顯示
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument(
         '--show-dir', help='directory where painted images will be saved')
@@ -154,11 +158,14 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     if 'pretrained' in cfg.model:
+        # 將原先在模型config資料當中的pretrained資料去除
         cfg.model.pretrained = None
     elif 'init_cfg' in cfg.model.backbone:
+        # 將初始化方式去除
         cfg.model.backbone.init_cfg = None
 
     if cfg.model.get('neck'):
+        # 獲取模型的neck模塊部分，將pretrained部分全部去除
         if isinstance(cfg.model.neck, list):
             for neck_cfg in cfg.model.neck:
                 if neck_cfg.get('rfp_backbone'):
@@ -168,6 +175,7 @@ def main():
             if cfg.model.neck.rfp_backbone.get('pretrained'):
                 cfg.model.neck.rfp_backbone.pretrained = None
 
+    # 驗證模式下只支援單gpu
     if args.gpu_ids is not None:
         cfg.gpu_ids = args.gpu_ids[0:1]
         warnings.warn('`--gpu-ids` is deprecated, please use `--gpu-id`. '
@@ -184,16 +192,16 @@ def main():
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
 
-    test_dataloader_default_args = dict(
-        samples_per_gpu=1, workers_per_gpu=2, dist=distributed, shuffle=False)
+    # 驗證模式下一個epoch只會有一張圖像
+    test_dataloader_default_args = dict(samples_per_gpu=1, workers_per_gpu=2, dist=distributed, shuffle=False)
 
     # in case the test dataset is concatenated
     if isinstance(cfg.data.test, dict):
+        # 將測試模式變成True
         cfg.data.test.test_mode = True
         if cfg.data.test_dataloader.get('samples_per_gpu', 1) > 1:
             # Replace 'ImageToTensor' to 'DefaultFormatBundle'
-            cfg.data.test.pipeline = replace_ImageToTensor(
-                cfg.data.test.pipeline)
+            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
     elif isinstance(cfg.data.test, list):
         for ds_cfg in cfg.data.test:
             ds_cfg.test_mode = True
@@ -235,8 +243,7 @@ def main():
 
     if not distributed:
         model = build_dp(model, cfg.device, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr)
+        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir, args.show_score_thr)
     else:
         model = build_ddp(
             model,

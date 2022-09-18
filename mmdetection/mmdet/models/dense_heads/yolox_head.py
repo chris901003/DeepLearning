@@ -320,13 +320,29 @@ class YOLOXHead(BaseDenseHead, BBoxTestMixin):
                 (n,) tensor where each item is the predicted class label of
                 the corresponding box.
         """
+        """ 獲取真正標註的匡
+        Args:
+            cls_scores: 分類類別置信度分數
+            bbox_preds: 預測匡
+            objectnesses: 正樣本預測概率
+            img_metas: 圖像詳細資訊
+            cfg: test的預處理設定
+            rescale: 是否需要重新縮放
+            with_nms: 是否使用nms
+        """
+        # 檢查batch_size是否相同
         assert len(cls_scores) == len(bbox_preds) == len(objectnesses)
+        # 如果有特別設定cfg就會更新使用的cfg否則就使用原始的cfg
         cfg = self.test_cfg if cfg is None else cfg
+        # 獲取圖像經過多少倍的縮放
         scale_factors = np.array(
             [img_meta['scale_factor'] for img_meta in img_metas])
 
+        # 獲取batch_size大小
         num_imgs = len(img_metas)
+        # 獲取特徵圖大小
         featmap_sizes = [cls_score.shape[2:] for cls_score in cls_scores]
+        # 構建priors網格，這裡會將步距填上
         mlvl_priors = self.prior_generator.grid_priors(
             featmap_sizes,
             dtype=cls_scores[0].dtype,
@@ -334,39 +350,47 @@ class YOLOXHead(BaseDenseHead, BBoxTestMixin):
             with_stride=True)
 
         # flatten cls_scores, bbox_preds and objectness
+        # 將類別置信度分數攤平 [bs, height, width, num_cls] -> [bs, height * width, num_cls]
         flatten_cls_scores = [
-            cls_score.permute(0, 2, 3, 1).reshape(num_imgs, -1,
-                                                  self.cls_out_channels)
+            cls_score.permute(0, 2, 3, 1).reshape(num_imgs, -1, self.cls_out_channels)
             for cls_score in cls_scores
         ]
+        # 將回歸匡預測攤平 [bs, height, width, 4] -> [bs, height * width, 4]
         flatten_bbox_preds = [
             bbox_pred.permute(0, 2, 3, 1).reshape(num_imgs, -1, 4)
             for bbox_pred in bbox_preds
         ]
+        # 將正樣本預測攤平 [bs, height, width, 1]  -> [bs, height * width, 1]
         flatten_objectness = [
             objectness.permute(0, 2, 3, 1).reshape(num_imgs, -1)
             for objectness in objectnesses
         ]
 
+        # 將不同尺度的特徵圖資料融合
+        # 對於類別以及正樣本需要通過sigmoid [bs, total_pixel, channel]
         flatten_cls_scores = torch.cat(flatten_cls_scores, dim=1).sigmoid()
         flatten_bbox_preds = torch.cat(flatten_bbox_preds, dim=1)
         flatten_objectness = torch.cat(flatten_objectness, dim=1).sigmoid()
         flatten_priors = torch.cat(mlvl_priors)
 
+        # 將預測匡縮放到原圖上
         flatten_bboxes = self._bbox_decode(flatten_priors, flatten_bbox_preds)
 
         if rescale:
-            flatten_bboxes[..., :4] /= flatten_bboxes.new_tensor(
-                scale_factors).unsqueeze(1)
+            # 將座標位置進行縮放
+            flatten_bboxes[..., :4] /= flatten_bboxes.new_tensor(scale_factors).unsqueeze(1)
 
+        # 結果的列表
         result_list = []
+        # 遍歷所有圖像
         for img_id in range(len(img_metas)):
+            # 將該圖像的所有資料提取出來
             cls_scores = flatten_cls_scores[img_id]
             score_factor = flatten_objectness[img_id]
             bboxes = flatten_bboxes[img_id]
 
-            result_list.append(
-                self._bboxes_nms(cls_scores, bboxes, score_factor, cfg))
+            # 將通過nms後的結果放到result_list當中
+            result_list.append(self._bboxes_nms(cls_scores, bboxes, score_factor, cfg))
 
         return result_list
 
@@ -393,17 +417,33 @@ class YOLOXHead(BaseDenseHead, BBoxTestMixin):
         return decoded_bboxes
 
     def _bboxes_nms(self, cls_scores, bboxes, score_factor, cfg):
+        """ 進行nms非極大值抑制
+        Args:
+            cls_scores: 分類類別置信度，tensor [sum(height * width), num_cls]
+            bboxes: 回歸匡，tensor shape [sum(height * width), 4]
+            score_factor: 置信度倍率參數，這裡會是預測是否為正樣本的概率，tensor shape [sum(height * width)]
+            cfg: nms的相關參數
+        """
+        # 對於每個像素點獲取最大置信度的類別
         max_scores, labels = torch.max(cls_scores, 1)
+        # 獲取哪些匡是合法的，這裡會將類別置信度乘上正樣本置信度，如果超過閾值表示該點預測的為正樣本
         valid_mask = score_factor * max_scores >= cfg.score_thr
 
+        # 將非合法匡的部分過濾掉
+        # 回歸匡
         bboxes = bboxes[valid_mask]
+        # 置信度分數
         scores = max_scores[valid_mask] * score_factor[valid_mask]
+        # 預測類別
         labels = labels[valid_mask]
 
         if labels.numel() == 0:
+            # 如果沒有標註訊息就直接回傳
             return bboxes, labels
         else:
+            # 進行nms非極大值抑制
             dets, keep = batched_nms(bboxes, scores, labels, cfg.nms)
+            # 將結果回傳
             return dets, labels[keep]
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'objectnesses'))

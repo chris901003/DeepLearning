@@ -309,19 +309,33 @@ def batched_nms(boxes: Tensor,
         - keep (Tensor): The indices of remaining boxes in input
           boxes.
     """
+    """ 進行NMS非極大值抑制
+    Args:
+        boxes: 標註匡在原圖上的位置，tensor shape [num_bboxes, 4]，[xmin, ymin, xmax, ymax]
+        scores: 置信度分數，tensor shape [num_bboxes]
+        idxs: 預測類別，tensor shape [num_bboxes]
+        nms_cfg: nms的設定資料
+        class_agnostic: 不依據不同的預測類別進行nms，當作只有一個類別進行nms
+    """
     # skip nms when nms_cfg is None
     if nms_cfg is None:
+        # 如果沒有設定nms_cfg就直接回傳，不進行nms操作
         scores, inds = scores.sort(descending=True)
         boxes = boxes[inds]
         return torch.cat([boxes, scores[:, None]], -1), inds
 
+    # 拷貝一份nms_cfg資料
     nms_cfg_ = nms_cfg.copy()
+    # 獲取是否需要根據不同類別進行nms
     class_agnostic = nms_cfg_.pop('class_agnostic', class_agnostic)
     if class_agnostic:
+        # 如果使用的話boxes_for_nms就直接是所有boxes
         boxes_for_nms = boxes
     else:
+        # 否則就會根據不同的類別進行nms處理
         # When using rotated boxes, only apply offsets on center.
         if boxes.size(-1) == 5:
+            # 如果boxes的回歸匡有5個參數就會到這裡
             # Strictly, the maximum coordinates of the rotating box
             # (x,y,w,h,a) should be calculated by polygon coordinates.
             # But the conversion from rotated box to polygon will
@@ -330,24 +344,30 @@ def batched_nms(boxes: Tensor,
             # which is larger than polygon max coordinate
             # max(x1, y1, x2, y2,x3, y3, x4, y4)
             max_coordinate = boxes[..., :2].max() + boxes[..., 2:4].max()
-            offsets = idxs.to(boxes) * (
-                max_coordinate + torch.tensor(1).to(boxes))
+            offsets = idxs.to(boxes) * (max_coordinate + torch.tensor(1).to(boxes))
             boxes_ctr_for_nms = boxes[..., :2] + offsets[:, None]
-            boxes_for_nms = torch.cat([boxes_ctr_for_nms, boxes[..., 2:5]],
-                                      dim=-1)
+            boxes_for_nms = torch.cat([boxes_ctr_for_nms, boxes[..., 2:5]], dim=-1)
         else:
+            # 如果是[xmin, ymin, xmax, ymax]就會到這裡
+            # 獲取boxes當中每個維度的最大值
             max_coordinate = boxes.max()
-            offsets = idxs.to(boxes) * (
-                max_coordinate + torch.tensor(1).to(boxes))
+            # 構建偏移量，這樣就可以將不同類別的預測匡偏移到不會在計算nms時被消除的地方
+            offsets = idxs.to(boxes) * (max_coordinate + torch.tensor(1).to(boxes))
+            # 將原先預測匡加上偏移量
             boxes_for_nms = boxes + offsets[:, None]
 
+    # 獲取type，如果沒有指定就使用默認的nms
     nms_type = nms_cfg_.pop('type', 'nms')
     nms_op = eval(nms_type)
 
+    # 獲取split的閾值，如果沒有設定就會是10000，表示要多少個為一組，避免記憶體炸開
     split_thr = nms_cfg_.pop('split_thr', 10000)
     # Won't split to multiple nms nodes when exporting to onnx
     if boxes_for_nms.shape[0] < split_thr or torch.onnx.is_in_onnx_export():
+        # 如果預測匡數量小於split_thr就會到這裡
+        # 使用num_op進行指定的非極大值抑制
         dets, keep = nms_op(boxes_for_nms, scores, **nms_cfg_)
+        # 將留下的部分過濾出來
         boxes = boxes[keep]
 
         # This assumes `dets` has arbitrary dimensions where
@@ -355,6 +375,7 @@ def batched_nms(boxes: Tensor,
         # Currently it supports bounding boxes [x1, y1, x2, y2, score] or
         # rotated boxes [cx, cy, w, h, angle_radian, score].
 
+        # 獲取置信度分數資料
         scores = dets[:, -1]
     else:
         max_num = nms_cfg_.pop('max_num', -1)
@@ -377,7 +398,9 @@ def batched_nms(boxes: Tensor,
             boxes = boxes[:max_num]
             scores = scores[:max_num]
 
+    # 將預測匡結果以及置信度分數拼接再一起
     boxes = torch.cat([boxes, scores[:, None]], -1)
+    # 回傳結果
     return boxes, keep
 
 

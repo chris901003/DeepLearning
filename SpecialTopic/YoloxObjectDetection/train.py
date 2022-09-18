@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from utils import get_specified_option
 from detector import build_detector
-from dataset import build_dataset, custom_collate_fn
+from dataset import build_dataset, custom_collate_fn, custom_collate_fn_val
 from run import run
 
 
@@ -14,6 +14,10 @@ def parse_args():
     parser.add_argument('--model-size', default='l', type=str)
     parser.add_argument('--num-classes', default=9, type=int)
     parser.add_argument('--use-depthwise', default=False, type=bool)
+    parser.add_argument('--train-epoch', default=300, type=int)
+    parser.add_argument('--val-epoch', default=10, type=int)
+    parser.add_argument('--val-coco-json', default='/Users/huanghongyan/Downloads/data_annotation/val2017.json',
+                        type=str)
     args = parser.parse_args()
     return args
 
@@ -70,7 +74,7 @@ def main():
         'optimizer_cfg': {
             'type': 'SGD',
             'momentum': 0.9,
-            'lr': 0.01,
+            'lr': 0.001,
             'weight_decay': 5e-4,
             'nesterov': True
         }
@@ -101,6 +105,23 @@ def main():
         ]
     }
     dataset = build_dataset(dataset_cfg)
+
+    if args.val_epoch is not None:
+        # 構建驗證圖像的dataset
+        val_dataset_cfg = {
+            'type': 'LabelImgYoloFormat',
+            'annotations': '/Users/huanghongyan/Downloads/data_annotation/annotations',
+            'images': '/Users/huanghongyan/Downloads/data_annotation/imgs',
+            'pipelines': [
+                {'type': 'LoadImageFromFile', 'save_key': 'img'},
+                {'type': 'LoadAnnotations', 'img_key': 'img', 'save_key': ['gt_labels', 'gt_bboxes'], 'with_bbox': True},
+                {'type': 'Resize', 'img_scale': (640, 640), 'keep_ratio': False},
+                {'type': 'Collect', 'keys': ['img', 'gt_bboxes', 'gt_labels', 'scale_factor', 'image_path']}
+            ]
+        }
+        val_dataset = build_dataset(val_dataset_cfg)
+    else:
+        val_dataset = None
 
     # 可視化
     # results = dataset[0]
@@ -138,8 +159,24 @@ def main():
     }
     train_dataloader = DataLoader(**dataloader_cfg)
 
-    train_epoch = 30
-    run(model, device, args.work_dir, train_epoch, train_dataloader)
+    if args.val_epoch is not None:
+        val_dataloader_cfg = {
+            'dataset': val_dataset,
+            'batch_size': 1,
+            'shuffle': False,
+            'num_workers': 1,
+            'pin_memory': True,
+            'drop_last': False,
+            'collate_fn': custom_collate_fn_val
+        }
+        val_dataloader = DataLoader(**val_dataloader_cfg)
+    else:
+        val_dataloader = None
+
+    train_epoch = args.train_epoch
+    val_epoch = args.val_epoch
+    run(model, device, args.work_dir, train_epoch, train_dataloader, val_epoch=val_epoch, val_dataloader=val_dataloader,
+        val_coco_json=args.val_coco_json)
     print('Finish training')
 
 

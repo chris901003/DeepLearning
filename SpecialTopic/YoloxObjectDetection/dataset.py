@@ -135,9 +135,7 @@ class Compose:
 
 
 def custom_collate_fn(batch):
-    imgs = list()
-    gt_bboxes = list()
-    gt_labels = list()
+    imgs, gt_bboxes, gt_labels = list(), list(), list()
     for info in batch:
         img = info['img']
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -152,3 +150,17 @@ def custom_collate_fn(batch):
         gt_labels.append(gt_label)
     imgs = torch.stack(imgs)
     return imgs, gt_bboxes, gt_labels
+
+
+def custom_collate_fn_val(batch):
+    imgs, scale_factors, images_path = list(), list(), list()
+    for info in batch:
+        img = info['img']
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.transpose(img, (2, 0, 1))
+        img = torch.from_numpy(img).float()
+        imgs.append(img)
+        scale_factors.append(info['scale_factor'])
+        images_path.append(info['image_path'])
+    imgs = torch.stack(imgs)
+    return imgs, scale_factors, images_path

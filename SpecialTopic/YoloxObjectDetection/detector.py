@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from utils import get_specified_option
+import numpy as np
+import torchvision
 from common_use_model import ConvModule, DepthwiseSeparableConvModule, CrossEntropyLoss, IoULoss, build_optimizer
 from yolox_submodel import Focus, SPPBottleneck, CSPLayer, MlvlPointGenerator, SimOTAAssigner, PseudoSampler
 
@@ -96,7 +98,7 @@ class YOLOX(nn.Module):
             x = self.neck(x)
         return x
 
-    def forward(self, img, gt_bboxes, gt_labels):
+    def forward_train(self, img, gt_bboxes, gt_labels):
         self.optimizer.zero_grad()
         img, gt_bboxes = self._preprocess(img, gt_bboxes)
         x = self.extract_feat(img)
@@ -110,6 +112,33 @@ class YOLOX(nn.Module):
         loss.backward()
         self.optimizer.step()
         return loss.item()
+
+    def forward_test(self, imgs, scale_factor=None):
+        assert imgs.shape[0] == 1, '目前只支持驗證時使用單張圖像'
+        rescale = scale_factor is not None
+        feat = self.extract_feat(imgs)
+        results_list = self.bbox_head.simple_test(feat, scale_factor, rescale=rescale)
+        bbox_results = [self.bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
+                        for det_bboxes, det_labels in results_list]
+        return bbox_results
+
+    def forward(self, img, gt_bboxes=None, gt_labels=None, scale_factor=None, return_loss=True):
+        if return_loss:
+            assert gt_bboxes is not None
+            assert gt_labels is not None
+            return self.forward_train(img, gt_bboxes, gt_labels)
+        else:
+            return self.forward_test(img, scale_factor=scale_factor)
+
+    @staticmethod
+    def bbox2result(bboxes, labels, num_classes):
+        if bboxes.shape[0] == 0:
+            return [np.zeros((0, 5), dtype=np.float32) for _ in range(num_classes)]
+        else:
+            if isinstance(bboxes, torch.Tensor):
+                bboxes = bboxes.detach().cpu().numpy()
+                labels = labels.detach().cpu().numpy()
+            return [bboxes[labels == i, :] for i in range(num_classes)]
 
     def _preprocess(self, img, gt_bboxes):
         scale_y = self._input_size[0] / self._default_input_size[0]
@@ -323,6 +352,67 @@ class YOLOXHead(nn.Module):
             loss_inputs = outs + (gt_bboxes, gt_labels)
         losses = self.loss(*loss_inputs)
         return losses
+
+    def simple_test(self, feats, scale_factor, rescale=False):
+        outs = self(feats)
+        results_list = self.get_bboxes(*outs, scale_factor=scale_factor, rescale=rescale)
+        return results_list
+
+    def get_bboxes(self, cls_scores, bbox_preds, objectnesses, scale_factor=None, cfg=None,
+                   rescale=False, with_nms=True):
+        assert len(cls_scores) == len(bbox_preds) == len(objectnesses)
+        cfg = self.test_cfg if cfg is None else cfg
+        scale_factor = np.stack(scale_factor)
+        num_imgs = len(cls_scores[0])
+        featmap_size = [cls_score.shape[2:] for cls_score in cls_scores]
+        mlvl_priors = self.prior_generator.grid_priors(featmap_size, dtype=cls_scores[0].dtype,
+                                                       device=cls_scores[0].device, with_stride=True)
+        flatten_cls_scores = [cls_score.permute(0, 2, 3, 1).reshape(num_imgs, -1, self.cls_out_channels)
+                              for cls_score in cls_scores]
+        flatten_bbox_preds = [bbox_pred.permute(0, 2, 3, 1).reshape(num_imgs, -1, 4)
+                              for bbox_pred in bbox_preds]
+        flatten_objectness = [objectness.permute(0, 2, 3, 1).reshape(num_imgs, -1)
+                              for objectness in objectnesses]
+        flatten_cls_scores = torch.cat(flatten_cls_scores, dim=1).sigmoid()
+        flatten_bbox_preds = torch.cat(flatten_bbox_preds, dim=1)
+        flatten_objectness = torch.cat(flatten_objectness, dim=1).sigmoid()
+        flatten_priors = torch.cat(mlvl_priors)
+        flatten_bboxes = self._bbox_decode(flatten_priors, flatten_bbox_preds)
+        if rescale:
+            flatten_bboxes[..., :4] /= flatten_bboxes.new_tensor(scale_factor).unsqueeze(1)
+        result_list = []
+        for img_id in range(num_imgs):
+            cls_scores = flatten_cls_scores[img_id]
+            score_factor = flatten_objectness[img_id]
+            bboxes = flatten_bboxes[img_id]
+            result_list.append(self._bboxes_nms(cls_scores, bboxes, score_factor, cfg))
+        return result_list
+
+    def _bboxes_nms(self, cls_scores, bboxes, score_factor, cfg):
+        max_scores, labels = torch.max(cls_scores, 1)
+        valid_mask = score_factor * max_scores >= cfg['score_thr']
+        bboxes = bboxes[valid_mask]
+        scores = max_scores[valid_mask] * score_factor[valid_mask]
+        labels = labels[valid_mask]
+        if labels.numel() == 0:
+            return bboxes, labels
+        else:
+            dets, labels = self.batched_nms(bboxes, scores, labels, cfg['nms'])
+            return dets, labels
+
+    @staticmethod
+    def batched_nms(bboxes, scores, labels, nms):
+        max_wh = 4096
+        offset_bbox = bboxes.clone() + labels.view(-1, 1) * max_wh
+        i = torchvision.ops.nms(offset_bbox, scores, nms['iou_threshold'])
+        max_num = nms.get('max_num', None)
+        if max_num is not None:
+            i = i[:min(len(i), max_num)]
+        bboxes = bboxes[i]
+        scores = scores[i]
+        labels = labels[i]
+        dets = torch.cat([bboxes, scores.unsqueeze(dim=1)], dim=1)
+        return dets, labels
 
     @staticmethod
     def forward_single(x, cls_convs, reg_convs, conv_cls, conv_reg, conv_obj):

@@ -66,12 +66,12 @@ def imagenet_vid_classes():
 
 
 def coco_classes():
-    # return [
-    #     'rice', 'noodle', 'drink', 'soup'
-    # ]
     return [
-        'Donburi', 'SoupRice', 'Rice', 'Countable', 'SoupNoodle', 'Noodle', 'SideDish', 'SolidSoup', 'Soup'
+        'rice', 'noodle', 'drink', 'soup'
     ]
+    # return [
+    #     'Donburi', 'SoupRice', 'Rice', 'Countable', 'SoupNoodle', 'Noodle', 'SideDish', 'SolidSoup', 'Soup'
+    # ]
     # return [
     #     'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
     #     'truck', 'boat', 'traffic_light', 'fire_hydrant', 'stop_sign',
