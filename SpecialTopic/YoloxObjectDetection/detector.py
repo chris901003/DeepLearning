@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from utils import get_specified_option
-from common_use_model import ConvModule, DepthwiseSeparableConvModule, CrossEntropyLoss, IoULoss
+from common_use_model import ConvModule, DepthwiseSeparableConvModule, CrossEntropyLoss, IoULoss, build_optimizer
 from yolox_submodel import Focus, SPPBottleneck, CSPLayer, MlvlPointGenerator, SimOTAAssigner, PseudoSampler
 
 
@@ -72,7 +72,7 @@ def build_sampler(sampler_cfg, **kwargs):
 
 class YOLOX(nn.Module):
     def __init__(self, backbone, neck, bbox_head, train_cfg=None, test_cfg=None,
-                 input_size=(640, 640), size_multiplier=32):
+                 input_size=(640, 640), size_multiplier=32, optimizer_cfg='default'):
         super(YOLOX, self).__init__()
         self.backbone = build_backbone(backbone)
         if neck is not None:
@@ -86,6 +86,9 @@ class YOLOX(nn.Module):
         self._input_size = input_size
         self._size_multiplier = size_multiplier
         self._progress_in_iter = 0
+        if optimizer_cfg == 'default':
+            optimizer_cfg = dict(type='SGD', lr=0.01, momentum=0.9)
+        self.optimizer = build_optimizer(self, optimizer_cfg)
 
     def extract_feat(self, img):
         x = self.backbone(img)
@@ -94,10 +97,19 @@ class YOLOX(nn.Module):
         return x
 
     def forward(self, img, gt_bboxes, gt_labels):
+        self.optimizer.zero_grad()
         img, gt_bboxes = self._preprocess(img, gt_bboxes)
         x = self.extract_feat(img)
+        if torch.isnan(x[0]).sum():
+            import numpy as np
+            t = np.max(img.numpy())
+            print('f')
         losses = self.bbox_head.forward_train(x, gt_bboxes, gt_labels)
-        return losses
+        losses['loss_bbox'] = torch.sum(losses['loss_bbox'])
+        loss = sum(_value for _key, _value in losses.items())
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
 
     def _preprocess(self, img, gt_bboxes):
         scale_y = self._input_size[0] / self._default_input_size[0]
@@ -411,6 +423,8 @@ class YOLOXHead(nn.Module):
             bbox_targets.append(bbox_target)
             l1_targets.append(l1_target)
             num_fg_imgs.append(num_fg_img)
+        num_pos = torch.tensor(sum(num_fg_imgs), dtype=torch.float, device=flatten_cls_preds.device)
+        num_total_samples = max(num_pos, 1.0)
 
         pos_masks = torch.cat(pos_masks, dim=0)
         cls_targets = torch.cat(cls_targets, dim=0)
@@ -418,9 +432,10 @@ class YOLOXHead(nn.Module):
         bbox_targets = torch.cat(bbox_targets, dim=0)
         if self.use_l1:
             l1_targets = torch.cat(l1_targets, dim=0)
-        loss_bbox = self.loss_bbox(flatten_bboxes.view(-1, 4)[pos_masks], bbox_targets)
-        loss_cls = self.loss_cls(flatten_cls_preds.view(-1, self.num_classes)[pos_masks], cls_targets)
-        loss_obj = self.loss_obj(flatten_objectness.view(-1, 1), obj_targets)
+        loss_bbox = self.loss_bbox(flatten_bboxes.view(-1, 4)[pos_masks], bbox_targets) / num_total_samples
+        loss_obj = self.loss_obj(flatten_objectness.view(-1, 1), obj_targets) / num_total_samples
+        loss_cls = self.loss_cls(flatten_cls_preds.view(-1, self.num_classes)
+                                 [pos_masks], cls_targets) / num_total_samples
 
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
         return loss_dict

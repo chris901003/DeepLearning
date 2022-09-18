@@ -62,6 +62,16 @@ def build_activation_layer(cfg):
     return act
 
 
+def build_optimizer(model, cfg):
+    support_optimizer = {
+        'SGD': torch.optim.SGD,
+        'Adam': torch.optim.Adam
+    }
+    optimizer_cls = get_specified_option(support_optimizer, cfg)
+    optimizer = optimizer_cls(model.parameters(), **cfg)
+    return optimizer
+
+
 def fp16_clamp(x, min=None, max=None):
     if not x.is_cuda and x.dtype == torch.float16:
         return x.float().clamp(min, max).half()
@@ -254,6 +264,45 @@ class DepthwiseSeparableConvModule(nn.Module):
         return out
 
 
+def reduce_loss(loss, reduction):
+    reduction_enum = F._Reduction.get_enum(reduction)
+    if reduction_enum == 0:
+        return loss
+    elif reduction_enum == 1:
+        return loss.mean()
+    elif reduction_enum == 2:
+        return loss.sum()
+
+
+def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
+    if weight is not None:
+        loss = loss * weight
+    if avg_factor is None:
+        loss = reduce_loss(loss, reduction)
+    else:
+        if reduction == 'mean':
+            eps = torch.finfo(torch.float32).eps
+            loss = loss.sum() / (avg_factor + eps)
+        elif reduction != 'none':
+            raise ValueError
+    return loss
+
+
+def _expand_onehot_labels(labels, label_weights, label_channels, ignore_index):
+    bin_labels = labels.new_full((labels.size(0), label_channels), 0)
+    valid_mask = (labels >= 0) & (labels != ignore_index)
+    inds = torch.nonzero(valid_mask & (labels < label_channels), as_tuple=False)
+    if inds.numel() > 0:
+        bin_labels[inds, labels[inds]] = 1
+    valid_mask = valid_mask.view(-1, 1).expand(labels.size(0), label_channels).float()
+    if label_weights is None:
+        bin_label_weights = valid_mask
+    else:
+        bin_label_weights = label_weights.view(-1, 1).repeat(1, label_channels)
+        bin_label_weights *= valid_mask
+    return bin_labels, bin_label_weights, valid_mask
+
+
 class CrossEntropyLoss(nn.Module):
     def __init__(self, use_sigmoid=False, use_mask=False, reduction='mean', class_weight=None, ignore_index=None,
                  loss_weight=1.0, avg_non_ignore=None):
@@ -267,17 +316,54 @@ class CrossEntropyLoss(nn.Module):
         self.ignore_index = ignore_index
         self.avg_non_ignore = avg_non_ignore
         if self.use_sigmoid:
-            self.cls_criterion = nn.CrossEntropyLoss(reduction=reduction)
+            self.cls_criterion = self.binary_cross_entropy
+        else:
+            self.cls_criterion = self.cross_entropy
 
-    def forward(self, pred, label):
-        if label.shape[-1] == 1:
-            loss = F.binary_cross_entropy_with_logits(pred, label)
-            return loss
-        if pred.shape == label.shape:
-            label = label.argmax(dim=-1)
-        label = label.type(torch.LongTensor)
-        loss = self.cls_criterion(pred, label)
+    def forward(self, cls_score, label, weight=None, avg_factor=None, reduction_override=None, ignore_index=None,
+                **kwargs):
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = reduction_override if reduction_override else self.reduction
+        if ignore_index is None:
+            ignore_index = self.ignore_index
+        if self.class_weight is not None:
+            class_weight = cls_score.new_tensor(self.class_weight, device=cls_score.device)
+        else:
+            class_weight = None
+        loss = self.cls_criterion(cls_score, label, weight, class_weight=class_weight, reduction=reduction,
+                                  avg_factor=avg_factor, ignore_index=ignore_index, avg_non_ignore=self.avg_non_ignore)
         loss = loss * self.loss_weight
+        return loss
+
+    @staticmethod
+    def cross_entropy(pred, label, weight=None, reduction='mean', avg_factor=None, class_weight=None, ignore_index=-100,
+                      avg_non_ignore=False):
+        ignore_index = -100 if ignore_index is None else ignore_index
+        loss = F.cross_entropy(pred, label, weight=class_weight, reduction='none', ignore_index=ignore_index)
+        if (avg_factor is None) and avg_non_ignore and reduction == 'mean':
+            avg_factor = label.numel() - (label == ignore_index).sum().item()
+        if weight is not None:
+            weight = weight.float()
+        loss = weight_reduce_loss(loss, weight=weight, reduction=reduction, avg_factor=avg_factor)
+        return loss
+
+    @staticmethod
+    def binary_cross_entropy(pred, label, weight=None, reduction='mean', avg_factor=None, class_weight=None,
+                             ignore_index=-100, avg_non_ignore=False):
+        ignore_index = -100 if ignore_index is None else ignore_index
+        if pred.dim() != label.dim():
+            label, weight, valid_mask = _expand_onehot_labels(label, weight, pred.size(-1), ignore_index)
+        else:
+            valid_mask = ((label >= 0) & (label != ignore_index)).float()
+            if weight is not None:
+                weight = weight * valid_mask
+            else:
+                weight = valid_mask
+        if (avg_factor is None) and avg_non_ignore and reduction == 'mean':
+            avg_factor = valid_mask.sum().item()
+        weight = weight.float()
+        loss = F.binary_cross_entropy_with_logits(pred, label.float(), pos_weight=class_weight, reduction='none')
+        loss = weight_reduce_loss(loss, weight, reduction=reduction, avg_factor=avg_factor)
         return loss
 
 
@@ -291,11 +377,16 @@ class IoULoss(nn.Module):
         self.reduction = reduction
         self.loss_weight = loss_weight
 
-    def forward(self, pred, target, reduction_override=None):
+    def forward(self, pred, target, weight=None, avg_factor=None, reduction_override=None, **kwargs):
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        loss = self.loss_weight * self.iou_loss(pred, target, mode=self.mode, eps=self.eps)
-        if self.reduction == 'mean':
-            loss = loss.sum() / len(loss)
+        reduction = reduction_override if reduction_override else self.reduction
+        loss = self.loss_weight * self.get_iou_loss(pred, target, weight, mode=self.mode, eps=self.eps,
+                                                    reduction=reduction, avg_factor=avg_factor, **kwargs)
+        return loss
+
+    def get_iou_loss(self, pred, target, weight=None, reduction='mean', avg_factor=None, **kwargs):
+        loss = self.iou_loss(pred, target, **kwargs)
+        loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
         return loss
 
     @staticmethod

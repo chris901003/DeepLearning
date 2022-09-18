@@ -1,5 +1,8 @@
 import copy
 import os
+import cv2
+import numpy as np
+import torch
 from torch.utils.data.dataset import Dataset
 from utils import get_specified_option
 from pipeline import LoadImageFromFile, RandomAffine, MixUp, YOLOXHSVRandomAug, RandomFlip, Resize, Pad, \
@@ -56,6 +59,7 @@ class MultiImageMixDataset(Dataset):
             for _ in range(self.max_fetch):
                 updated_results = pipeline(copy.deepcopy(results))
                 if updated_results is not None:
+                    results = updated_results
                     break
             else:
                 raise RuntimeError('採樣過多次')
@@ -86,7 +90,6 @@ class LabelImgYoloFormat(Dataset):
             image_path = os.path.join(self.images, image_name)
             annotation_name = os.path.splitext(image_name)[0] + '.txt'
             annotation_path = os.path.join(self.annotations, annotation_name)
-            print(annotation_path)
             assert os.path.isfile(annotation_path)
             data = {
                 'image_path': image_path,
@@ -129,3 +132,23 @@ class Compose:
         for pipeline in self.pipelines:
             data = pipeline(data)
         return data
+
+
+def custom_collate_fn(batch):
+    imgs = list()
+    gt_bboxes = list()
+    gt_labels = list()
+    for info in batch:
+        img = info['img']
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.transpose(img, (2, 0, 1))
+        img = torch.from_numpy(img).float()
+        imgs.append(img)
+        gt_bbox = info['gt_bboxes']
+        gt_bbox = torch.from_numpy(gt_bbox)
+        gt_bboxes.append(gt_bbox)
+        gt_label = info['gt_labels']
+        gt_label = torch.from_numpy(gt_label)
+        gt_labels.append(gt_label)
+    imgs = torch.stack(imgs)
+    return imgs, gt_bboxes, gt_labels

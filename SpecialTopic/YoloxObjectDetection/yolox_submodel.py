@@ -231,7 +231,7 @@ class SimOTAAssigner:
         assigned_gt_inds = decoded_bboxes.new_full((num_bboxes, ), 0, dtype=torch.long)
         valid_mask, is_in_boxes_and_center = self.get_in_gt_and_in_center_info(priors, gt_bboxes)
         valid_decoded_bbox = decoded_bboxes[valid_mask]
-        valid_pred_score = pred_scores[valid_mask]
+        valid_pred_scores = pred_scores[valid_mask]
         num_valid = valid_decoded_bbox.size(0)
 
         if num_gt == 0 or num_bboxes == 0 or num_valid == 0:
@@ -248,12 +248,15 @@ class SimOTAAssigner:
         iou_cost = -torch.log(pairwise_ious + eps)
         gt_onehot_label = (
             F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1))
-        valid_pred_score = valid_pred_score.unsqueeze(1).repeat(1, num_gt, 1)
-        cls_cost = (F.binary_cross_entropy(
-            valid_pred_score.to(dtype=torch.float32).sqrt_(),
-            gt_onehot_label,
-            reduction='none'
-        ).sum(dim=-1).to(dtype=valid_pred_score.dtype))
+        valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
+        try:
+            cls_cost = (F.binary_cross_entropy(
+                valid_pred_scores.to(dtype=torch.float32).sqrt_(),
+                gt_onehot_label,
+                reduction='none'
+            ).sum(dim=-1).to(dtype=valid_pred_scores.dtype))
+        except:
+            print('f')
         cost_matrix = (
             cls_cost * self.cls_weight + iou_cost * self.iou_weight + (~is_in_boxes_and_center) * INF)
         matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
