@@ -5,11 +5,11 @@ import os
 
 def main():
     # 圖像位置
-    images_path_root = '/Users/huanghongyan/Downloads/data_annotation/save/imgs'
+    images_path_root = '/Users/huanghongyan/Downloads/data_annotation/img/generate_img/imgs'
     # 標註檔案位置
-    annotations_path_root = '/Users/huanghongyan/Downloads/data_annotation/save/annotations'
+    annotations_path_root = '/Users/huanghongyan/Downloads/data_annotation/img/generate_img/annotations'
     # 結果保存位置
-    save_path = '/Users/huanghongyan/Downloads/data_annotation/save/check'
+    save_path = '/Users/huanghongyan/Downloads/data_annotation/img/generate_img/check'
     if not os.path.exists(save_path):
         os.mkdir(save_path)
     support_image_format = ['.jpg', '.JPG', '.jpeg', '.JPEG']
@@ -27,11 +27,15 @@ def main():
         with open(annotation_path, 'r') as f:
             annotations = f.readlines()
         for annotation in annotations:
-            label, xmin, ymin, xmax, ymax = annotation.strip().split(' ')
-            xmin = int(float(xmin) * img_width)
-            ymin = int(float(ymin) * img_height)
-            xmax = int(float(xmax) * img_width)
-            ymax = int(float(ymax) * img_height)
+            label, center_x, center_y, width, height = annotation.strip().split(' ')
+            center_x = float(center_x) * img_width
+            center_y = float(center_y) * img_height
+            width = float(width) * img_width
+            height = float(height) * img_height
+            xmin = int(max(0, center_x - width / 2))
+            ymin = int(max(0, center_y - height / 2))
+            xmax = int(min(center_x + width / 2, img_width))
+            ymax = int(min(center_y + height / 2, img_height))
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
             cv2.putText(image, label, (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 90, 44), 5, cv2.LINE_AA)
         cv2.putText(image, str(len(annotations)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 90, 44), 5, cv2.LINE_AA)

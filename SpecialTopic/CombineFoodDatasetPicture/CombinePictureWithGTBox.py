@@ -270,12 +270,15 @@ def main():
         annotation_path = os.path.join(annotation_save_path, f'{idx}.txt')
         with open(annotation_path, 'w') as f:
             for labels, bboxes in zip(total_labels, total_bboxes):
-                bboxes[0::2] = bboxes[0::2] / picture_size[1]
-                bboxes[1::2] = bboxes[1::2] / picture_size[0]
+                bboxes[..., 0::2] = bboxes[..., 0::2] / picture_size[1]
+                bboxes[..., 1::2] = bboxes[..., 1::2] / picture_size[0]
+                width = bboxes[..., 2] - bboxes[..., 0]
+                height = bboxes[..., 3] - bboxes[..., 1]
+                center_x = bboxes[..., 0] + width / 2
+                center_y = bboxes[..., 1] + height / 2
                 labels = labels.tolist()
-                bboxes = bboxes.tolist()
-                for label, bbox in zip(labels, bboxes):
-                    anno = [str(label)] + [str(box) for box in bbox]
+                for label, x, y, w, h in zip(labels, center_x, center_y, width, height):
+                    anno = [str(label), str(x), str(y), str(w), str(h)]
                     anno = ' '.join(anno)
                     f.write(anno + '\n')
 
