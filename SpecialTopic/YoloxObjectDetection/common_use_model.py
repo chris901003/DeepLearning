@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from utils import get_specified_option
+from weight_init import kaiming_init, constant_init
 
 
 def build_conv_layer(cfg, *args, **kwargs) -> nn.Module:
@@ -210,6 +211,19 @@ class ConvModule(nn.Module):
             if act_cfg_['type'] not in ['Tanh', 'PReLU', 'Sigmoid', 'HSigmoid', 'Swish', 'GELU']:
                 act_cfg_['inplace'] = act_cfg_.get('inplace', inplace)
             self.activate = build_activation_layer(act_cfg_)
+        self.init_weights()
+
+    def init_weights(self):
+        if not hasattr(self.conv, 'init_weights'):
+            if self.with_activation and self.act_cfg['type'] == 'LeakyReLU':
+                nonlinearity = 'leaky_relu'
+                a = self.act_cfg.get('negative_slope', 0.01)
+            else:
+                nonlinearity = 'relu'
+                a = 0
+            kaiming_init(self.conv, a=a, nonlinearity=nonlinearity)
+        if self.with_norm:
+            constant_init(self.norm, 1, bias=0)
 
     @property
     def norm(self):
@@ -257,11 +271,20 @@ class DepthwiseSeparableConvModule(nn.Module):
             groups=in_channels, norm_cfg=dw_norm_cfg, act_cfg=dw_act_cfg, **kwargs)
         self.pointwise_conv = ConvModule(
             in_channels, out_channels, kernel_size=1, norm_cfg=pw_norm_cfg, act_cfg=pw_act_cfg, **kwargs)
+        self.init_weights()
 
     def forward(self, x):
         out = self.depthwise_conv(x)
         out = self.pointwise_conv(out)
         return out
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
 
 def reduce_loss(loss, reduction):

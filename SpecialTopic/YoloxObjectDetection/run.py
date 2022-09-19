@@ -8,7 +8,6 @@ from pycocotools.cocoeval import COCOeval
 
 def run(model, device, work_dir, train_epoch, train_dataloader, optimizer=None, loss_function=None,
         val_epoch=None, val_dataloader=None, val_coco_json=None):
-    val_one_epoch(model, device, val_dataloader, 1, val_coco_json)
     if val_epoch is not None:
         assert val_dataloader is not None, '使用驗證模式需要提供驗證資料集'
         assert val_coco_json is not None, '無法計算mAP值'
@@ -34,6 +33,8 @@ def train_one_epoch(model, device, dataloader, epoch, optimizer=None, loss_funct
             if optimizer is not None:
                 optimizer.zero_grad()
             total_picture += imgs.shape[0]
+            gt_bboxes = [bboxes.to(device) for bboxes in gt_bboxes]
+            gt_labels = [labels.to(device) for labels in gt_labels]
             imgs = imgs.to(device)
             loss = model(imgs, gt_bboxes, gt_labels)
             if loss_function is not None:
@@ -56,13 +57,23 @@ def val_one_epoch(model, device, dataloader, epoch, val_coco_json):
             imgs = imgs.to(device)
             results = model(imgs, scale_factor=scale_factor, return_loss=False)
             for image_path, result in zip(images_path, results):
+                import cv2
+                # from PIL import Image
+                # image = cv2.imread(image_path)
                 image_id = int(os.path.splitext(os.path.basename(image_path))[0])
                 for cls in range(len(result)):
                     for box in result[cls]:
                         tmp = box.tolist()
+
+                        # if tmp[4] > 0.5:
+                        #     cv2.rectangle(image, (int(tmp[0]), int(tmp[1])), (int(tmp[2]), int(tmp[3])), (0, 255, 0), 2)
+
                         bbox = [tmp[0], tmp[1], tmp[2] - tmp[0], tmp[3] - tmp[1]]
                         data = dict(image_id=image_id, category_id=cls, bbox=bbox, score=tmp[4])
                         res.append(data)
+                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                # image = Image.fromarray(image)
+                # image.show()
             pbar.update(1)
     print('Writing json file ...')
     with open(json_file, 'w') as f:

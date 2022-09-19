@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -239,6 +241,7 @@ class YOLOXPAFPN(nn.Module):
             self.out_convs.append(
                 ConvModule(in_channels[i], out_channels, kernel_size=1,
                            conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        self.init_weights()
 
     def forward(self, inputs):
         assert len(inputs) == len(self.in_channels)
@@ -261,6 +264,14 @@ class YOLOXPAFPN(nn.Module):
         for idx, conv in enumerate(self.out_convs):
             outs[idx] = conv(outs[idx])
         return tuple(outs)
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='leaky_relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
 
 class YOLOXHead(nn.Module):
@@ -311,6 +322,15 @@ class YOLOXHead(nn.Module):
             sampler_cfg = dict(type='PseudoSampler')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self._init_layers()
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='leaky_relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def _init_layers(self):
         self.multi_level_cls_convs = nn.ModuleList()
@@ -448,6 +468,7 @@ class YOLOXHead(nn.Module):
         decoded_bboxes = torch.stack([tl_x, tl_y, br_x, br_y], dim=-1)
         return decoded_bboxes
 
+    @torch.no_grad()
     def _get_target_single(self, cls_preds, objectness, priors, decode_bboxes, gt_bboxes, gt_labels, idx):
         cls_preds = cls_preds[idx]
         objectness = objectness[idx]
@@ -514,7 +535,7 @@ class YOLOXHead(nn.Module):
             l1_targets.append(l1_target)
             num_fg_imgs.append(num_fg_img)
         num_pos = torch.tensor(sum(num_fg_imgs), dtype=torch.float, device=flatten_cls_preds.device)
-        num_total_samples = max(num_pos, 1.0)
+        num_total_samples = max(num_pos, torch.Tensor(1))
 
         pos_masks = torch.cat(pos_masks, dim=0)
         cls_targets = torch.cat(cls_targets, dim=0)

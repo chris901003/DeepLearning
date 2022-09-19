@@ -70,6 +70,7 @@ class DarknetBottleneck(nn.Module):
         self.conv2 = conv(hidden_channels, out_channels, kernel_size=3, stride=1, padding=1,
                           conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
         self.add_identity = add_identity and in_channels == out_channels
+        # self.init_weights()
 
     def forward(self, x):
         identity = x
@@ -79,11 +80,23 @@ class DarknetBottleneck(nn.Module):
             out = out + identity
         return out
 
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
 
 class CSPLayer(nn.Module):
     def __init__(self, in_channels, out_channels, expand_ratio=0.5, num_blocks=1, add_identity=True,
-                 use_depthwise=False, conv_cfg=None, norm_cfg=None, act_cfg=None):
+                 use_depthwise=False, conv_cfg=None, norm_cfg='Default', act_cfg='Default'):
         super(CSPLayer, self).__init__()
+        if norm_cfg == 'Default':
+            norm_cfg = dict(type='BN', momentum=0.03, eps=0.001)
+        if act_cfg == 'Default':
+            act_cfg = dict(type='Swish')
         mid_channels = int(out_channels * expand_ratio)
         self.main_conv = ConvModule(in_channels, mid_channels, kernel_size=1,
                                     conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)

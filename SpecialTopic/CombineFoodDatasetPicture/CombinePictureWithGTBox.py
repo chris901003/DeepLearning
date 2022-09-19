@@ -4,6 +4,7 @@ from tqdm import tqdm
 import cv2
 import numpy as np
 from PIL import Image
+from shutil import copyfile
 
 
 def parse_args():
@@ -170,6 +171,8 @@ def main():
     annotation_save_path = os.path.join(save_path, 'annotations')
     if not os.path.exists(annotation_save_path):
         os.mkdir(annotation_save_path)
+    classes_txt = os.path.join(args.annotation, 'classes.txt')
+    copyfile(classes_txt, os.path.join(annotation_save_path, 'classes.txt'))
     data_info = get_img_data(args.img, args.annotation)
     assert len(data_info) > 0, '沒有圖像資料可以使用'
 

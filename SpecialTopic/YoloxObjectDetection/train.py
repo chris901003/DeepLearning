@@ -74,7 +74,7 @@ def main():
         'optimizer_cfg': {
             'type': 'SGD',
             'momentum': 0.9,
-            'lr': 0.001,
+            'lr': 0.01,
             'weight_decay': 5e-4,
             'nesterov': True
         }
