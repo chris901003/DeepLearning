@@ -81,6 +81,7 @@ def main():
     }
     model = build_detector(model_cfg)
     model = model.to(device)
+    # model.load_state_dict(torch.load('/Users/huanghongyan/Downloads/best_model.pkt', map_location='cpu'))
     dataset_cfg = {
         'type': 'MultiImageMixDataset',
         'dataset': {

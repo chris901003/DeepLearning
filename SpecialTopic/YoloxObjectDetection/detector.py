@@ -328,9 +328,19 @@ class YOLOXHead(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='leaky_relu')
+                if m.bias is not None:
+                    m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
+        def bias_init_with_prob(prior_prob):
+            bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+            return bias_init
+        bias_init = bias_init_with_prob(0.01)
+        for conv_cls, conv_obj in zip(self.multi_level_conv_cls, self.multi_level_conv_obj):
+            conv_cls.bias.data.fill_(bias_init)
+            conv_obj.bias.data.fill_(bias_init)
 
     def _init_layers(self):
         self.multi_level_cls_convs = nn.ModuleList()
