@@ -72,7 +72,7 @@ def train():
     #                   训练前一定要修改classes_path，使其对应自己的数据集
     # ---------------------------------------------------------------------#
     # 就是.names存放的地方
-    classes_path = 'model_data/voc_classes.txt'
+    classes_path = '/Users/huanghongyan/Downloads/food_data_flag/classes.txt'
     # ----------------------------------------------------------------------------------------------------------------------------#
     #   权值文件的下载请看README，可以通过网盘下载。模型的 预训练权重 对不同数据集是通用的，因为特征是通用的。
     #   模型的 预训练权重 比较重要的部分是 主干特征提取网络的权值部分，用于进行特征提取。
@@ -211,7 +211,7 @@ def train():
     #   save_period     多少个epoch保存一次权值
     # ------------------------------------------------------------------#
     # 未來可以寫一個save_best，只保留最佳的
-    save_period = 10
+    save_period = 5
     # ------------------------------------------------------------------#
     #   save_dir        权值与日志文件保存的文件夹
     # ------------------------------------------------------------------#
@@ -227,20 +227,20 @@ def train():
     #   （二）此处设置评估参数较为保守，目的是加快评估速度。
     # ------------------------------------------------------------------#
     eval_flag = True
-    eval_period = 10
+    eval_period = 5
     # ------------------------------------------------------------------#
     #   num_workers     用于设置是否使用多线程读取数据
     #                   开启后会加快数据读取速度，但是会占用更多内存
     #                   内存较小的电脑可以设置为2或者0  
     # ------------------------------------------------------------------#
-    num_workers = 4
+    num_workers = 1
 
     # ----------------------------------------------------#
     #   获得图片路径和标签
     # ----------------------------------------------------#
     # 文檔中包含圖像路徑以及gt_box的座標，這裡給的是絕對座標且是左上右下的點(xmin, ymin, xmax, ymax, class)
-    train_annotation_path = '2007_train.txt'
-    val_annotation_path = '2007_val.txt'
+    train_annotation_path = '2012_train.txt'
+    val_annotation_path = '2012_val.txt'
 
     # ------------------------------------------------------#
     #   设置用到的显卡
@@ -578,8 +578,8 @@ def train():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--Cuda', type=bool, default=torch.cuda.is_available())
-    parser.add_argument('--models-path', type=str, default='model_data/yolox_m.pth')
-    parser.add_argument('--phi', type=str, default='m')
-    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--model-path', type=str, default='/Users/huanghongyan/Downloads/yolox_l.pth')
+    parser.add_argument('--phi', type=str, default='l')
+    parser.add_argument('--batch-size', type=int, default=2)
     opt = parser.parse_args()
     train()

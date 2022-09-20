@@ -137,32 +137,22 @@ class Compose:
 
 
 def custom_collate_fn(batch):
-    imgs, gt_bboxes, gt_labels = list(), list(), list()
-    for info in batch:
-        img = info['img']
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.transpose(img, (2, 0, 1))
-        img = torch.from_numpy(img).float()
-        imgs.append(img)
-        gt_bbox = info['gt_bboxes']
-        gt_bbox = torch.from_numpy(gt_bbox)
-        gt_bboxes.append(gt_bbox)
-        gt_label = info['gt_labels']
-        gt_label = torch.from_numpy(gt_label)
-        gt_labels.append(gt_label)
-    imgs = torch.stack(imgs)
-    return imgs, gt_bboxes, gt_labels
+    images = []
+    bboxes = []
+    for img, box in batch:
+        images.append(img)
+        bboxes.append(box)
+    images = torch.from_numpy(np.array(images)).type(torch.FloatTensor)
+    bboxes = [torch.from_numpy(ann).type(torch.FloatTensor) for ann in bboxes]
+    return images, bboxes
 
 
 def custom_collate_fn_val(batch):
-    imgs, scale_factors, images_path = list(), list(), list()
-    for info in batch:
-        img = info['img']
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.transpose(img, (2, 0, 1))
-        img = torch.from_numpy(img).float()
-        imgs.append(img)
-        scale_factors.append(info['scale_factor'])
-        images_path.append(info['image_path'])
-    imgs = torch.stack(imgs)
-    return imgs, scale_factors, images_path
+    images = []
+    bboxes = []
+    for img, box in batch:
+        images.append(img)
+        bboxes.append(box)
+    images = torch.from_numpy(np.array(images)).type(torch.FloatTensor)
+    bboxes = [torch.from_numpy(ann).type(torch.FloatTensor) for ann in bboxes]
+    return images, bboxes

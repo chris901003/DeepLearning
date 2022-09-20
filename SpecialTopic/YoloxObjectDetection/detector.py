@@ -8,11 +8,13 @@ import numpy as np
 import torchvision
 from common_use_model import ConvModule, DepthwiseSeparableConvModule, CrossEntropyLoss, IoULoss, build_optimizer
 from yolox_submodel import Focus, SPPBottleneck, CSPLayer, MlvlPointGenerator, SimOTAAssigner, PseudoSampler
+from net.yolo import YoloBody
 
 
 def build_detector(model_cfg):
     support_detector = {
-        'YOLOX': YOLOX
+        'YOLOX': YOLOX,
+        'YoloBody': YoloBody
     }
     detection_cls = get_specified_option(support_detector, model_cfg)
     detection = detection_cls(**model_cfg)
@@ -101,7 +103,6 @@ class YOLOX(nn.Module):
         return x
 
     def forward_train(self, img, gt_bboxes, gt_labels):
-        self.optimizer.zero_grad()
         img, gt_bboxes = self._preprocess(img, gt_bboxes)
         x = self.extract_feat(img)
         if torch.isnan(x[0]).sum():
@@ -111,6 +112,7 @@ class YOLOX(nn.Module):
         losses = self.bbox_head.forward_train(x, gt_bboxes, gt_labels)
         losses['loss_bbox'] = torch.sum(losses['loss_bbox'])
         loss = sum(_value for _key, _value in losses.items())
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         return loss.item()
@@ -328,8 +330,6 @@ class YOLOXHead(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='leaky_relu')
-                if m.bias is not None:
-                    m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -555,8 +555,8 @@ class YOLOXHead(nn.Module):
             l1_targets = torch.cat(l1_targets, dim=0)
         loss_bbox = self.loss_bbox(flatten_bboxes.view(-1, 4)[pos_masks], bbox_targets) / num_total_samples
         loss_obj = self.loss_obj(flatten_objectness.view(-1, 1), obj_targets) / num_total_samples
-        loss_cls = self.loss_cls(flatten_cls_preds.view(-1, self.num_classes)
-                                 [pos_masks], cls_targets) / num_total_samples
+        loss_cls = self.loss_cls(flatten_cls_preds.view(-1, self.num_classes)[pos_masks],
+                                 cls_targets) / num_total_samples
 
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
         return loss_dict

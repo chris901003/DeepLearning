@@ -44,6 +44,23 @@ def fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, eval_callbac
             break
 
         images, targets = batch[0], batch[1]
+        # from torchvision import transforms
+        # from PIL import Image
+        # import numpy as np
+        # import cv2
+        # target = targets[0]
+        # img = transforms.ToPILImage()(images[0]).convert('RGB')
+        # img = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+        # for bbox in target:
+        #     xmin = int(bbox[0] - bbox[2] / 2)
+        #     ymin = int(bbox[1] - bbox[3] / 2)
+        #     xmax = int(bbox[0] + bbox[2] / 2)
+        #     ymax = int(bbox[1] + bbox[3] / 2)
+        #     cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # img = Image.fromarray(img)
+        # img.show()
+
         with torch.no_grad():
             # 轉換到cuda上
             if cuda:

@@ -30,9 +30,9 @@ class YOLO(object):
         #   如果出现shape不匹配，同时要注意训练时的model_path和classes_path参数的修改
         # --------------------------------------------------------------------------#
         # 預訓練權重位置
-        "model_path": 'model_data/yolox_s.pth',
+        "model_path": '/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/Yolox/best_weight.pth',
         # .names文件位置
-        "classes_path": 'model_data/coco_classes.txt',
+        "classes_path": '/Users/huanghongyan/Downloads/food_data_flag/classes.txt',
         # ---------------------------------------------------------------------#
         #   输入图片的大小，必须为32的倍数。
         # ---------------------------------------------------------------------#
@@ -43,7 +43,7 @@ class YOLO(object):
         # ---------------------------------------------------------------------#
         # 決定網路的版本，不同版本在層結構中會有不同的channel
         # 記得要對應上正確的預訓練權重，不然會無法載入
-        "phi": 's',
+        "phi": 'l',
         # ---------------------------------------------------------------------#
         #   只有得分大于置信度的预测框会被保留下来
         # ---------------------------------------------------------------------#
@@ -61,7 +61,7 @@ class YOLO(object):
         #   是否使用Cuda
         #   没有GPU可以设置成False
         # -------------------------------#
-        "cuda": True,
+        "cuda": False,
     }
 
     @classmethod

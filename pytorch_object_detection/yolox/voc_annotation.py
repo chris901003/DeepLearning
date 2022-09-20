@@ -12,7 +12,7 @@ from utils.utils import get_classes
 #   annotation_mode为1代表获得VOCdevkit/VOC2007/ImageSets里面的txt
 #   annotation_mode为2代表获得训练用的2007_train.txt、2007_val.txt
 # --------------------------------------------------------------------------------------------------------------------------------#
-annotation_mode = 0
+annotation_mode = 2
 # -------------------------------------------------------------------#
 #   必须要修改，用于生成2007_train.txt、2007_val.txt的目标信息
 #   与训练和预测所用的classes_path一致即可
@@ -20,7 +20,7 @@ annotation_mode = 0
 #   那么就是因为classes没有设定正确
 #   仅在annotation_mode为0和2的时候有效
 # -------------------------------------------------------------------#
-classes_path = 'model_data/voc_classes.txt'
+classes_path = '/Users/huanghongyan/Downloads/VOCdevkit/VOC2012/classes.txt'
 # --------------------------------------------------------------------------------------------------------------------------------#
 #   trainval_percent用于指定(训练集+验证集)与测试集的比例，默认情况下 (训练集+验证集):测试集 = 9:1
 #   train_percent用于指定(训练集+验证集)中训练集与验证集的比例，默认情况下 训练集:验证集 = 9:1
@@ -32,9 +32,9 @@ train_percent = 0.9
 #   指向VOC数据集所在的文件夹
 #   默认指向根目录下的VOC数据集
 # -------------------------------------------------------#
-VOCdevkit_path = 'VOCdevkit'
+VOCdevkit_path = '/Users/huanghongyan/Downloads/VOCdevkit'
 
-VOCdevkit_sets = [('2007', 'train'), ('2007', 'val')]
+VOCdevkit_sets = [('2012', 'train'), ('2012', 'val')]
 classes, _ = get_classes(classes_path)
 
 # -------------------------------------------------------#
@@ -71,8 +71,8 @@ if __name__ == "__main__":
 
     if annotation_mode == 0 or annotation_mode == 1:
         print("Generate txt in ImageSets.")
-        xmlfilepath = os.path.join(VOCdevkit_path, 'VOC2007/Annotations')
-        saveBasePath = os.path.join(VOCdevkit_path, 'VOC2007/ImageSets/Main')
+        xmlfilepath = os.path.join(VOCdevkit_path, 'VOC2012/Annotations')
+        saveBasePath = os.path.join(VOCdevkit_path, 'VOC2012/ImageSets/Main')
         temp_xml = os.listdir(xmlfilepath)
         total_xml = []
         for xml in temp_xml:
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         print("Generate txt in ImageSets done.")
 
     if annotation_mode == 0 or annotation_mode == 2:
-        print("Generate 2007_train.txt and 2007_val.txt for train.")
+        print("Generate 2012_train.txt and 2012_val.txt for train.")
         type_index = 0
         for year, image_set in VOCdevkit_sets:
             image_ids = open(os.path.join(VOCdevkit_path, 'VOC%s/ImageSets/Main/%s.txt' % (year, image_set)),
@@ -125,7 +125,7 @@ if __name__ == "__main__":
             photo_nums[type_index] = len(image_ids)
             type_index += 1
             list_file.close()
-        print("Generate 2007_train.txt and 2007_val.txt for train done.")
+        print("Generate 2012_train.txt and 2012_val.txt for train done.")
         
         def printTable(List1, List2):
             for i in range(len(List1[0])):
