@@ -30,7 +30,7 @@ class YOLO(object):
         #   如果出现shape不匹配，同时要注意训练时的model_path和classes_path参数的修改
         # --------------------------------------------------------------------------#
         # 預訓練權重位置
-        "model_path": '/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/Yolox/best_weight.pth',
+        "model_path": '/Users/huanghongyan/Downloads/best_weight.pth',
         # .names文件位置
         "classes_path": '/Users/huanghongyan/Downloads/food_data_flag/classes.txt',
         # ---------------------------------------------------------------------#
