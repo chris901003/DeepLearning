@@ -11,6 +11,7 @@
    - [yolox_m.pth](https://github.com/bubbliiiing/yolox-pytorch/releases/download/v1.0/yolox_m.pth)
    - [yolox_l.pth](https://github.com/bubbliiiing/yolox-pytorch/releases/download/v1.0/yolox_l.pth)
    - [yolox_x.pth](https://github.com/bubbliiiing/yolox-pytorch/releases/download/v1.0/yolox_x.pth)
+   - [權重資料來源](https://github.com/bubbliiiing/yolox-pytorch/tree/bilibili)
 2. 分類類別檔案(使用labelImg時就會自動產生)
 3. [訓練的標註文件](https://github.com/chris901003/DeepLearning/blob/main/some_utils/labelImg2yolox.py)
 4. [驗證的標註文件](https://github.com/chris901003/DeepLearning/blob/main/some_utils/labelImg2yolox.py)
