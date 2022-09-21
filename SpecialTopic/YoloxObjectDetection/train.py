@@ -15,40 +15,64 @@ from utils_fit import fit_one_epoch
 def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
+    # 預訓練權重位置，如果沒有要使用就填 'none'
     parser.add_argument('--models-path', type=str, default='/Users/huanghongyan/Downloads/best_weight.pth')
+    # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
+    # 一個batch大小
     parser.add_argument('--batch-size', type=int, default=2)
+    # 類別文件
     parser.add_argument('--classes-path', default='/Users/huanghongyan/Downloads/food_data_flag/classes.txt', type=str)
+    # 訓練標註文件
     parser.add_argument('--train-annotation-path', default='/Users/huanghongyan/Downloads/food_data_flag/'
                                                            '2012_train.txt', type=str)
+    # 驗證標註文件
     parser.add_argument('--val-annotation-path', default='/Users/huanghongyan/Downloads/food_data_flag/2012_train.txt',
                         type=str)
+    # 是否使用雙精度模式，只有gpu模式下才會有效果
     parser.add_argument('--fp16', action='store_true')
 
     # 與訓練過程相關
+    # 初始Epoch
     parser.add_argument('--Init-Epoch', type=int, default=0)
+    # 解除骨幹凍結epoch，如果沒有使用預訓練權重建議設定成與Init-Epoch相同
     parser.add_argument('--Freeze_Epoch', type=int, default=50)
+    # 總訓練Epoch數
     parser.add_argument('--UnFreeze_Epoch', type=int, default=300)
+    # 是否先凍結backbone部分，到模型較為穩定時解除
     parser.add_argument('--Freeze-Train', action='store_false')
+    # 最大學習率
     parser.add_argument('--Init-lr', type=float, default=1e-2)
+    # 使用的優化器 ['sgd', 'adam']
     parser.add_argument('--optimizer_type', type=str, default='sgd')
+    # 優化器相關超參數
     parser.add_argument('--momentum', type=float, default=0.937)
     parser.add_argument('--weight-decay', type=float, default=5e-4)
+    # 學習率調整方式 ['cos']
     parser.add_argument('--lr-decay-type', type=str, default='cos')
 
     # 保存資料以及訓練流程相關設定
+    # 多少Epoch會強制保存模型權重
     parser.add_argument('--save-period', type=int, default=10)
+    # 保存位置
     parser.add_argument('--save-dir', type=str, default='./checkpoints')
+    # 多少個Epoch會進行mAP計算
     parser.add_argument('--eval-period', type=int, default=10)
+    # mAP計算需使用的coco文件
     parser.add_argument('--coco-json-file', type=str,
                         default='/Users/huanghongyan/Downloads/food_data_flag/val2017.json')
+    # DataLoader使用的cpu數量
     parser.add_argument('--num-workers', type=int, default=1)
 
     # 比較不會需要調整的部分
+    # 是否使用gpu進行訓練
     parser.add_argument('--Cuda', type=bool, default=torch.cuda.is_available())
+    # 分布式訓練，目前不支援
     parser.add_argument('--distributed', action='store_true')
     parser.add_argument('--sync-bn', action='store_true')
+    # 輸入網路的圖像大小，目前訓練可以隨意調整，但驗證就無法進行
     parser.add_argument('--input-shape', default=[640, 640], nargs='+', type=int)
+    # 是否使用mosaic數據增強
     parser.add_argument('--mosaic', action='store_false')
     args = parser.parse_args()
     return args
