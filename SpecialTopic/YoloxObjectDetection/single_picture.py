@@ -6,7 +6,7 @@ import cv2
 from PIL import Image
 from utils import get_classes
 from api import detect_image
-from ST.build import build_detector
+from SpecialTopic.ST.build import build_detector
 
 
 def parse_args():

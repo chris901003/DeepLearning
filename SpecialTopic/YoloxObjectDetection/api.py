@@ -9,7 +9,7 @@ from utils import resize_image, cvtColor, preprocess_input, decode_outputs, non_
 def detect_image(model, device, image_info, input_shape, num_classes, confidence=0.5, nms_iou=0.3, keep_ratio=True):
     if isinstance(image_info, str):
         image = Image.open(image_info)
-    elif isinstance(image_info, np.array):
+    elif type(image_info) is np.ndarray:
         image = Image.fromarray(cv2.cvtColor(image_info, cv2.COLOR_BGR2RGB))
     elif isinstance(image_info, PIL.JpegImagePlugin.JpegImageFile):
         image = image_info

@@ -23,4 +23,5 @@
 ### 其他資訊
 訓練入口檔案: train.py\
 驗證入口檔案: 未寫\
-實際使用入口檔案: 未寫
+實際使用入口檔案: single_picture.py\
+對影片進行偵測同時提取: video_detect_extract.py
