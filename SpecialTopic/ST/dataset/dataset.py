@@ -23,8 +23,6 @@ class YoloDataset(Dataset):
                 data['annotation_lines'].append(line)
             shuffle(data['annotation_lines'])
         data = self.pipelines(data)
-        if not self.train:
-            return data
         image = data['image']
         if isinstance(image, list):
             assert len(image) == 1, '圖像資料錯誤'
@@ -38,7 +36,11 @@ class YoloDataset(Dataset):
         if len(box) != 0:
             box[:, 2:4] = box[:, 2:4] - box[:, 0:2]
             box[:, 0:2] = box[:, 0:2] + box[:, 2:4] / 2
-        return image, box
+        if self.train:
+            return image, box
+        data['image'] = image
+        data['bboxes'] = box
+        return data
 
     def __len__(self):
         return self.length
@@ -56,7 +58,8 @@ class YoloDataset(Dataset):
 
     @staticmethod
     def custom_collate_fn_val(batch):
-        image = batch[0]['image'][0]
-        image = np.expand_dims(np.transpose(preprocess_input(np.array(image, dtype='float32')), (2, 0, 1)), 0)
-        image = torch.from_numpy(image).type(torch.FloatTensor)
-        return image, batch[0]['ori_size'], batch[0]['keep_ratio'], batch[0]['images_path'][0]
+        image = [batch[0]['image']]
+        bboxes = [batch[0]['bboxes']]
+        bboxes = [torch.from_numpy(ann).type(torch.FloatTensor) for ann in bboxes]
+        image = torch.from_numpy(np.array(image)).type(torch.FloatTensor)
+        return image, bboxes, batch[0]['ori_size'], batch[0]['keep_ratio'], batch[0]['images_path'][0]

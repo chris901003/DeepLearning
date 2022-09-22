@@ -69,12 +69,12 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
         pbar.close()
         print('Finish Train')
         print('Start Validation')
-        pbar = tqdm(total=epoch_step_val, desc=f'Epoch {epoch + 1}/{Epoch}', position=dict, miniters=0.3)
+        pbar = tqdm(total=epoch_step_val, desc=f'Epoch {epoch + 1}/{Epoch}', postfix=dict, miniters=0.3)
     model_train_eval = model_train.eval()
     for iteration, batch in enumerate(gen_val):
         if iteration >= epoch_step_val:
             break
-        images, targets = batch[0], batch[1]
+        images, targets, ori_size, keep_ratio, image_path = batch[0], batch[1], batch[2], batch[3], batch[4]
         with torch.no_grad():
             if cuda:
                 images = images.cuda(local_rank)
@@ -101,7 +101,7 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
         assert coco_json_file is not None, '如果需要進行coco mAP計算需要提供json檔'
         res = list()
         for iteration, batch in enumerate(tqdm(gen_val)):
-            images, ori_size, keep_ratio, image_path = batch[0], batch[1], batch[2], batch[3]
+            images, targets, ori_size, keep_ratio, image_path = batch[0], batch[1], batch[2], batch[3], batch[4]
             image_id = int(os.path.splitext(os.path.basename(image_path))[0])
             input_shape = images.shape[-2:]
             if cuda:

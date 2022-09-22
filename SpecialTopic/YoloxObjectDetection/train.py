@@ -4,11 +4,11 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from utils import get_classes
-from ST.build import build_detector, build_loss, build_dataset
-from ST.net.weight_init import weights_init_yolox
+from SpecialTopic.ST.build import build_detector, build_loss, build_dataset
+from SpecialTopic.ST.net.weight_init import weights_init_yolox
+from SpecialTopic.ST.net.lr_scheduler import get_lr_scheduler_yolox, set_optimizer_lr_yolox
 import numpy as np
 from torch.backends import cudnn
-from ST.net.lr_scheduler import get_lr_scheduler_yolox, set_optimizer_lr_yolox
 from utils_fit import fit_one_epoch
 
 
@@ -57,7 +57,7 @@ def parse_args():
     # 保存位置
     parser.add_argument('--save-dir', type=str, default='./checkpoints')
     # 多少個Epoch會進行mAP計算
-    parser.add_argument('--eval-period', type=int, default=10)
+    parser.add_argument('--eval-period', type=int, default=1)
     # mAP計算需使用的coco文件
     parser.add_argument('--coco-json-file', type=str,
                         default='/Users/huanghongyan/Downloads/food_data_flag/val2017.json')
@@ -210,7 +210,7 @@ def main():
         'pipeline_cfg': [
             {'type': 'LoadInfoFromAnno', 'key': 'annotation_lines'},
             {'type': 'Resize', 'input_shape': args.input_shape, 'save_info': True},
-            {'type': 'Collect', 'keys': ['image', 'ori_size', 'keep_ratio', 'images_path']}
+            {'type': 'Collect', 'keys': ['image', 'bboxes', 'ori_size', 'keep_ratio', 'images_path']}
         ]
     }
     val_dataset = build_dataset(val_dataset_cfg)
