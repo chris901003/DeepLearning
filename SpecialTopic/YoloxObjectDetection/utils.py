@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torchvision.ops import boxes
+from PIL import Image
 
 
 def get_classes(classes_path):
@@ -77,3 +78,33 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape, keep_ratio):
     boxes = np.concatenate([box_mins[..., 0:1], box_mins[..., 1:2], box_maxes[..., 0:1], box_maxes[..., 1:2]], axis=-1)
     boxes *= np.concatenate([image_shape, image_shape], axis=-1)
     return boxes
+
+
+def cvtColor(image):
+    if len(np.shape(image)) == 3 and np.shape(image)[2] == 3:
+        return image
+    else:
+        image = image.convert('RGB')
+        return image
+
+
+def resize_image(image, size, keep_ratio=True):
+    iw, ih = image.size
+    h, w = size
+    if keep_ratio:
+        scale = min(w / iw, h / ih)
+        nw = int(iw * scale)
+        nh = int(ih * scale)
+        image = image.resize((nw, nh), Image.BICUBIC)
+        new_image = Image.new('RGB', size, (128, 128, 128))
+        new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))
+    else:
+        new_image = image.resize((w, h), Image.BICUBIC)
+    return new_image
+
+
+def preprocess_input(image):
+    image /= 255.0
+    image -= np.array([0.485, 0.456, 0.406])
+    image /= np.array([0.229, 0.224, 0.225])
+    return image
