@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+import torch.nn.functional as F
 from ..build import build_backbone, build_head, build_neck, build_loss
 from .weight_init import normal_init
 
@@ -48,8 +49,13 @@ class I3DHead(nn.Module):
         losses = self.loss_cls(cls_score, labels)
         loss_dict['loss'] = losses
         predict = cls_score.argmax(dim=1)
+        predict_score, predict_idx = torch.topk(cls_score, k=5, dim=1)
+        labels = labels.view(-1, 1)
+        topk = (labels == predict_idx).sum()
+        topk_acc = topk / labels.size(0)
         acc = torch.eq(predict, labels).sum() / labels.size(0)
         loss_dict['acc'] = acc
+        loss_dict['topk_acc'] = topk_acc
         return loss_dict
 
 
@@ -77,12 +83,12 @@ class Recognizer3D(nn.Module):
         x = self.backbone(imgs)
         return x
 
-    def forward(self, imgs, label=None, return_loss=True):
-        if return_loss:
+    def forward(self, imgs, label=None, mode='train'):
+        if mode == 'train':
             if label is None:
                 raise ValueError('續練時需要提供label資訊')
             return self.forward_train(imgs, label)
-        return self.forward_test(imgs)
+        return self.forward_test(imgs, label, mode)
 
     def forward_train(self, imgs, labels):
         assert self.cls_head is not None
@@ -98,5 +104,34 @@ class Recognizer3D(nn.Module):
         losses.update(loss_cls)
         return losses
 
-    def forward_test(self, imgs):
-        pass
+    def forward_test(self, imgs, label, mode):
+        num_segs = imgs.shape[1]
+        imgs = imgs.reshape((-1, ) + imgs.shape[2:])
+        feat = self.extract_feat(imgs)
+        if self.neck is not None:
+            feat, _ = self.neck(feat)
+        assert self.cls_head is not None
+        cls_score = self.cls_head(feat)
+        cls_score = self.average_clip(cls_score, num_segs)
+        if mode == 'test':
+            return cls_score
+        elif mode == 'val':
+            losses = dict()
+            assert label is not None
+            label = label.squeeze(dim=-1)
+            loss_cls = self.cls_head.loss(cls_score, label)
+            losses.update(loss_cls)
+            return losses
+
+    def average_clip(self, cls_score, num_segs=1):
+        average_clips = self.test_cfg['average_clips']
+        assert average_clips in ['score', 'prob', None]
+        if average_clips is None:
+            return cls_score
+        batch_size = cls_score.shape[0]
+        cls_score = cls_score.view(batch_size // num_segs, num_segs, -1)
+        if average_clips == 'prob':
+            cls_score = F.softmax(cls_score, dim=2).mean(dim=1)
+        elif average_clips == 'score':
+            cls_score = cls_score.mean(dim=1)
+        return cls_score

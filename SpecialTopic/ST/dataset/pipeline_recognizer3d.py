@@ -329,3 +329,33 @@ class ToTensor:
         for key in self.keys:
             results[key] = to_tensor(results[key])
         return results
+
+
+class ThreeCrop:
+    def __init__(self, crop_size):
+        self.crop_size = (crop_size, crop_size)
+
+    def __call__(self, results):
+        imgs = results['imgs']
+        img_h, img_w = results['imgs'][0].shape[:2]
+        crop_w, crop_h = self.crop_size
+        assert crop_h == img_h or crop_w == img_w
+        offsets = [(0, 0)]
+        if crop_h == img_h:
+            w_step = (img_w - crop_w) // 2
+            offsets = [(0, 0), (2 * w_step, 0), (w_step, 0)]
+        elif crop_w == img_w:
+            h_step = (img_h - crop_h) // 2
+            offsets = [(0, 0), (0, 2 * h_step), (0, h_step)]
+        cropped = list()
+        crop_bboxes = list()
+        for x_offset, y_offset in offsets:
+            bbox = [x_offset, y_offset, x_offset + crop_w, y_offset + crop_h]
+            crop = [img[y_offset:y_offset + crop_h, x_offset:x_offset + crop_w] for img in imgs]
+            cropped.extend(crop)
+            crop_bboxes.extend([bbox for _ in range(len(imgs))])
+        crop_bboxes = np.array(crop_bboxes)
+        results['imgs'] = cropped
+        results['crop_bbox'] = crop_bboxes
+        results['img_shape'] = results['imgs'][0].shape[:2]
+        return results

@@ -16,7 +16,8 @@ def args_parser():
     parser.add_argument('--train-annotation', type=str, default='/Users/huanghongyan/Documents/DeepLearning/mmaction2/'
                                                                 'data/kinetics400/kinetics400_train_list_videos.txt')
     # 驗證資料標註文件
-    parser.add_argument('--eval-annotation', type=str, default='none')
+    parser.add_argument('--eval-annotation', type=str, default='/Users/huanghongyan/Documents/DeepLearning/mmaction2/'
+                                                                'data/kinetics400/kinetics400_val_list_videos.txt')
     # 分類類別數
     parser.add_argument('--num-classes', type=int, default=400)
     # 一個batch的大小，如果gpu的ram爆開請將此條小
@@ -30,7 +31,7 @@ def args_parser():
     # 保存權重路徑
     parser.add_argument('--save-dir', type=str, default='./checkpoint')
     # 多少次訓練epoch後進行驗證
-    parser.add_argument('--eval-period', type=int, default=10)
+    parser.add_argument('--eval-period', type=int, default=1)
     # 優化器選擇
     parser.add_argument('--optimizer-type', type=str, default='sgd')
     # 學習率調整方式
@@ -105,7 +106,33 @@ def main():
         'collate_fn': train_dataset.custom_collate_fn
     }
     train_dataloader = DataLoader(**train_dataloader_cfg)
-    eval_dataloader = None
+    eval_dataset_cfg = {
+        'type': 'VideoDataset',
+        'ann_file': args.eval_annotation,
+        'data_prefix': '/Users/huanghongyan/Documents/DeepLearning/mmaction2/data/kinetics400/videos_val',
+        'pipeline': [
+            {'type': 'PyAVInit'},
+            {'type': 'SampleFrames', 'clip_len': 32, 'frame_interval': 2, 'num_clips': 2, 'test_mode': True},
+            {'type': 'PyAVDecode'},
+            {'type': 'Recognizer3dResize', 'scale': (-1, 256)},
+            {'type': 'ThreeCrop', 'crop_size': 256},
+            {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_bgr': False},
+            {'type': 'FormatShape', 'input_format': 'NCTHW'},
+            {'type': 'Collect', 'keys': ['imgs', 'label']},
+            {'type': 'ToTensor', 'keys': ['imgs', 'label']}
+        ]
+    }
+    eval_dataset = build_dataset(eval_dataset_cfg)
+    eval_dataloader_cfg = {
+        'dataset': eval_dataset,
+        'batch_size': 1,
+        'shuffle': False,
+        'num_workers': args.num_workers,
+        'pin_memory': True,
+        'drop_last': False,
+        'collate_fn': train_dataset.custom_collate_fn
+    }
+    eval_dataloader = DataLoader(**eval_dataloader_cfg)
     if args.eval_annotation != 'none':
         pass
     if args.fp16:

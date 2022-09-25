@@ -49,7 +49,7 @@ test_pipeline = [
         type='SampleFrames',
         clip_len=32,
         frame_interval=2,
-        num_clips=10,
+        num_clips=2,
         test_mode=True),
     dict(type='PyAVDecode'),
     dict(type='Resize', scale=(-1, 256)),

@@ -8,13 +8,14 @@ class Compose:
     def __init__(self, pipelines_cfg):
         from .pipeline import LoadInfoFromAnno, Resize, ResizeAndAugmentation, Mosaic, Collect
         from .pipeline_recognizer3d import PyAVInit, SampleFrames, PyAVDecode, MultiScaleCrop, Flip, Normalize
-        from .pipeline_recognizer3d import FormatShape, ToTensor
+        from .pipeline_recognizer3d import FormatShape, ToTensor, ThreeCrop
         from .pipeline_recognizer3d import Resize as Recognizer3dResize
         support_pipeline = {
             'LoadInfoFromAnno': LoadInfoFromAnno, 'Resize': Resize, 'ResizeAndAugmentation': ResizeAndAugmentation,
             'Mosaic': Mosaic, 'Collect': Collect, 'PyAVInit': PyAVInit, 'SampleFrames': SampleFrames,
             'PyAVDecode': PyAVDecode, 'MultiScaleCrop': MultiScaleCrop, 'Flip': Flip, 'Normalize': Normalize,
-            'FormatShape': FormatShape, 'ToTensor': ToTensor, 'Recognizer3dResize': Recognizer3dResize
+            'FormatShape': FormatShape, 'ToTensor': ToTensor, 'Recognizer3dResize': Recognizer3dResize,
+            'ThreeCrop': ThreeCrop
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:

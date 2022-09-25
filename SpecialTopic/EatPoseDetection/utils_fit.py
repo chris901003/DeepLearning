@@ -12,6 +12,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, eval_datalo
                   save_dir, eval_period):
     loss = 0
     total_acc = 0
+    total_topk_acc = 0
     print('Start Train')
     pbar = tqdm(total=len(train_dataloader), desc=f'Epoch {epoch + 1}/{Epoch}', postfix=dict, miniters=0.3)
     model = model.train()
@@ -25,6 +26,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, eval_datalo
             outputs = model(imgs, labels)
             loss_value = outputs['loss']
             acc = outputs['acc']
+            topk_acc = outputs['topk_acc']
             loss_value.backward()
             optimizer.step()
         else:
@@ -33,14 +35,17 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, eval_datalo
                 outputs = model(imgs, labels)
             loss_value = outputs['loss']
             acc = outputs['acc']
+            topk_acc = outputs['topk_acc']
             scaler.scale(loss_value).backward()
             scaler.step(optimizer)
             scaler.update()
         loss += loss_value.item()
         total_acc += acc.item()
+        total_topk_acc += topk_acc.item()
         pbar.set_postfix(**{
             'loss': loss / (iteration + 1),
             'acc': total_acc / (iteration + 1),
+            'top5 acc': total_topk_acc / (iteration + 1),
             'lr': get_lr(optimizer)
         })
         pbar.update(1)
@@ -60,6 +65,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, eval_datalo
         return
     eval_loss = 0
     eval_total_acc = 0
+    eval_total_topk_acc = 0
     print('Start Validation')
     pbar = tqdm(total=len(eval_dataloader), desc=f'Epoch {epoch + 1}/{Epoch}', postfix=dict, miniters=0.3)
     model = model.eval()
@@ -68,14 +74,17 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, eval_datalo
         with torch.no_grad():
             imgs = imgs.to(device)
             labels = labels.to(device)
-            outputs = model(imgs, labels)
+            outputs = model(imgs, labels, mode='val')
             loss_value = outputs['loss']
             acc = outputs['acc']
+            topk_acc = outputs['topk_acc']
             eval_loss += loss_value.item()
             eval_total_acc += acc.item()
+            eval_total_topk_acc += topk_acc.item()
         pbar.set_postfix(**{
             'loss': eval_loss / (iteration + 1),
-            'acc': eval_total_acc / (iteration + 1)
+            'acc': eval_total_acc / (iteration + 1),
+            'top5 acc': eval_total_topk_acc / (iteration + 1),
         })
         pbar.update(1)
     pbar.clear()
