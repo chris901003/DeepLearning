@@ -61,3 +61,6 @@
 
 #### CombineFoodDatasetPicture
 使用食物分類資料集，進行標註圖像後直接將多張圖像進行拼貼，最後獲取目標檢測資料集
+
+#### EatPoseDetection
+檢測吃飯動作
