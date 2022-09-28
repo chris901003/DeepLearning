@@ -16,7 +16,7 @@ def parse_args():
     # 模型大小，注意這裡要與預訓練權重匹配
     parser.add_argument('--phi', type=str, default='l')
     # 類別資訊
-    parser.add_argument('--classes-path', type=str, default='/Users/huanghongyan/Downloads/food_data_flag/classes.txt')
+    parser.add_argument('--classes-path', type=str, default='/Users/huanghongyan/Downloads/data_annotation/classes.txt')
     # 要預測的圖像路徑
     parser.add_argument('--image-path', type=str, default='/Users/huanghongyan/Downloads/food_data_flag/imgs/0.jpeg')
     # 最終輸入到網路的圖像大小，不是給的圖像大小
@@ -49,6 +49,8 @@ def main():
     print(f'Load weights {args.models_path}')
     model_dict = model.state_dict()
     pretrained_dict = torch.load(args.models_path, map_location=device)
+    if 'model_weight' in pretrained_dict.keys():
+        pretrained_dict = pretrained_dict['model_weight']
     load_key, no_load_key, temp_dict = [], [], {}
     for k, v in pretrained_dict.items():
         if k in model_dict.keys() and np.shape(model_dict[k]) == np.shape(v):
@@ -58,6 +60,7 @@ def main():
             no_load_key.append(k)
     model_dict.update(temp_dict)
     model.load_state_dict(model_dict)
+    model = model.to(device)
     print("\nSuccessful Load Key:", str(load_key)[:500], "……\nSuccessful Load Key Num:", len(load_key))
     print("\nFail To Load Key:", str(no_load_key)[:500], "……\nFail To Load Key num:", len(no_load_key))
     assert len(no_load_key) == 0, '給定的預訓練權重與模型不匹配'

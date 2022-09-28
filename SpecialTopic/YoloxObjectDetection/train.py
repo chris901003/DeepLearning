@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
     # 預訓練權重位置，如果沒有要使用就填 'none'
-    parser.add_argument('--models-path', type=str, default='/Users/huanghongyan/Downloads/best_weight.pth')
+    parser.add_argument('--models-path', type=str, default='/Users/huanghongyan/Downloads/yolox_l.pth')
     # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
     # 一個batch大小
@@ -54,6 +54,14 @@ def parse_args():
     # 保存資料以及訓練流程相關設定
     # 多少Epoch會強制保存模型權重
     parser.add_argument('--save-period', type=int, default=10)
+    # 是否保存最佳訓練損失
+    parser.add_argument('--best-train-loss', action='store_false')
+    # 是否保存最佳驗證損失
+    parser.add_argument('--best-val-loss', action='store_false')
+    # 是否保存最佳mAP值
+    parser.add_argument('--best-mAP', action='store_false')
+    # 是否需要保存優化器
+    parser.add_argument('--save-optimizer', action='store_true')
     # 保存位置
     parser.add_argument('--save-dir', type=str, default='./checkpoints')
     # 多少個Epoch會進行mAP計算
@@ -100,11 +108,16 @@ def main():
     }
     model = build_detector(model_cfg)
     weights_init_yolox(model)
+    optimizer_weight = None
     if args.models_path != 'none':
         if local_rank == 0:
             print(f'Load weights {args.models_path}')
         model_dict = model.state_dict()
         pretrained_dict = torch.load(args.models_path, map_location=device)
+        if 'model_weight' in pretrained_dict:
+            optimizer_weight = pretrained_dict['optimizer_weight']
+            args.Init_Epoch = pretrained_dict['Epoch']
+            pretrained_dict = pretrained_dict['model_weight']
         load_key, no_load_key, temp_dict = [], [], {}
         for k, v in pretrained_dict.items():
             if k in model_dict.keys() and np.shape(model_dict[k]) == np.shape(v):
@@ -168,6 +181,9 @@ def main():
     }[args.optimizer_type]
     optimizer.add_param_group({"params": pg1, "weight_decay": args.weight_decay})
     optimizer.add_param_group({"params": pg2})
+    if optimizer_weight is not None:
+        print('加載優化器權重')
+        optimizer.load_state_dict(optimizer_weight)
     lr_scheduler_func = get_lr_scheduler_yolox(args.lr_decay_type, Init_lr_fit, Min_lr_fit, args.UnFreeze_Epoch)
     assert os.path.isfile(args.train_annotation_path), '需提供標註文件'
     if args.val_annotation_path == 'none':
@@ -224,6 +240,11 @@ def main():
         'collate_fn': val_dataset.custom_collate_fn_val
     }
     val_dataloader = DataLoader(**val_dataloader_cfg)
+    training_state = dict(train_loss=10000, val_loss=10000, mAP=0)
+    best_train_loss = args.best_train_loss
+    best_val_loss = args.best_val_loss
+    best_mAP = args.best_mAP
+    save_optimizer = args.save_optimizer
     for epoch in range(args.Init_Epoch, args.UnFreeze_Epoch):
         if epoch > args.Freeze_Epoch and not UnFreeze_flag and args.Freeze_Train:
             batch_size = Unfreeze_batch_size
@@ -248,7 +269,8 @@ def main():
         set_optimizer_lr_yolox(optimizer, lr_scheduler_func, epoch)
         fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, epoch_step_val, train_dataloader,
                       val_dataloader, args.UnFreeze_Epoch, args.Cuda, args.fp16, scaler, args.save_period,
-                      args.save_dir, num_classes, local_rank, args.eval_period, args.coco_json_file)
+                      args.save_dir, num_classes, local_rank, args.eval_period, args.coco_json_file,
+                      training_state, best_train_loss, best_val_loss, best_mAP, save_optimizer)
 
 
 if __name__ == '__main__':
