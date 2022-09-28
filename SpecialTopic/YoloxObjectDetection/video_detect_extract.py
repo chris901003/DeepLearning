@@ -1,7 +1,6 @@
 import cv2
 from PIL import Image
 import shutil
-import copy
 import torch
 import os
 import argparse
