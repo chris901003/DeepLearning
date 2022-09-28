@@ -82,6 +82,7 @@ def parse_args():
     parser.add_argument('--input-shape', default=[640, 640], nargs='+', type=int)
     # 是否使用mosaic數據增強
     parser.add_argument('--mosaic', action='store_false')
+    # 將數據進打包
     args = parser.parse_args()
     return args
 
