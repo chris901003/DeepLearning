@@ -17,18 +17,17 @@ def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
     # 預訓練權重位置，如果沒有要使用就填 'none'
-    parser.add_argument('--models-path', type=str, default='/Users/huanghongyan/Downloads/yolox_l.pth')
+    parser.add_argument('--models-path', type=str, default=r'C:\Checkpoint\YoloxPretrained\yolox_l.pth')
     # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
     # 一個batch大小
     parser.add_argument('--batch-size', type=int, default=2)
     # 類別文件
-    parser.add_argument('--classes-path', default='/Users/huanghongyan/Downloads/food_data_flag/classes.txt', type=str)
+    parser.add_argument('--classes-path', default=r'C:\Dataset\FoodDetectionDataset\classes.txt', type=str)
     # 訓練標註文件
-    parser.add_argument('--train-annotation-path', default='/Users/huanghongyan/Downloads/food_data_flag/'
-                                                           '2012_train.txt', type=str)
+    parser.add_argument('--train-annotation-path', default=r'C:\Dataset\FoodDetectionDataset\2012_train.txt', type=str)
     # 驗證標註文件
-    parser.add_argument('--val-annotation-path', default='/Users/huanghongyan/Downloads/food_data_flag/2012_train.txt',
+    parser.add_argument('--val-annotation-path', default=r'C:\Dataset\FoodDetectionDataset\2012_val.txt',
                         type=str)
     # 是否使用雙精度模式，只有gpu模式下才會有效果
     parser.add_argument('--fp16', action='store_true')
@@ -69,7 +68,7 @@ def parse_args():
     parser.add_argument('--eval-period', type=int, default=1)
     # mAP計算需使用的coco文件
     parser.add_argument('--coco-json-file', type=str,
-                        default='/Users/huanghongyan/Downloads/food_data_flag/val2017.json')
+                        default=r'C:\Dataset\FoodDetectionDataset\2012_train.txt\val2017.json')
     # DataLoader使用的cpu數量
     parser.add_argument('--num-workers', type=int, default=1)
 
