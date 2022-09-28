@@ -11,23 +11,23 @@ from SpecialTopic.ST.build import build_detector, build_dataset
 def args_parser():
     parser = argparse.ArgumentParser('Detect eating pose')
     # 模型預訓練權重資料
-    parser.add_argument('--models-path', type=str, default='none')
+    parser.add_argument('--models-path', type=str, default=r'C:\Checkpoint\Kinetics400\10_1.94.pth')
     # 訓練資料標註文件
-    parser.add_argument('--train-annotation', type=str, default='/Users/huanghongyan/Documents/DeepLearning/mmaction2/'
-                                                                'data/kinetics400/kinetics400_train_list_videos.txt')
+    parser.add_argument('--train-annotation', type=str, default=r'C:\Dataset\kinetics400\kinetics400_train_'
+                                                                r'list_videos.txt')
     # 驗證資料標註文件
-    parser.add_argument('--eval-annotation', type=str, default='/Users/huanghongyan/Documents/DeepLearning/mmaction2/'
-                                                                'data/kinetics400/kinetics400_val_list_videos.txt')
+    parser.add_argument('--eval-annotation', type=str, default=r'C:\Dataset\kinetics400\kinetics400_val_'
+                                                               r'list_videos.txt')
     # 分類類別數
     parser.add_argument('--num-classes', type=int, default=400)
     # 一個batch的大小，如果gpu的ram爆開請將此條小
-    parser.add_argument('--batch-size', type=int, default=2)
+    parser.add_argument('--batch-size', type=int, default=4)
     # 最大學習率
     parser.add_argument('--Init-lr', type=float, default=1e-2)
     # 總訓練次數
     parser.add_argument('--epoch', type=int, default=300)
     # 多少個Epoch後會保存權重資料
-    parser.add_argument('--save-period', type=int, default=1)
+    parser.add_argument('--save-period', type=int, default=10)
     # 保存權重路徑
     parser.add_argument('--save-dir', type=str, default='./checkpoint')
     # 多少次訓練epoch後進行驗證
@@ -46,13 +46,14 @@ def args_parser():
 
 def main():
     args = args_parser()
+    args.fp16 = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model_cfg = {
         'type': 'Recognizer3D',
         'backbone': {
             'type': 'ResNet3d',
             'pretrained2d': True,
-            'pretrained': '/Users/huanghongyan/.cache/torch/hub/checkpoints/resnet50-0676ba61.pth',
+            'pretrained': r'C:\Checkpoint\Resnet\resnet50-0676ba61.pth',
             'depth': 50,
             'conv1_kernel': (5, 7, 7),
             'conv1_stride_t': 2,
@@ -76,10 +77,11 @@ def main():
         }
     }
     model = build_detector(model_cfg)
+    model = model.to(device)
     train_dataset_cfg = {
         'type': 'VideoDataset',
         'ann_file': args.train_annotation,
-        'data_prefix': '/Users/huanghongyan/Documents/DeepLearning/mmaction2/data/kinetics400/videos_train',
+        'data_prefix': r'C:\Dataset\kinetics400\videos_train',
         'pipeline': [
             {'type': 'PyAVInit'},
             {'type': 'SampleFrames', 'clip_len': 32, 'frame_interval': 2, 'num_clips': 1},
@@ -109,7 +111,7 @@ def main():
     eval_dataset_cfg = {
         'type': 'VideoDataset',
         'ann_file': args.eval_annotation,
-        'data_prefix': '/Users/huanghongyan/Documents/DeepLearning/mmaction2/data/kinetics400/videos_val',
+        'data_prefix': r'C:\Dataset\kinetics400\videos_val',
         'pipeline': [
             {'type': 'PyAVInit'},
             {'type': 'SampleFrames', 'clip_len': 32, 'frame_interval': 2, 'num_clips': 2, 'test_mode': True},
