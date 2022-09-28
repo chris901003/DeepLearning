@@ -48,8 +48,9 @@ class I3DHead(nn.Module):
         loss_dict = dict()
         losses = self.loss_cls(cls_score, labels)
         loss_dict['loss'] = losses
+        num_classes = cls_score.size(1)
         predict = cls_score.argmax(dim=1)
-        predict_score, predict_idx = torch.topk(cls_score, k=5, dim=1)
+        predict_score, predict_idx = torch.topk(cls_score, k=min(num_classes, 5), dim=1)
         labels = labels.view(-1, 1)
         topk = (labels == predict_idx).sum()
         topk_acc = topk / labels.size(0)
