@@ -14,13 +14,13 @@ from utils import get_classes
 def parse_args():
     parser = argparse.ArgumentParser('Extract object from video')
     # 預訓練權重位置
-    parser.add_argument('--models-path', type=str, default='/Users/huanghongyan/Downloads/best_weight.pth')
+    parser.add_argument('--models-path', type=str, default=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth')
     # 模型大小，注意這裡要與預訓練權重匹配
     parser.add_argument('--phi', type=str, default='l')
     # 類別資訊
-    parser.add_argument('--classes-path', type=str, default='/Users/huanghongyan/Downloads/data_annotation/classes.txt')
+    parser.add_argument('--classes-path', type=str, default=r'C:\Dataset\FoodDetectionDataset\classes.txt')
     # 要預測的圖像路徑
-    parser.add_argument('--video-path', type=str, default='/Users/huanghongyan/Downloads/test.mp4')
+    parser.add_argument('--video-path', type=str, default=r'C:\Dataset\FoodDetectionDataset\real_movie1.MOV')
     # 最終輸入到網路的圖像大小，不是給的圖像大小
     parser.add_argument('--input-shape', type=int, default=[640, 640], nargs='+')
     # 開啟後會對整段影片進行預測
@@ -32,11 +32,15 @@ def parse_args():
     # 間隔多少幀預測一次
     parser.add_argument('--frame-interval', type=int, default=150)
     # 擷取出的圖像檔案路徑
-    parser.add_argument('--save_path', type=str, default='./save')
+    parser.add_argument('--save_path', type=str, default=r'C:\DeepLearning\SpecialTopic\YoloxObjectDetection\save')
     # 置信度閾值
     parser.add_argument('--confidence', type=float, default=0.5)
     # nms處理閾值
     parser.add_argument('--nms-iou', type=float, default=0.3)
+    # 最小標註框寬度
+    parser.add_argument('--min-bbox-width', type=float, default=5)
+    # 最小標註框高度
+    parser.add_argument('--min-bbox-height', type=float, default=5)
     args = parser.parse_args()
     return args
 
@@ -45,7 +49,7 @@ def main():
     args = parse_args()
     hole_video = args.hole_video
     extract_picture = args.extract_picture
-    extract_labelImg = args.extract_labelImg
+    extract_labelimg = args.extract_labelImg
     video_write = None
     if hole_video:
         print('將會對整段影片進行預測，最終影片結果會輸出到指定資料夾當中')
@@ -57,6 +61,12 @@ def main():
     if os.path.exists(args.save_path):
         shutil.rmtree(args.save_path)
     os.mkdir(args.save_path)
+    if extract_labelimg:
+        os.mkdir(os.path.join(args.save_path, 'full_picture'))
+        os.mkdir(os.path.join(args.save_path, 'full_picture', 'imgs'))
+        os.mkdir(os.path.join(args.save_path, 'full_picture', 'annotations'))
+        shutil.copy(args.classes_path, os.path.join(args.save_path, 'full_picture', 'annotations'))
+        shutil.copy(args.classes_path, os.path.join(args.save_path, 'full_picture'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     class_names, num_classes = get_classes(args.classes_path)
     for i in range(num_classes):
@@ -124,17 +134,21 @@ def main():
                             1, (89, 214, 210), 2, cv2.LINE_AA)
             video_write.write(image)
 
-        if (extract_picture or extract_labelImg) and (idx % args.frame_interval == 0):
+        if (extract_picture or extract_labelimg) and (idx % args.frame_interval == 0):
             if results is None:
                 results = detect_image(model, device, img, args.input_shape, num_classes,
                                        confidence=args.confidence, nms_iou=args.nms_iou)
             labels, scores, bboxes = results
+            labelimg_info = list()
             for label, bbox, score in zip(labels, bboxes, scores):
                 ymin, xmin, ymax, xmax = bbox
                 ymin = int(max(0, ymin))
                 xmin = int(max(0, xmin))
                 ymax = int(min(height, ymax))
                 xmax = int(min(width, xmax))
+                # 過濾過小標註框
+                if (xmax - xmin < args.min_bbox_width) or (ymax - ymin < args.min_bbox_height):
+                    continue
                 if extract_picture:
                     target = img[ymin:ymax + 1, xmin:xmax + 1, :]
                     target = target.astype(np.uint8)
@@ -143,11 +157,28 @@ def main():
                     target = Image.fromarray(cv2.cvtColor(target, cv2.COLOR_BGR2RGB))
                     target.save(target_folder)
                     total_picture += 1
+                if extract_labelimg:
+                    # 將單張圖像標註資訊寫成labelImg格式方便進行微調，或是添加預測框
+                    center_x = (xmin + xmax) / 2 / width
+                    center_y = (ymin + ymax) / 2 / height
+                    w = (xmax - xmin) / width
+                    h = (ymax - ymin) / height
+                    info_res = str(label) + ' ' + str(center_x) + ' ' + str(center_y) + ' ' + str(w) + ' ' + str(h)
+                    labelimg_info.append(info_res)
                 cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 10)
                 result_str = str(class_names[int(label)]) + '|' + str(round(score * 100, 2))
                 cv2.putText(image, result_str, (xmin + 50, ymin + 70),
                             cv2.FONT_HERSHEY_TRIPLEX, 2, (246, 152, 40), 5, cv2.LINE_AA)
             cv2.imshow('current', image)
+            if extract_labelimg:
+                save_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                image_path = os.path.join(args.save_path, 'full_picture', 'imgs', f'{idx}.jpg')
+                save_image.save(image_path)
+                annotation_path = os.path.join(args.save_path, 'full_picture', 'annotations', f'{idx}.txt')
+                with open(annotation_path, 'w') as f:
+                    for info in labelimg_info:
+                        f.write(info)
+                        f.write('\n')
         idx += 1
         print(idx)
         if cv2.waitKey(1) & 0xFF == ord('q'):
