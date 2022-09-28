@@ -5,6 +5,7 @@ import time
 import numpy as np
 from collections import deque
 from threading import Thread
+from operator import itemgetter
 from api import init_recognizer
 from SpecialTopic.ST.dataset.utils import Compose
 
@@ -24,9 +25,8 @@ EXCLUDE_STEPS = [
 
 def parse_args():
     parser = argparse.ArgumentParser('Camera Detection')
-    parser.add_argument('--checkpoint', type=str, default='none')
-    parser.add_argument('--label', type=str, default='/Users/huanghongyan/Documents/DeepLearning/mmaction2/data/'
-                                                     'kinetics400/label_map_k400.txt')
+    parser.add_argument('--checkpoint', type=str, default=r'C:\Checkpoint\Kinetics400\10_1.94.pth')
+    parser.add_argument('--label', type=str, default=r'C:\Dataset\kinetics400\label_map_k400.txt')
     parser.add_argument('--camera-id', type=int, default=0)
     parser.add_argument('--threshold', type=float, default=0.01)
     parser.add_argument('--average-size', type=int, default=1)
@@ -74,12 +74,19 @@ def show_results(result_queue, threshold, frame):
 
 
 def collate(batch):
-    print('f')
+    imgs, labels = list(), list()
+    for info in batch:
+        imgs.append(info['imgs'])
+        labels.append(info['label'])
+    imgs = torch.stack(imgs)
+    labels = torch.stack(labels)
+    return imgs, labels
 
 
-def inference(frame_queue, sample_length, data, test_pipeline, device):
+def inference(frame_queue, sample_length, data, test_pipeline, device, model, average_size, label, result_queue,
+              inference_fps):
     score_cache = deque()
-    score_sum = 0
+    scores_sum = 0
     cur_time = time.time()
     while True:
         cur_window = list()
@@ -91,8 +98,26 @@ def inference(frame_queue, sample_length, data, test_pipeline, device):
         cur_data = data.copy()
         cur_data['imgs'] = cur_window
         cur_data = test_pipeline(cur_data)
-        cur_data = collate(cur_data)
-        print('f')
+        cur_data = collate([cur_data])
+        imgs, labels = cur_data
+        imgs, labels = imgs.to(device), labels.to(device)
+        with torch.no_grad():
+            scores = model(imgs, labels, mode='test').cpu().numpy()[0]
+        score_cache.append(scores)
+        scores_sum += scores
+        if len(score_cache) == average_size:
+            scores_avg = scores_sum / average_size
+            num_selected_labels = min(len(label), 5)
+            scores_tuples = tuple(zip(label, scores_avg))
+            scores_sorted = sorted(scores_tuples, key=itemgetter(1), reverse=True)
+            results = scores_sorted[:num_selected_labels]
+            result_queue.append(results)
+            scores_sum -= score_cache.popleft()
+        if inference_fps > 0:
+            sleep_time = 1 / inference_fps - (time.time() - cur_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            cur_time = time.time()
 
 
 def main():
@@ -122,8 +147,9 @@ def main():
     frame_queue = deque(maxlen=sample_length)
     result_queue = deque(maxlen=1)
     show_cur_time = time.time()
-    # pr = Thread(target=inference, args=(frame_queue, sample_length, data, test_pipeline, device), daemon=True)
-    # pr.start()
+    pr = Thread(target=inference, args=(frame_queue, sample_length, data, test_pipeline, device, model, average_size,
+                                        label, result_queue, inference_fps), daemon=True)
+    pr.start()
     while True:
         _, frame = camera.read()
         frame_queue.append(np.array(frame[:, :, ::-1]))
@@ -137,13 +163,12 @@ def main():
             out_frame = show_results(result_queue, threshold, frame)
             show_cur_time = time.time()
             cv2.imshow('camera', out_frame)
-        inference(frame_queue, sample_length, data, test_pipeline, device)
         ch = cv2.waitKey(1)
         if ch == 27 or ch == ord('q') or ch == ord('Q'):
             break
     camera.release()
     cv2.destroyAllWindows()
-    # pr.join()
+    pr.join()
 
 
 if __name__ == '__main__':

@@ -53,7 +53,7 @@ class I3DHead(nn.Module):
         labels = labels.view(-1, 1)
         topk = (labels == predict_idx).sum()
         topk_acc = topk / labels.size(0)
-        acc = torch.eq(predict, labels).sum() / labels.size(0)
+        acc = torch.eq(predict, labels.squeeze(dim=-1)).sum() / labels.size(0)
         loss_dict['acc'] = acc
         loss_dict['topk_acc'] = topk_acc
         return loss_dict
