@@ -11,15 +11,17 @@ from SpecialTopic.ST.build import build_detector, build_dataset
 def args_parser():
     parser = argparse.ArgumentParser('Detect eating pose')
     # 模型預訓練權重資料
-    parser.add_argument('--models-path', type=str, default=r'C:\Checkpoint\Kinetics400\10_1.94.pth')
+    parser.add_argument('--models-path', type=str, default='none')
     # 訓練資料標註文件
-    parser.add_argument('--train-annotation', type=str, default=r'C:\Dataset\kinetics400\kinetics400_train_'
-                                                                r'list_videos.txt')
+    parser.add_argument('--train-annotation', type=str, default='./data/train_annotations.txt')
     # 驗證資料標註文件
-    parser.add_argument('--eval-annotation', type=str, default=r'C:\Dataset\kinetics400\kinetics400_val_'
-                                                               r'list_videos.txt')
+    parser.add_argument('--eval-annotation', type=str, default='./data/val_annotations.txt')
     # 分類類別數
     parser.add_argument('--num-classes', type=int, default=400)
+    # 圖像資料root路徑，協助在構建標註文件時使用相對路徑
+    parser.add_argument('--data-prefix', type=str, default='')
+    # 骨幹預訓練權重，通常使用torchvision的resnet作為預訓練權重
+    parser.add_argument('--pretrained2d-path', type=str, default='')
     # 一個batch的大小，如果gpu的ram爆開請將此條小
     parser.add_argument('--batch-size', type=int, default=4)
     # 最大學習率
@@ -52,8 +54,8 @@ def main():
         'type': 'Recognizer3D',
         'backbone': {
             'type': 'ResNet3d',
-            'pretrained2d': True,
-            'pretrained': r'C:\Checkpoint\Resnet\resnet50-0676ba61.pth',
+            'pretrained2d': True if args.pretrained2d_path != 'none' else False,
+            'pretrained': args.pretrained2d_path,
             'depth': 50,
             'conv1_kernel': (5, 7, 7),
             'conv1_stride_t': 2,
@@ -81,7 +83,7 @@ def main():
     train_dataset_cfg = {
         'type': 'VideoDataset',
         'ann_file': args.train_annotation,
-        'data_prefix': r'C:\Dataset\kinetics400\videos_train',
+        'data_prefix': args.data_prefix,
         'pipeline': [
             {'type': 'PyAVInit'},
             {'type': 'SampleFrames', 'clip_len': 32, 'frame_interval': 2, 'num_clips': 1},
@@ -111,7 +113,7 @@ def main():
     eval_dataset_cfg = {
         'type': 'VideoDataset',
         'ann_file': args.eval_annotation,
-        'data_prefix': r'C:\Dataset\kinetics400\videos_val',
+        'data_prefix': args.data_prefix,
         'pipeline': [
             {'type': 'PyAVInit'},
             {'type': 'SampleFrames', 'clip_len': 32, 'frame_interval': 2, 'num_clips': 2, 'test_mode': True},
@@ -131,7 +133,7 @@ def main():
         'shuffle': False,
         'num_workers': args.num_workers,
         'pin_memory': True,
-        'drop_last': False,
+        'drop_last': True if args.batch_size == 2 else False,
         'collate_fn': train_dataset.custom_collate_fn
     }
     eval_dataloader = DataLoader(**eval_dataloader_cfg)
