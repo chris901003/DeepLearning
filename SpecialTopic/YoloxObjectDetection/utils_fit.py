@@ -106,11 +106,11 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
         if eval_loss > (val_loss / len(gen_val)):
             training_state['val_loss'] = val_loss / len(gen_val)
             if save_optimizer:
-                save = dict(model_weight=model_train_eval.state_dict(), optimizer_weight=optimizer.state_dict(),
+                save = dict(model_weight=model.state_dict(), optimizer_weight=optimizer.state_dict(),
                             Epoch=epoch + 1)
                 torch.save(save, os.path.join(save_dir, f'yolox_best_val_loss.pth'))
             else:
-                torch.save(model_train_eval.state_dict(), os.path.join(save_dir, f'yolox_best_val_loss.pth'))
+                torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_val_loss.pth'))
 
     if local_rank == 0:
         pbar.clear()
@@ -162,11 +162,11 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
             if mAP > training_state['mAP']:
                 training_state['mAP'] = mAP
                 if save_optimizer:
-                    save = dict(model_weight=model_train_eval.state_dict(), optimizer_weight=optimizer.state_dict(),
+                    save = dict(model_weight=model.state_dict(), optimizer_weight=optimizer.state_dict(),
                                 Epoch=epoch + 1)
                     torch.save(save, os.path.join(save_dir, f'yolox_best_mAP.pth'))
                 else:
-                    torch.save(model_train_eval.state_dict(), os.path.join(save_dir, f'yolox_best_mAP.pth'))
+                    torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_mAP.pth'))
 
     if (epoch + 1) % save_period == 0:
         if not os.path.exists(save_dir):

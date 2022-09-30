@@ -30,6 +30,7 @@ class YoloDataset(Dataset):
             assert len(image) == 1, '圖像資料錯誤'
             image = image[0]
         box = data['bboxes']
+        box = [bx if bx.ndim == 2 else np.ndarray((0, 5)) for bx in box]
         image = np.transpose(preprocess_input(np.array(image, dtype=np.float32)), (2, 0, 1))
         if isinstance(box, list):
             box = np.concatenate(box, axis=0)
