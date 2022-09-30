@@ -10,11 +10,13 @@ from shutil import copyfile
 def parse_args():
     parser = argparse.ArgumentParser('Generate Picture with gt boxes')
     # 圖像資料夾地址
-    parser.add_argument('--img', default='/Users/huanghongyan/Downloads/data_annotation/img', type=str)
+    parser.add_argument('--img', default='/Users/huanghongyan/Downloads/data_annotation/imgs', type=str)
     # 標註文件地址
-    parser.add_argument('--annotation', default='/Users/huanghongyan/Downloads/data_annotation/annotation', type=str)
+    parser.add_argument('--annotation', default='/Users/huanghongyan/Downloads/data_annotation/annotations', type=str)
     # 背景圖地止，如果使用none不指定就會隨機生成顏色作為背景
     parser.add_argument('--background', default='none', type=str)
+    # 如果有需要合成圖像且該圖像不帶有標註，創造負樣本使用
+    parser.add_argument('--img-without-annotation', default='none', type=str)
     # 存放位置，auto表示會在img資料夾下建立generate_img資料夾，並且會將圖像存放在該資料架下
     parser.add_argument('--save', default='auto', type=str)
     # 總共需要生產多少張圖像
@@ -67,6 +69,21 @@ def get_img_data(imgs_path, annotations_path):
             labels.append(label)
         del img
         data = dict(img_path=img_path, bboxes=bboxes, labels=labels)
+        result.append(data)
+    return result
+
+
+def get_negative_img(img_folder):
+    result = list()
+    support_image_format = ['.jpg', '.JPG', '.jpeg', '.JPEG']
+    for image_name in os.listdir(img_folder):
+        if os.path.splitext(image_name)[1] not in support_image_format:
+            continue
+        image_path = os.path.join(img_folder, image_name)
+        bboxes, labels = list(), list()
+        bboxes.append([-1, -1, -1, -1])
+        labels.append(-1)
+        data = dict(img_path=image_path, bboxes=bboxes, labels=labels)
         result.append(data)
     return result
 
@@ -174,6 +191,9 @@ def main():
     classes_txt = os.path.join(args.annotation, 'classes.txt')
     copyfile(classes_txt, os.path.join(annotation_save_path, 'classes.txt'))
     data_info = get_img_data(args.img, args.annotation)
+    if args.img_without_annotation != 'none':
+        negative_info = get_negative_img(args.img_without_annotation)
+        data_info.extend(negative_info)
     assert len(data_info) > 0, '沒有圖像資料可以使用'
 
     background = None
