@@ -1,12 +1,26 @@
 import os
 import cv2
 from tqdm import tqdm
+import argparse
+
+
+def parse_args():
+    parse = argparse.ArgumentParser('將labelImg檔案資料轉成yolox訓練時需要的標註檔')
+    # 圖像資料夾位置
+    parse.add_argument('--image-folder', type=str, default='./imgs')
+    # 標註文件資料夾位置
+    parse.add_argument('--anno-folder', type=str, default='./annotations')
+    # 標註檔保存位置
+    parse.add_argument('--save-path', type=str, default='./2012_train.txt')
+    args = parse.parse_args()
+    return args
 
 
 def main():
-    image_folder = '/Users/huanghongyan/Downloads/food_data_flag/imgs'
-    anno_folder = '/Users/huanghongyan/Downloads/food_data_flag/annotations'
-    save_path = '/Users/huanghongyan/Downloads/food_data_flag/2012_train.txt'
+    args = parse_args()
+    image_folder = args.image_folder
+    anno_folder = args.anno_folder
+    save_path = args.save_path
     support_image = ['.jpg', '.JPG', '.jpeg', '.JPEG']
     imgs_name = [img_name for img_name in os.listdir(image_folder) if os.path.splitext(img_name)[1] in support_image]
     annos_name = [anno_name for anno_name in os.listdir(anno_folder) if os.path.splitext(anno_name)[1] == '.txt']

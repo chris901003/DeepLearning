@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser('Transform labelImg yolo format to coco format')
-    parser.add_argument('--source', default='/Users/huanghongyan/Downloads/food_data_flag', type=str)
+    parser.add_argument('--source', default='./data', type=str)
     args = parser.parse_args()
     return args
 
