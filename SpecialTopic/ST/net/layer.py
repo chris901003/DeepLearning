@@ -196,3 +196,53 @@ class Bottleneck3d(nn.Module):
         out = out + identity
         out = self.relu(out)
         return out
+
+
+class BasicBlockResnet(nn.Module):
+    expansion = 1
+
+    def __init__(self, in_channel, out_channel, stride=1, downsample=None):
+        super(BasicBlockResnet, self).__init__()
+        self.layer1 = ConvModule(in_channel, out_channel, kernel_size=3, stride=stride, padding=1, bias=False,
+                                 conv_cfg=dict(type='Conv'), norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU'))
+        self.layer2 = ConvModule(out_channel, out_channel, kernel_size=3, stride=1, padding=1, bias=False,
+                                 conv_cfg=dict(type='Conv'), norm_cfg=dict(type='BN'), act_cfg=None)
+        self.downsample = downsample
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out += identity
+        out = self.relu(out)
+        return out
+
+
+class BottleneckResnet(nn.Module):
+    expansion = 4
+
+    def __init__(self, in_channel, out_channel, stride=1, downsample=None, groups=1, width_per_group=64):
+        super(BottleneckResnet, self).__init__()
+        width = int(out_channel * (width_per_group / 64.)) * groups
+        self.layer1 = ConvModule(in_channel, width, kernel_size=1, stride=1, bias=False,
+                                 conv_cfg=dict(type='Conv'), norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU'))
+        self.layer2 = ConvModule(width, width, kernel_size=3, stride=stride, padding=1, groups=groups, bias=False,
+                                 conv_cfg=dict(type='Conv'), norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU'))
+        self.layer3 = ConvModule(width, out_channel * self.expansion, kernel_size=1, stride=1, bias=False,
+                                 conv_cfg=dict(type='Conv'), norm_cfg=dict(type='BN'), act_cfg=None)
+        self.downsample = downsample
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out += identity
+        out = self.relu(out)
+        return out

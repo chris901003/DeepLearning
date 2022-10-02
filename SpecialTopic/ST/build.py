@@ -5,9 +5,11 @@ from torch import nn
 def build_detector(detector_cfg):
     from .net.yolox import YoloBody
     from .net.Recognizer3D import Recognizer3D
+    from .net.resnet import ResNet
     support_detector = {
         'YoloBody': YoloBody,
-        'Recognizer3D': Recognizer3D
+        'Recognizer3D': Recognizer3D,
+        'ResNet': ResNet
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
@@ -17,10 +19,12 @@ def build_detector(detector_cfg):
 def build_backbone(backbone_cfg):
     from .net.yolox import YOLOPAFPN
     from .net.backbone import CSPDarknet, ResNet3d
+    from .net.resnet import ResnetExtract
     support_backbone = {
         'YOLOPAFPN': YOLOPAFPN,
         'CSPDarknet': CSPDarknet,
-        'ResNet3d': ResNet3d
+        'ResNet3d': ResNet3d,
+        'ResnetExtract': ResnetExtract
     }
     backbone_cls = get_cls_from_dict(support_backbone, backbone_cfg)
     backbone = backbone_cls(**backbone_cfg)
@@ -30,9 +34,11 @@ def build_backbone(backbone_cfg):
 def build_head(head_cfg):
     from .net.yolox import YOLOXHead
     from .net.Recognizer3D import I3DHead
+    from .net.resnet import ResnetHead
     support_head = {
         'YOLOXHead': YOLOXHead,
-        'I3DHead': I3DHead
+        'I3DHead': I3DHead,
+        'ResnetHead': ResnetHead
     }
     head_cls = get_cls_from_dict(support_head, head_cfg)
     head = head_cls(**head_cfg)
@@ -105,10 +111,11 @@ def build_loss(loss_cfg):
 
 
 def build_dataset(dataset_cfg):
-    from .dataset.dataset import YoloDataset, VideoDataset
+    from .dataset.dataset import YoloDataset, VideoDataset, RemainingDataset
     support_dataset = {
         'YoloDataset': YoloDataset,
-        'VideoDataset': VideoDataset
+        'VideoDataset': VideoDataset,
+        'RemainingDataset': RemainingDataset
     }
     dataset_cls = get_cls_from_dict(support_dataset, dataset_cfg)
     dataset = dataset_cls(**dataset_cfg)
