@@ -12,7 +12,7 @@ from SpecialTopic.ST.build import build_detector, build_dataset
 def parse_args():
     parser = argparse.ArgumentParser('使用分類網路進行剩餘量判斷')
     # 選擇使用的模型主幹
-    parser.add_argument('--model-type', type=str, default='ResNet')
+    parser.add_argument('--model-type', type=str, default='VIT')
     # 使用的模型大小，這裡支援的尺寸會與使用的模型主幹有關
     parser.add_argument('--phi', type=str, default='m')
     # batch size，盡量調整到超過4，這樣BN層才不會出問題
@@ -34,6 +34,8 @@ def parse_args():
 
     # 起始Epoch數
     parser.add_argument('--Init-Epoch', type=int, default=0)
+    # 在多少個Epoch前會將骨幹凍結，這邊建議訓練VIT時可以進行凍結
+    parser.add_argument('--Freeze-Epoch', type=int, default=0)
     # 總共要訓練多少個Epoch
     parser.add_argument('--Total-Epoch', type=int, default=100)
     # 最大學習率
@@ -173,7 +175,16 @@ def main():
     save_optimizer = args.save_optimizer
     save_path = args.save_path
     weight_name = args.weight_name
+    Freeze = False
+    if args.Init_Epoch < args.Freeze_Epoch:
+        Freeze = True
+        for param in model.backbone.parameters():
+            param.requires_grad = False
     for epoch in range(args.Init_Epoch, args.Total_Epoch):
+        if Freeze and args.Freeze_Epoch >= epoch:
+            Freeze = False
+            for param in model.backbone.parameters():
+                param.requires_grad = True
         set_optimizer_lr_yolox(optimizer, lr_scheduler_func, epoch)
         fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloader, args.Total_Epoch, fp16, scaler,
                       args.save_period, save_path, training_state, best_train_loss, best_val_loss, save_optimizer,

@@ -6,10 +6,12 @@ def build_detector(detector_cfg):
     from .net.yolox import YoloBody
     from .net.Recognizer3D import Recognizer3D
     from .net.resnet import ResNet
+    from .net.VIT import VIT
     support_detector = {
         'YoloBody': YoloBody,
         'Recognizer3D': Recognizer3D,
-        'ResNet': ResNet
+        'ResNet': ResNet,
+        'VIT': VIT
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
@@ -20,11 +22,13 @@ def build_backbone(backbone_cfg):
     from .net.yolox import YOLOPAFPN
     from .net.backbone import CSPDarknet, ResNet3d
     from .net.resnet import ResnetExtract
+    from .net.VIT import VisionTransformer
     support_backbone = {
         'YOLOPAFPN': YOLOPAFPN,
         'CSPDarknet': CSPDarknet,
         'ResNet3d': ResNet3d,
-        'ResnetExtract': ResnetExtract
+        'ResnetExtract': ResnetExtract,
+        'VisionTransformer': VisionTransformer
     }
     backbone_cls = get_cls_from_dict(support_backbone, backbone_cfg)
     backbone = backbone_cls(**backbone_cfg)
@@ -35,10 +39,12 @@ def build_head(head_cfg):
     from .net.yolox import YOLOXHead
     from .net.Recognizer3D import I3DHead
     from .net.resnet import ResnetHead
+    from .net.VIT import VitHead
     support_head = {
         'YOLOXHead': YOLOXHead,
         'I3DHead': I3DHead,
-        'ResnetHead': ResnetHead
+        'ResnetHead': ResnetHead,
+        'VitHead': VitHead
     }
     head_cls = get_cls_from_dict(support_head, head_cfg)
     head = head_cls(**head_cfg)
@@ -59,7 +65,8 @@ def build_activation(act_cfg):
         'ReLU': nn.ReLU,
         'LeakyReLU': nn.LeakyReLU,
         'SELU': nn.SELU,
-        'Sigmoid': nn.Sigmoid
+        'Sigmoid': nn.Sigmoid,
+        'GELU': nn.GELU
     }
     act_cls = get_cls_from_dict(support_act, act_cfg_)
     act = act_cls(**act_cfg_)
@@ -89,7 +96,7 @@ def build_norm(norm_cfg, num_features, postfix=''):
         'LN': nn.LayerNorm
     }
     norm_cls = get_cls_from_dict(support_norm, norm_cfg_)
-    abbr = 'bn'
+    abbr = 'bn' if 'BN' in norm_cfg['type'] else 'ln'
     name = abbr + str(postfix)
     requires_grad = norm_cfg_.pop('requires_grad', True)
     norm_cfg_.setdefault('eps', 1e-5)

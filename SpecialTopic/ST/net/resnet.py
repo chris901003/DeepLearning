@@ -57,12 +57,13 @@ class ResnetHead(nn.Module):
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.loss = nn.CrossEntropyLoss()
 
-    def forward(self, x, labels, with_loss=True):
+    def forward(self, x, labels=None, with_loss=True):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
         if not with_loss:
             return x
+        assert labels is not None, '如果需要計算loss需要提供label'
         if labels.ndim == 2:
             labels = labels.squeeze(dim=-1)
         loss_dict = dict()
@@ -117,7 +118,7 @@ class ResNet(nn.Module):
             self.pretrained = pretrained
             self.init_weights()
 
-    def forward(self, imgs, labels, with_loss=True):
+    def forward(self, imgs, labels=None, with_loss=True):
         output = self.backbone(imgs)
         if self.with_cls_head:
             results = self.cls_head(output, labels, with_loss)
