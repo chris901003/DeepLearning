@@ -5,3 +5,10 @@ def get_cls_from_dict(support_cls, cfg):
         raise NotImplementedError(f'指定的 {cls_name} 模塊為實作，如果需要請自行添加')
     cls = support_cls[cls_name]
     return cls
+
+
+def get_classes(classes_path):
+    with open(classes_path) as f:
+        class_name = f.readlines()
+    class_names = [c.strip() for c in class_name]
+    return class_names, len(class_names)

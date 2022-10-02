@@ -121,3 +121,47 @@ class VideoDataset(Dataset):
         imgs = torch.stack(imgs)
         labels = torch.stack(labels)
         return imgs, labels
+
+
+class RemainingDataset(Dataset):
+    def __init__(self, annotation_file, data_prefix, pipeline_cfg):
+        self.annotation_file = annotation_file
+        self.data_prefix = data_prefix
+        self.pipeline_cfg = pipeline_cfg
+        self.data_info = self.load_annotation()
+        self.pipeline = Compose(pipeline_cfg)
+
+    def load_annotation(self):
+        results = list()
+        support_image_format = ['.jpg', '.JPG', '.jpeg', '.JPEG']
+        with open(self.annotation_file, 'r') as f:
+            annotations = f.readlines()
+        for annotation in annotations:
+            image_path, label = annotation.split(' ')
+            if self.data_prefix != '':
+                image_path = os.path.join(self.data_prefix, image_path)
+            if os.path.splitext(image_path)[1] not in support_image_format:
+                raise ValueError(f'{image_path} 圖像資料檔案格式不支援')
+            data = dict(image_path=image_path, label=int(label))
+            results.append(data)
+        return results
+
+    def __getitem__(self, index):
+        data = self.data_info[index]
+        data = self.pipeline(data)
+        return data
+
+    def __len__(self):
+        return len(self.data_info)
+
+    @staticmethod
+    def train_collate_fn(batch):
+        images, labels = list(), list()
+        for info in batch:
+            image = info['image']
+            image = image.transpose((2, 0, 1))
+            images.append(torch.from_numpy(image))
+            labels.append(torch.LongTensor([info['label']]))
+        images = torch.stack(images)
+        labels = torch.stack(labels)
+        return images, labels

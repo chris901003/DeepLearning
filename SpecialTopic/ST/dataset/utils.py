@@ -10,12 +10,14 @@ class Compose:
         from .pipeline_recognizer3d import PyAVInit, SampleFrames, PyAVDecode, MultiScaleCrop, Flip, Normalize
         from .pipeline_recognizer3d import FormatShape, ToTensor, ThreeCrop
         from .pipeline_recognizer3d import Resize as Recognizer3dResize
+        from .pipeline_classify import LoadRemainingAnnotation, ResizeSingle, NormalizeSingle
         support_pipeline = {
             'LoadInfoFromAnno': LoadInfoFromAnno, 'Resize': Resize, 'ResizeAndAugmentation': ResizeAndAugmentation,
             'Mosaic': Mosaic, 'Collect': Collect, 'PyAVInit': PyAVInit, 'SampleFrames': SampleFrames,
             'PyAVDecode': PyAVDecode, 'MultiScaleCrop': MultiScaleCrop, 'Flip': Flip, 'Normalize': Normalize,
             'FormatShape': FormatShape, 'ToTensor': ToTensor, 'Recognizer3dResize': Recognizer3dResize,
-            'ThreeCrop': ThreeCrop
+            'ThreeCrop': ThreeCrop, 'LoadRemainingAnnotation': LoadRemainingAnnotation, 'ResizeSingle': ResizeSingle,
+            'NormalizeSingle': NormalizeSingle
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:
