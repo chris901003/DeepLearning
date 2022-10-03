@@ -3,7 +3,7 @@ import time
 
 
 class Logger:
-    def __init__(self, logger_name='root', logger_root='./log_save', save_info=None):
+    def __init__(self, logger_name='root', logger_root='./log_save', save_info=None, email_sender=None, email_key=None):
         """ 對Logger進行初始化
         Args:
              logger_name: 紀錄器名稱，給紀錄器一個名稱比較知道是從哪裡寫出的資料
@@ -13,6 +13,8 @@ class Logger:
         self.logger_name = logger_name
         self.time_stamp = time.time()
         self.logger_root = logger_root
+        self.email_sender = email_sender
+        self.email_key = email_key
         if not os.path.exists(self.logger_root):
             os.mkdir(self.logger_root)
         if save_info is None:
@@ -128,14 +130,52 @@ class Logger:
                 f.write(res)
                 f.write(sep[1])
 
+    def send_email(self, subject, send_to, text_info=None, image_info=None):
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        import smtplib
+        assert self.email_sender is not None, '需要先指定用哪個帳號進行傳送'
+        assert self.email_key is not None, '需要提供傳送電子郵件的密碼'
+        assert text_info is not None or image_info is not None, '至少需要選擇文字或是圖像進行傳遞'
+        content = MIMEMultipart()
+        content['subject'] = subject
+        content['from'] = self.email_sender
+        content['to'] = send_to
+        if text_info is not None:
+            if os.path.isfile(text_info):
+                with open(text_info, 'r') as f:
+                    text_info = f.readlines()
+                text_info = ''.join(text_info)
+            content.attach(MIMEText(text_info))
+        if image_info is not None:
+            assert os.path.isfile(image_info), '只支援圖像檔案'
+            from email.mime.image import MIMEImage
+            from pathlib import Path
+            content.attach(MIMEImage(Path(image_info).read_bytes()))
+        with smtplib.SMTP(host='smtp.gmail.com', port=587) as smtp:
+            try:
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.login(self.email_sender, self.email_key)
+                smtp.send_message(content)
+                print(f'Send email to {send_to}')
+            except ValueError:
+                print('Email send fail')
+
 
 def test():
-    log = Logger(save_info=dict(x=list(), y=list(), z=list()))
+    # 這裡真的會從我的郵件發送出去，所以也不要玩太過分喔
+    log = Logger(save_info=dict(x=list(), y=list(), z=list()), email_sender='a0987999103@gmail.com',
+                 email_key='lvdcnoxprjblyndt')
     log.append_info('x', [1, 2, 3, 4, 5])
     log.append_info('y', [10, 20, 30, 40, 50])
     log.append_info('z', [1, 15, 28, 38, 55])
     log.draw_x_y(save_path='test.png', x=['x', 'x'], y=['y', 'z'], line_style=['-', '--'], color=[(1, 0, 0), (0, 1, 0)])
     log.save_to_file(save_path='test.txt', vars_name=['x', 'y'])
+    text_path = os.path.join(log.logger_root, 'test.txt')
+    image_path = os.path.join(log.logger_root, 'test.png')
+    log.send_email(subject='Testing', send_to='109project.deeplearning@gmail.com',
+                   text_info=text_path, image_info=image_path)
 
 
 if __name__ == '__main__':
