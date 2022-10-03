@@ -7,6 +7,7 @@ from utils import get_classes
 from SpecialTopic.ST.build import build_detector, build_loss, build_dataset
 from SpecialTopic.ST.net.weight_init import weights_init_yolox
 from SpecialTopic.ST.net.lr_scheduler import get_lr_scheduler_yolox, set_optimizer_lr_yolox
+from SpecialTopic.ST.utils import get_logger
 import numpy as np
 from torch.backends import cudnn
 from utils_fit import fit_one_epoch
@@ -17,17 +18,17 @@ def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
     # 預訓練權重位置，如果沒有要使用就填 'none'
-    parser.add_argument('--models-path', type=str, default=r'C:\Checkpoint\YoloxPretrained\yolox_l.pth')
+    parser.add_argument('--models-path', type=str, default='./pretrained.pth')
     # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
     # 一個batch大小
     parser.add_argument('--batch-size', type=int, default=2)
     # 類別文件
-    parser.add_argument('--classes-path', default=r'C:\Dataset\FoodDetectionDataset\classes.txt', type=str)
+    parser.add_argument('--classes-path', default='./classes.txt', type=str)
     # 訓練標註文件
-    parser.add_argument('--train-annotation-path', default=r'C:\Dataset\FoodDetectionDataset\2012_train.txt', type=str)
+    parser.add_argument('--train-annotation-path', default='./2012_train.txt', type=str)
     # 驗證標註文件
-    parser.add_argument('--val-annotation-path', default=r'C:\Dataset\FoodDetectionDataset\2012_val.txt',
+    parser.add_argument('--val-annotation-path', default='none',
                         type=str)
     # 是否使用雙精度模式，只有gpu模式下才會有效果
     parser.add_argument('--fp16', action='store_true')
@@ -67,8 +68,7 @@ def parse_args():
     # 多少個Epoch會進行mAP計算
     parser.add_argument('--eval-period', type=int, default=1)
     # mAP計算需使用的coco文件
-    parser.add_argument('--coco-json-file', type=str,
-                        default=r'C:\Dataset\FoodDetectionDataset\2012_train.txt\val2017.json')
+    parser.add_argument('--coco-json-file', type=str, default='./val2017.json')
     # DataLoader使用的cpu數量
     parser.add_argument('--num-workers', type=int, default=1)
 
@@ -82,6 +82,17 @@ def parse_args():
     parser.add_argument('--input-shape', default=[640, 640], nargs='+', type=int)
     # 是否使用mosaic數據增強
     parser.add_argument('--mosaic', action='store_false')
+
+    # 將訓練過程用郵件進行傳送
+    parser.add_argument('--send-email', action='store_false')
+    # 使用哪個電子郵件進行傳送
+    parser.add_argument('--email-sender', type=str, default='none')
+    # 該電子郵件傳送郵件時需要的鑰匙
+    parser.add_argument('--email-key', type=str, default='none')
+    # 要傳送到哪個對象，目前一但開始訓練就固定傳送對象，可以一次傳送給多人
+    parser.add_argument('--send-to', type=str, default=[], nargs='+')
+    # 多少個epoch會將結果傳遞
+    parser.add_argument('--save-log-period', type=int, default=10)
     # 將數據進打包(from chris)
     args = parser.parse_args()
     return args
@@ -189,7 +200,7 @@ def main():
     assert os.path.isfile(args.train_annotation_path), '需提供標註文件'
     if args.val_annotation_path == 'none':
         print('未指定驗證標註文件，這裡使用訓練文件作為代替')
-        args.val_annotation_path = args.train_annotation_val
+        args.val_annotation_path = args.train_annotation_path
     with open(args.train_annotation_path, encoding='utf-8') as f:
         train_lines = f.readlines()
     with open(args.val_annotation_path, encoding='utf-8') as f:
@@ -246,6 +257,13 @@ def main():
     best_val_loss = args.best_val_loss
     best_mAP = args.best_mAP
     save_optimizer = args.save_optimizer
+    save_info = {
+        'train_loss': list(), 'val_loss': list(), 'mAP': list()
+    }
+    if args.send_email:
+        logger = get_logger(save_info=save_info, email_sender=args.email_sender, email_key=args.email_key)
+    else:
+        logger = get_logger(save_info=save_info)
     for epoch in range(args.Init_Epoch, args.UnFreeze_Epoch):
         if epoch > args.Freeze_Epoch and not UnFreeze_flag and args.Freeze_Train:
             batch_size = Unfreeze_batch_size
@@ -271,7 +289,8 @@ def main():
         fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, epoch_step_val, train_dataloader,
                       val_dataloader, args.UnFreeze_Epoch, args.Cuda, args.fp16, scaler, args.save_period,
                       args.save_dir, num_classes, local_rank, args.eval_period, args.coco_json_file,
-                      training_state, best_train_loss, best_val_loss, best_mAP, save_optimizer)
+                      training_state, best_train_loss, best_val_loss, best_mAP, save_optimizer,
+                      logger, args.send_to, args.save_log_period)
 
 
 if __name__ == '__main__':

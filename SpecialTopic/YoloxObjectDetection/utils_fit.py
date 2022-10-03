@@ -11,7 +11,7 @@ from utils import get_lr, decode_outputs, non_max_suppression
 def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch,
                   cuda, fp16, scaler, save_period, save_dir, num_classes, local_rank=0, eval_period=-1,
                   coco_json_file=None, training_state=None, best_train_loss=False, best_val_loss=False, best_mAP=False,
-                  save_optimizer=False):
+                  save_optimizer=False, logger=None, email_send_to=None, save_log_period=None):
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
     loss = 0
@@ -157,8 +157,8 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
         coco_eval.accumulate()
         coco_eval.summarize()
         os.remove(json_file)
+        mAP = float(coco_eval.stats[0])
         if best_mAP and training_state is not None:
-            mAP = float(coco_eval.stats[0])
             if mAP > training_state['mAP']:
                 training_state['mAP'] = mAP
                 if save_optimizer:
@@ -167,6 +167,7 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
                     torch.save(save, os.path.join(save_dir, f'yolox_best_mAP.pth'))
                 else:
                     torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_mAP.pth'))
+        logger.append_info('mAP', mAP)
 
     if (epoch + 1) % save_period == 0:
         if not os.path.exists(save_dir):
@@ -177,3 +178,20 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
         else:
             torch.save(model.state_dict(), os.path.join(save_dir,
                                                         f'{epoch + 1}_yolox_{round(val_loss / len(gen_val), 2)}.pth'))
+
+    logger.append_info('train_loss', round(loss / len(gen), 2))
+    logger.append_info('val_loss', round(val_loss / len(gen_val), 2))
+    if (epoch + 1) % save_log_period == 0:
+        x_line = [x for x in range(1, epoch + 2)]
+        color = [(133 / 255, 235 / 255, 207 / 255), (244 / 255, 94 / 255, 13 / 255)]
+        logger.draw_picture(draw_type='x_y', save_path=f'{epoch + 1}_loss.png', x=[x_line, x_line],
+                            y=['train_loss', 'val_loss'], x_label='Epoch', y_label='Loss', color=color,
+                            line_style=['-', '--'], grid=True)
+        logger.draw_picture(draw_type='x_y', save_path=f'{epoch + 1}_mAP.png', x=[x_line], y=['mAP'],
+                            x_label='Epoch', y_label='mAP', grid=True)
+        if len(email_send_to) > 0:
+            for send_to in email_send_to:
+                image_loss = os.path.join(logger.logger_root, f'{epoch + 1}_loss.png')
+                logger.send_email(subject='Yolox Loss', send_to=send_to, image_info=image_loss)
+                image_mAP = os.path.join(logger.logger_root, f'{epoch + 1}_mAP.png')
+                logger.send_email(subject='Yolox mAP', send_to=send_to, image_info=image_mAP)

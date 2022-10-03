@@ -200,12 +200,6 @@ def main():
         logger = get_logger(save_info=save_info, email_sender=args.email_sender, email_key=args.email_key)
     else:
         logger = get_logger(save_info=save_info)
-    logger.append_info('train_loss', 0)
-    logger.append_info('train_acc', 0)
-    logger.append_info('train_topk_acc', 0)
-    logger.append_info('val_loss', 0)
-    logger.append_info('val_acc', 0)
-    logger.append_info('val_topk_acc', 0)
     for epoch in range(args.Init_Epoch, args.Total_Epoch):
         if Freeze and args.Freeze_Epoch >= epoch:
             Freeze = False

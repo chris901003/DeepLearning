@@ -127,7 +127,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloa
     logger.append_info('val_acc', eval_acc)
     logger.append_info('val_topk_acc', eval_topk_acc)
     if (epoch + 1) % save_log_period == 0:
-        x_line = [x for x in range(0, epoch + 2)]
+        x_line = [x for x in range(1, epoch + 2)]
         color = [(133 / 255, 235 / 255, 207 / 255), (244 / 255, 94 / 255, 13 / 255)]
         logger.draw_picture(draw_type='x_y', save_path=f'{epoch + 1}_loss.png', x=[x_line, x_line],
                             y=['train_loss', 'val_loss'], x_label='Epoch', y_label='Loss', color=color,
