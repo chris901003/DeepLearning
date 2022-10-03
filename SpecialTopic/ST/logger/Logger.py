@@ -93,6 +93,7 @@ class Logger:
         plt.grid(grid)
         save_plt_path = os.path.join(self.logger_root, save_path)
         plt.savefig(save_plt_path)
+        plt.cla()
 
     def save_to_file(self, save_path, vars_name, separate_type=(' ', '\n'), write_type='w'):
         """ 將指定資料寫入到文件當中

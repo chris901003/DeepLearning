@@ -4,7 +4,7 @@ from torch import nn
 import os
 from torch.utils.data import DataLoader
 from utils_fit import fit_one_epoch
-from SpecialTopic.ST.utils import get_classes
+from SpecialTopic.ST.utils import get_classes, get_logger
 from SpecialTopic.ST.net.lr_scheduler import get_lr_scheduler_yolox, set_optimizer_lr_yolox
 from SpecialTopic.ST.build import build_detector, build_dataset
 
@@ -62,6 +62,17 @@ def parse_args():
     parser.add_argument('--num-workers', type=int, default=1)
     # 最終輸入到網路的圖像大小
     parser.add_argument('--input-shape', type=int, default=[224, 224], nargs='+')
+
+    # 將訓練過程用郵件進行傳送
+    parser.add_argument('--send-email', action='store_true')
+    # 使用哪個電子郵件進行傳送
+    parser.add_argument('--email-sender', type=str, default='none')
+    # 該電子郵件傳送郵件時需要的鑰匙
+    parser.add_argument('--email-key', type=str, default='none')
+    # 要傳送到哪個對象，目前一但開始訓練就固定傳送對象，可以一次傳送給多人
+    parser.add_argument('--send-to', type=str, default=[], nargs='+')
+    # 多少個epoch會將結果傳遞
+    parser.add_argument('--save-log-period', type=int, default=10)
     args = parser.parse_args()
     return args
 
@@ -180,6 +191,21 @@ def main():
         Freeze = True
         for param in model.backbone.parameters():
             param.requires_grad = False
+    send_to = args.send_to
+    save_info = {
+        'train_loss': list(), 'train_acc': list(), 'train_topk_acc': list(),
+        'val_loss': list(), 'val_acc': list(), 'val_topk_acc': list()
+    }
+    if args.send_email:
+        logger = get_logger(save_info=save_info, email_sender=args.email_sender, email_key=args.email_key)
+    else:
+        logger = get_logger(save_info=save_info)
+    logger.append_info('train_loss', 0)
+    logger.append_info('train_acc', 0)
+    logger.append_info('train_topk_acc', 0)
+    logger.append_info('val_loss', 0)
+    logger.append_info('val_acc', 0)
+    logger.append_info('val_topk_acc', 0)
     for epoch in range(args.Init_Epoch, args.Total_Epoch):
         if Freeze and args.Freeze_Epoch >= epoch:
             Freeze = False
@@ -188,7 +214,7 @@ def main():
         set_optimizer_lr_yolox(optimizer, lr_scheduler_func, epoch)
         fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloader, args.Total_Epoch, fp16, scaler,
                       args.save_period, save_path, training_state, best_train_loss, best_val_loss, save_optimizer,
-                      weight_name)
+                      weight_name, logger, send_to, args.save_log_period)
 
 
 if __name__ == '__main__':

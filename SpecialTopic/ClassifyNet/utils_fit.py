@@ -9,7 +9,8 @@ def get_lr(optimizer):
 
 
 def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloader, Total_Epoch, fp16, scaler,
-                  save_period, save_path, training_state, best_train_loss, best_val_loss, save_optimizer, weight_name):
+                  save_period, save_path, training_state, best_train_loss, best_val_loss, save_optimizer, weight_name,
+                  logger, email_send_to, save_log_period):
     train_loss = 0
     train_acc = 0
     train_topk_acc = 0
@@ -119,3 +120,24 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloa
     training_state['val_loss'] = min(training_state['val_loss'], (eval_loss / len(val_dataloader)))
     print(f'Less train loss: {training_state["train_loss"]}')
     print(f'Less eval loss: {training_state["val_loss"]}')
+    logger.append_info('train_loss', train_loss)
+    logger.append_info('train_acc', train_acc)
+    logger.append_info('train_topk_acc', train_topk_acc)
+    logger.append_info('val_loss', eval_loss)
+    logger.append_info('val_acc', eval_acc)
+    logger.append_info('val_topk_acc', eval_topk_acc)
+    if (epoch + 1) % save_log_period == 0:
+        x_line = [x for x in range(0, epoch + 2)]
+        color = [(133 / 255, 235 / 255, 207 / 255), (244 / 255, 94 / 255, 13 / 255)]
+        logger.draw_picture(draw_type='x_y', save_path=f'{epoch + 1}_loss.png', x=[x_line, x_line],
+                            y=['train_loss', 'val_loss'], x_label='Epoch', y_label='Loss', color=color,
+                            line_style=['-', '--'], grid=True)
+        logger.draw_picture(draw_type='x_y', save_path=f'{epoch + 1}_acc.png', x=[x_line, x_line],
+                            y=['train_acc', 'val_acc'], x_label='Epoch', y_label='Acc', color=color,
+                            line_style=['-', '--'], grid=True)
+        if len(email_send_to) > 0:
+            for send_to in email_send_to:
+                image_loss = os.path.join(logger.logger_root, f'{epoch + 1}_loss.png')
+                logger.send_email(subject='Classify Net Loss', send_to=send_to, image_info=image_loss)
+                image_acc = os.path.join(logger.logger_root, f'{epoch + 1}_acc.png')
+                logger.send_email(subject='Classify Net Acc', send_to=send_to, image_info=image_acc)
