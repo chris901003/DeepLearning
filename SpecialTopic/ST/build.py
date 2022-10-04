@@ -7,11 +7,13 @@ def build_detector(detector_cfg):
     from .net.Recognizer3D import Recognizer3D
     from .net.resnet import ResNet
     from .net.VIT import VIT
+    from .net.MobileVit import MobileVit
     support_detector = {
         'YoloBody': YoloBody,
         'Recognizer3D': Recognizer3D,
         'ResNet': ResNet,
-        'VIT': VIT
+        'VIT': VIT,
+        'MobileVit': MobileVit
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
@@ -23,12 +25,14 @@ def build_backbone(backbone_cfg):
     from .net.backbone import CSPDarknet, ResNet3d
     from .net.resnet import ResnetExtract
     from .net.VIT import VisionTransformer
+    from .net.MobileVit import MobileVitExtract
     support_backbone = {
         'YOLOPAFPN': YOLOPAFPN,
         'CSPDarknet': CSPDarknet,
         'ResNet3d': ResNet3d,
         'ResnetExtract': ResnetExtract,
-        'VisionTransformer': VisionTransformer
+        'VisionTransformer': VisionTransformer,
+        'MobileVitExtract': MobileVitExtract
     }
     backbone_cls = get_cls_from_dict(support_backbone, backbone_cfg)
     backbone = backbone_cls(**backbone_cfg)
@@ -40,11 +44,13 @@ def build_head(head_cfg):
     from .net.Recognizer3D import I3DHead
     from .net.resnet import ResnetHead
     from .net.VIT import VitHead
+    from .net.MobileVit import MobileVitHead
     support_head = {
         'YOLOXHead': YOLOXHead,
         'I3DHead': I3DHead,
         'ResnetHead': ResnetHead,
-        'VitHead': VitHead
+        'VitHead': VitHead,
+        'MobileVitHead': MobileVitHead
     }
     head_cls = get_cls_from_dict(support_head, head_cfg)
     head = head_cls(**head_cfg)
@@ -66,7 +72,8 @@ def build_activation(act_cfg):
         'LeakyReLU': nn.LeakyReLU,
         'SELU': nn.SELU,
         'Sigmoid': nn.Sigmoid,
-        'GELU': nn.GELU
+        'GELU': nn.GELU,
+        'SiLU': nn.SiLU
     }
     act_cls = get_cls_from_dict(support_act, act_cfg_)
     act = act_cls(**act_cfg_)

@@ -1,5 +1,8 @@
 import torch
 from torch import nn
+from typing import Union
+import math
+import torch.nn.functional as F
 from .basic import BaseConv, DWConv, ConvModule
 from ..build import build_activation, build_norm
 
@@ -319,7 +322,8 @@ class Attention(nn.Module):
 
 
 class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer='Default', drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer: Union[str, dict] = 'Default',
+                 drop=0.):
         super(Mlp, self).__init__()
         if act_layer == 'Default':
             act_layer = dict(type='GELU')
@@ -355,3 +359,182 @@ class DropPath(nn.Module):
 
     def forward(self, x):
         return self.drop_path(x, self.drop_prob, self.training)
+
+
+class InvertedResidual(nn.Module):
+    def __init__(self, in_channels, out_channels, stride, expand_ratio, skip_connection=True,
+                 conv_cfg='Default', norm_cfg='Default', act_cfg='Default'):
+        super(InvertedResidual, self).__init__()
+        assert stride in [1, 2]
+        if conv_cfg == 'Default':
+            conv_cfg = dict(type='Conv')
+        if norm_cfg == 'Default':
+            norm_cfg = dict(type='BN')
+        if act_cfg == 'Default':
+            act_cfg = dict(type='SiLU')
+        hidden_dim = self.make_divisible(int(round(in_channels * expand_ratio)), 8)
+        block = nn.Sequential()
+        if expand_ratio != 1:
+            block.add_module(
+                name='exp_1x1',
+                module=ConvModule(
+                    in_channels=in_channels, out_channels=hidden_dim, kernel_size=1,
+                    conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        block.add_module(
+            name='conv_3x3',
+            module=ConvModule(
+                in_channels=hidden_dim, out_channels=hidden_dim, stride=stride, kernel_size=3, padding=1, groups=hidden_dim,
+                conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        block.add_module(
+            name='red_1x1',
+            module=ConvModule(
+                in_channels=hidden_dim, out_channels=out_channels, kernel_size=1,
+                conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=None))
+        self.block = block
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.exp = expand_ratio
+        self.stride = stride
+        self.use_res_connect = (self.stride == 1 and in_channels == out_channels and skip_connection)
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.block(x)
+        else:
+            return self.block(x)
+
+    @staticmethod
+    def make_divisible(v, divisor=8, min_value=None):
+        if min_value is None:
+            min_value = divisor
+        new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
+        if new_v < 0.9 * v:
+            new_v += divisor
+        return new_v
+
+
+class TransformerEncoder(nn.Module):
+    def __init__(self, embed_dim, ffn_latent_dim, num_heads=8, attn_dropout=0.0, dropout=0.0, ffn_dropout=0.0):
+        super(TransformerEncoder, self).__init__()
+        attn_uint = Attention(embed_dim, num_heads, qkv_bias=True,
+                              attn_drop_ratio=attn_dropout, proj_drop_ratio=dropout)
+        self.pre_norm_mha = nn.Sequential(
+            nn.LayerNorm(embed_dim),
+            attn_uint
+        )
+        act_layer = dict(type='SiLU')
+        mlp = Mlp(in_features=embed_dim, hidden_features=ffn_latent_dim, out_features=embed_dim,
+                  act_layer=act_layer, drop=ffn_dropout)
+        self.pre_norm_ffn = nn.Sequential(nn.LayerNorm(embed_dim), mlp)
+        self.embed_dim = embed_dim
+        self.ffn_dim = ffn_latent_dim
+        self.ffn_dropout = ffn_dropout
+        self.std_dropout = dropout
+
+    def forward(self, x):
+        res = x
+        x = self.pre_norm_mha(x)
+        x = x + res
+        x = x + self.pre_norm_ffn(x)
+        return x
+
+
+class MobileVitBlock(nn.Module):
+    def __init__(self, in_channels, transformer_dim, ffn_dim, transformer_blocks, head_dim=32, attn_dropout=0.0,
+                 dropout=0.0, ffn_dropout=0.0, patch_h=8, patch_w=8, conv_ksize=3,
+                 conv_cfg='Default', norm_cfg='Default', act_cfg='Default'):
+        super(MobileVitBlock, self).__init__()
+        if conv_cfg == 'Default':
+            conv_cfg = dict(type='Conv')
+        if norm_cfg == 'Default':
+            norm_cfg = dict(type='BN')
+        if act_cfg == 'Default':
+            act_cfg = dict(type='SiLU')
+        conv_3x3_in = ConvModule(in_channels=in_channels, out_channels=in_channels, kernel_size=conv_ksize, stride=1,
+                                 padding=1, conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
+        conv_1x1_in = ConvModule(in_channels=in_channels, out_channels=transformer_dim, kernel_size=1, bias=False,
+                                 conv_cfg=conv_cfg, norm_cfg=None, act_cfg=None)
+        conv_1x1_out = ConvModule(in_channels=transformer_dim, out_channels=in_channels, kernel_size=1, stride=1,
+                                  conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
+        conv_3x3_out = ConvModule(in_channels=2 * in_channels, out_channels=in_channels, kernel_size=conv_ksize,
+                                  padding=1, stride=1, conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
+        self.local_rep = nn.Sequential()
+        self.local_rep.add_module(name='conv_3x3', module=conv_3x3_in)
+        self.local_rep.add_module(name='conv_1x1', module=conv_1x1_in)
+        assert transformer_dim % head_dim == 0
+        num_heads = transformer_dim // head_dim
+        global_rep = [
+            TransformerEncoder(embed_dim=transformer_dim, ffn_latent_dim=ffn_dim, num_heads=num_heads,
+                               attn_dropout=attn_dropout, dropout=dropout, ffn_dropout=ffn_dropout)
+            for _ in range(transformer_blocks)
+        ]
+        global_rep.append(nn.LayerNorm(transformer_dim))
+        self.global_rep = nn.Sequential(*global_rep)
+        self.conv_proj = conv_1x1_out
+        self.fusion = conv_3x3_out
+        self.patch_h = patch_h
+        self.patch_w = patch_w
+        self.patch_area = self.patch_w * self.patch_h
+        self.cnn_in_dim = in_channels
+        self.cnn_out_dim = transformer_dim
+        self.n_heads = num_heads
+        self.ffn_dim = ffn_dim
+        self.dropout = dropout
+        self.attn_dropout = attn_dropout
+        self.ffn_dropout = ffn_dropout
+        self.n_blocks = transformer_blocks
+        self.conv_ksize = conv_ksize
+
+    def unfolding(self, x):
+        patch_w, patch_h = self.patch_w, self.patch_h
+        patch_area = patch_w * patch_h
+        batch_size, in_channels, orig_h, orig_w = x.shape
+        new_h = int(math.ceil(orig_h / self.patch_h) * self.patch_h)
+        new_w = int(math.ceil(orig_w / self.patch_w) * self.patch_w)
+        interpolate = False
+        if new_w != orig_w or new_h != orig_h:
+            x = F.interpolate(x, size=(new_h, new_w), mode='bilinear', align_corners=False)
+            interpolate = True
+        num_patch_w = new_w // patch_w
+        num_patch_h = new_h // patch_h
+        num_patches = num_patch_w * num_patch_h
+        x = x.reshape(batch_size * in_channels * num_patch_h, patch_h, num_patch_w, patch_w)
+        x = x.transpose(1, 2)
+        x = x.reshape(batch_size, in_channels, num_patches, patch_area)
+        x = x.transpose(1, 3)
+        x = x.reshape(batch_size * patch_area, num_patches, -1)
+        info_dict = {
+            'orig_size': (orig_h, orig_w),
+            'batch_size': batch_size,
+            'interpolate': interpolate,
+            'total_patches': num_patches,
+            'num_patches_w': num_patch_w,
+            'num_patches_h': num_patch_h
+        }
+        return x, info_dict
+
+    def folding(self, x, info_dict):
+        n_dim = x.dim()
+        assert n_dim == 3, 'Tensor格式錯誤'
+        x = x.contiguous().view(info_dict['batch_size'], self.patch_area, info_dict['total_patches'], -1)
+        batch_size, pixels, num_patches, channels = x.shape
+        num_patch_h = info_dict['num_patches_h']
+        num_patch_w = info_dict['num_patches_w']
+        x = x.transpose(1, 3)
+        x = x.reshape(batch_size * channels * num_patch_h, num_patch_w, self.patch_h, self.patch_w)
+        x = x.transpose(1, 2)
+        x = x.reshape(batch_size, channels, num_patch_h * self.patch_h, num_patch_w * self.patch_w)
+        if info_dict['interpolate']:
+            x = F.interpolate(x, size=info_dict['orig_size'], mode='bilinear', align_corners=False)
+        return x
+
+    def forward(self, x):
+        res = x
+        fm = self.local_rep(x)
+        patches, info_dict = self.unfolding(fm)
+        for transformer_layer in self.global_rep:
+            patches = transformer_layer(patches)
+        fm = self.folding(x=patches, info_dict=info_dict)
+        fm = self.conv_proj(fm)
+        fm = self.fusion(torch.cat((res, fm), dim=1))
+        return fm
