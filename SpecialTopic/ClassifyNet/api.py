@@ -44,6 +44,7 @@ def init_model(cfg='none', model_type='ResNet', phi='m', num_classes=100, device
 
 
 def detect_single_picture(model, image, pipeline=None, device='auto'):
+    model = model.eval()
     assert isinstance(image, np.ndarray)
     if device == 'auto':
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -60,5 +61,6 @@ def detect_single_picture(model, image, pipeline=None, device='auto'):
     image = image.unsqueeze(dim=0)
     image = image.to(device)
     model = model.to(device)
-    output = model(image, with_loss=False)
+    with torch.no_grad():
+        output = model(image, with_loss=False)
     return output
