@@ -60,6 +60,7 @@ class VitHead(nn.Module):
         x = self.head(x)
         if not with_loss:
             return x
+        assert labels is not None, '需要計算loss須提供labels'
         if labels.ndim == 2:
             labels = labels.squeeze(dim=-1)
         loss_dict = dict()
@@ -110,7 +111,6 @@ class VIT(nn.Module):
     def forward(self, images, labels=None, with_loss=True):
         output = self.backbone(images)
         if self.with_cls_head:
-            assert labels is not None, '需要計算loss就需要提供標註'
             result = self.cls_head(output, labels, with_loss)
         else:
             result = output

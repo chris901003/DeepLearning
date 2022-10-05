@@ -21,7 +21,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloa
         images, labels = batch
         with torch.no_grad():
             images = images.to(device)
-            labels = labels.to(labels)
+            labels = labels.to(device)
         optimizer.zero_grad()
         if not fp16:
             outputs = model(images, labels, with_loss=True)
@@ -75,7 +75,7 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloa
         images, labels = batch
         with torch.no_grad():
             images = images.to(device)
-            labels = labels.to(labels)
+            labels = labels.to(device)
             outputs = model(images, labels, with_loss=True)
             loss = outputs['loss']
             acc = outputs['acc']
@@ -120,12 +120,12 @@ def fit_one_epoch(model, device, optimizer, epoch, train_dataloader, val_dataloa
     training_state['val_loss'] = min(training_state['val_loss'], (eval_loss / len(val_dataloader)))
     print(f'Less train loss: {training_state["train_loss"]}')
     print(f'Less eval loss: {training_state["val_loss"]}')
-    logger.append_info('train_loss', train_loss)
-    logger.append_info('train_acc', train_acc)
-    logger.append_info('train_topk_acc', train_topk_acc)
-    logger.append_info('val_loss', eval_loss)
-    logger.append_info('val_acc', eval_acc)
-    logger.append_info('val_topk_acc', eval_topk_acc)
+    logger.append_info('train_loss', train_loss / len(train_dataloader))
+    logger.append_info('train_acc', train_acc / len(train_dataloader))
+    logger.append_info('train_topk_acc', train_topk_acc / len(train_dataloader))
+    logger.append_info('val_loss', eval_loss / len(val_dataloader))
+    logger.append_info('val_acc', eval_acc / len(val_dataloader))
+    logger.append_info('val_topk_acc', eval_topk_acc / len(val_dataloader))
     if (epoch + 1) % save_log_period == 0:
         x_line = [x for x in range(1, epoch + 2)]
         color = [(133 / 255, 235 / 255, 207 / 255), (244 / 255, 94 / 255, 13 / 255)]
