@@ -12,18 +12,18 @@ from SpecialTopic.ClassifyNet.api import detect_single_picture as remain_detect_
 
 def args_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--video-path', type=str, default='./test.mp4')
+    parser.add_argument('--video-path', type=str, default=r'C:\Dataset\test_Trim.mp4')
     parser.add_argument('--object-detection-model-phi', type=str, default='l')
     parser.add_argument('--remain-detection-model-type', type=str, default='VIT')
     parser.add_argument('--remain-detection-model-phi', type=str, default='m')
     parser.add_argument('--object-detection-classes-path', type=str,
-                        default='/Users/huanghongyan/Downloads/data_annotation/classes.txt')
+                        default=r'C:\Dataset\FoodDetectionDataset\classes.txt')
     parser.add_argument('--remain-detection-classes-path', type=str,
-                        default='/Users/huanghongyan/Downloads/Donburi/classes.txt')
+                        default=r'C:\Dataset\FoodLeft\classes.txt')
     parser.add_argument('--object-detection-pretrained', type=str,
-                        default='./pretrained/object_detection/object_detection_pretrained.pth')
+                        default=r'C:\Checkpoint\YoloxFoodDetection\yolox_best_train_loss.pth')
     parser.add_argument('--remain-detection-pretrained', type=str,
-                        default='./pretrained/remain/remain_detection_x.pth')
+                        default=r'C:\Checkpoint\RemainDetection\remain\remain_detection_x.pth')
     args = parser.parse_args()
     return args
 
@@ -55,8 +55,16 @@ def remain_detection(remain_detection_model, remain_data, device):
     for data in remain_data:
         image = data['image']
         label = data['label']
-        remain = remain_detect_single_image(model=remain_detection_model[label], image=image, device=device)
-        data['remain'] = remain
+        # from PIL import Image
+        # img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        # img.show()
+        # img.save('./test.jpg')
+        remain = remain_detect_single_image(model=remain_detection_model[str(label)], image=image, device=device)[0]
+        remain = remain.softmax(dim=0)
+        index = remain.argmax(dim=0).item()
+        score = remain[index].item()
+        data['remain'] = index
+        data['remain_score'] = score
     return remain_data
 
 
@@ -80,6 +88,8 @@ def start_detection(video_path, device, object_detection_model, remain_detection
             for label, score, bbox in zip(labels, scores, boxes):
                 bbox = [int(box) for box in bbox]
                 ymin, xmin, ymax, xmax = bbox
+                if ymin < 0 or xmin < 0 or ymax >= img_height or xmax >= img_width:
+                    continue
                 ymin, xmin, ymax, xmax = max(0, ymin), max(0, xmin), min(img_height, ymax), min(img_width, xmax)
                 picture = frame[ymin:ymax, xmin:xmax, :]
                 data = dict(image=picture, index=index, label=label, origin_position=(xmin, ymin, xmax, ymax),
@@ -95,14 +105,17 @@ def start_detection(video_path, device, object_detection_model, remain_detection
                 remain_label = remain_detection_classes_name[remain_label_index]
                 xmin, ymin, xmax, ymax = origin_position
                 score = str(round(result['score'] * 100, 2))
+                remain_score = str(round(result['remain_score'] * 100, 2))
                 cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
-                info = object_detection_label + '|' + score + '|' + remain_label
+                info = object_detection_label + '|' + score + '|' + remain_label + '|' + remain_score
                 cv2.putText(frame, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
                             1, (89, 214, 210), 2, cv2.LINE_AA)
             cTime = time.time()
             fps = 1 / (cTime - pTime)
             pTime = cTime
             cv2.putText(frame, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+            cv2.namedWindow('img', 0)
+            cv2.resizeWindow('img', 1080 // 2, 1920 // 2)
             cv2.imshow('img', frame)
             video_write.write(frame)
         if cv2.waitKey(1) == ord('q'):
