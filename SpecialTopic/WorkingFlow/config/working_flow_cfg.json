@@ -1,0 +1,33 @@
+{
+  "step1": {
+    "type": "ReadPicture",
+    "config_file": "./config/get_picture_cfg.json",
+    "inputs": [],
+    "outputs": ["image", "image_type"]
+  },
+  "step2": {
+    "type": "ObjectDetection",
+    "config_file": "./config/object_detection_cfg.json",
+    "inputs": ["image", "image_type"],
+    "outputs": ["image", "picture", "category_from_object_detection", "id"]
+  },
+  "step3": {
+    "type": "ObjectClassifyToRemainClassify",
+    "config_file": "./config/object_classify_to_remain_classify_cfg.json",
+    "inputs": ["image", "picture", "category_from_object_detection", "id"],
+    "outputs": ["image", "picture", "category_from_object_detection", "category_to_remain", "id"]
+  },
+  "step4": {
+    "type": "RemainDetection",
+    "config_file": "./config/remain_detection_cfg.json",
+    "inputs": ["image", "picture", "category_from_object_detection", "category_to_remain", "id"],
+    "outputs": ["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain"]
+  },
+  "step5": {
+    "type": "ShowResults",
+    "config_file": "./config/show_results.json",
+    "inputs": ["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain"],
+    "outputs": ["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain",
+      "result_image"]
+  }
+}

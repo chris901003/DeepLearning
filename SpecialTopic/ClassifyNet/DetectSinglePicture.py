@@ -23,7 +23,8 @@ def parse_args():
 def main():
     args = parse_args()
     classes_name, num_classes = get_classes(args.classes_path)
-    model = init_model(num_classes=num_classes, pretrained=args.pretrained_path)
+    model = init_model(model_type=args.model_type, phi=args.phi,
+                       num_classes=num_classes, pretrained=args.pretrained_path)
     image = cv2.imread(args.image_path)
     output = detect_single_picture(model, image)[0]
     pred = output.argmax(dim=0).item()
