@@ -1,3 +1,4 @@
+import copy
 import torch
 from torch import nn
 import numpy as np
@@ -99,6 +100,7 @@ class VIT(nn.Module):
         self.with_cls_head = with_cls_head
         assert phi in self.build_format, '目前VIT有提供m以及l兩種大小的模型，歡迎添加'
         model_cfg = self.build_format.get(phi, None)
+        model_cfg = copy.deepcopy(model_cfg)
         model_cfg['cls_head']['num_classes'] = num_classes
         self.backbone = build_backbone(model_cfg['backbone'])
         if with_cls_head:

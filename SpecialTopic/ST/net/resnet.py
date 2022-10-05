@@ -1,3 +1,4 @@
+import copy
 import torch
 from torch import nn
 import numpy as np
@@ -106,6 +107,7 @@ class ResNet(nn.Module):
         self.num_classes = num_classes
         assert phi in self.build_format.keys(), '目前resnet提供[s, m, l]三種尺寸分別對應上[resnet34, resnet50, resnet101]'
         model_cfg = self.build_format[phi]
+        model_cfg = copy.deepcopy(model_cfg)
         model_cfg['cls_head']['num_classes'] = num_classes
         if group != -1:
             model_cfg['backbone']['group'] = group

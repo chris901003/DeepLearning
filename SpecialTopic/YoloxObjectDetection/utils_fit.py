@@ -147,27 +147,30 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
                 bbox = [round(xmin, 2), round(ymin, 2), round(xmax - xmin, 2), round(ymax - ymin, 2)]
                 data = dict(image_id=int(image_id), category_id=int(label) + 1, bbox=bbox, score=round(conf, 2))
                 res.append(data)
-        print('Writing json file ...')
-        with open(json_file, 'w') as f:
-            json.dump(res, f)
-        coco_anno = coco.COCO(coco_json_file)
-        coco_det = coco_anno.loadRes(json_file)
-        coco_eval = COCOeval(coco_anno, coco_det, "bbox")
-        coco_eval.evaluate()
-        coco_eval.accumulate()
-        coco_eval.summarize()
-        os.remove(json_file)
-        mAP = float(coco_eval.stats[0])
-        if best_mAP and training_state is not None:
-            if mAP > training_state['mAP']:
-                training_state['mAP'] = mAP
-                if save_optimizer:
-                    save = dict(model_weight=model.state_dict(), optimizer_weight=optimizer.state_dict(),
-                                Epoch=epoch + 1)
-                    torch.save(save, os.path.join(save_dir, f'yolox_best_mAP.pth'))
-                else:
-                    torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_mAP.pth'))
-        logger.append_info('mAP', mAP)
+        if len(res) == 0:
+            print('Without detect any box, skip mAP validate.')
+        else:
+            print('Writing json file ...')
+            with open(json_file, 'w') as f:
+                json.dump(res, f)
+            coco_anno = coco.COCO(coco_json_file)
+            coco_det = coco_anno.loadRes(json_file)
+            coco_eval = COCOeval(coco_anno, coco_det, "bbox")
+            coco_eval.evaluate()
+            coco_eval.accumulate()
+            coco_eval.summarize()
+            os.remove(json_file)
+            mAP = float(coco_eval.stats[0])
+            if best_mAP and training_state is not None:
+                if mAP > training_state['mAP']:
+                    training_state['mAP'] = mAP
+                    if save_optimizer:
+                        save = dict(model_weight=model.state_dict(), optimizer_weight=optimizer.state_dict(),
+                                    Epoch=epoch + 1)
+                        torch.save(save, os.path.join(save_dir, f'yolox_best_mAP.pth'))
+                    else:
+                        torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_mAP.pth'))
+            logger.append_info('mAP', mAP)
 
     if (epoch + 1) % save_period == 0:
         if not os.path.exists(save_dir):

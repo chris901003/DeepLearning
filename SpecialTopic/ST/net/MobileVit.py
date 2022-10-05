@@ -1,6 +1,7 @@
+import copy
 import torch
 from torch import nn
-import numpy  as np
+import numpy as np
 from SpecialTopic.ST.build import build_backbone, build_head
 from ..model_config.MobileVitConfig import MobileVit_config
 from SpecialTopic.ST.net.basic import ConvModule
@@ -133,6 +134,7 @@ class MobileVit(nn.Module):
         self.pretrained = pretrained
         assert phi in MobileVit_config.keys(), '目前只支援[s, m, l]'
         model_cfg = MobileVit_config[phi]
+        model_cfg = copy.deepcopy(model_cfg)
         for k in ['layer1', 'layer2', 'layer3', 'layer4', 'layer5']:
             model_cfg['backbone'][k].update({"dropout": 0.1, "ffn_dropout": 0.0, "attn_dropout": 0.0})
         model_cfg['cls_head']['num_classes'] = num_classes
