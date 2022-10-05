@@ -4,7 +4,8 @@ import PIL
 import torch
 from PIL import Image
 from SpecialTopic.ST.build import build_detector
-from utils import resize_image, cvtColor, preprocess_input, decode_outputs, non_max_suppression
+from SpecialTopic.YoloxObjectDetection.utils import resize_image, cvtColor, preprocess_input, decode_outputs, \
+    non_max_suppression
 
 
 def detect_image(model, device, image_info, input_shape, num_classes, confidence=0.5, nms_iou=0.3, keep_ratio=True):
@@ -33,13 +34,13 @@ def detect_image(model, device, image_info, input_shape, num_classes, confidence
     return top_label, top_conf, top_boxes
 
 
-def init_model(cfg='auto', pretrained='none', num_classes=100, device='auto'):
+def init_model(cfg='auto', pretrained='none', num_classes=100, phi='l', device='auto'):
     if device == 'auto':
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     if cfg == 'auto':
         cfg = {
             'type': 'YoloBody',
-            'phi': 'l',
+            'phi': phi,
             'backbone_cfg': {
                 'type': 'YOLOPAFPN'
             },
