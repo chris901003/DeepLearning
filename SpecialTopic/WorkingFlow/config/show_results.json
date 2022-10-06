@@ -1,4 +1,3 @@
 {
-  "type": "DrawResultsOnPicture",
-  "api": "show_results"
+  "type": "DrawResultsOnPicture"
 }
