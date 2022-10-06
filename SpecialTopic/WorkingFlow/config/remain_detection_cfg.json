@@ -2,6 +2,5 @@
   "type": "VitRemainDetection",
   "phi": "m",
   "classes_path": "./prepare/remain_detection_classes.txt",
-  "pretrained": "./prepare/remain_pretrained_x.pth",
-  "api": "remain_detection"
+  "pretrained": "./prepare/remain_pretrained_x.pth"
 }

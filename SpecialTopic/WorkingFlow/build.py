@@ -1,0 +1,104 @@
+import copy
+from SpecialTopic.ST.utils import get_cls_from_dict
+from SpecialTopic.WorkingFlow.utils import list_of_list
+
+
+class WorkingSequence:
+    def __init__(self, working_flow_cfg):
+        from SpecialTopic.WorkingFlow.MainBlock.ReadPicture import ReadPicture
+        from SpecialTopic.WorkingFlow.MainBlock.ObjectDetection import ObjectDetection
+        from SpecialTopic.WorkingFlow.MainBlock.ObjectClassifyToRemainClassify import ObjectClassifyToRemainClassify
+        from SpecialTopic.WorkingFlow.MainBlock.RemainDetection import RemainDetection
+        from SpecialTopic.WorkingFlow.MainBlock.ShowResults import ShowResults
+        # 整個流程初始化框架
+        support_module = {
+            # 列出有哪些支援的主模塊
+            'ReadPicture': ReadPicture,
+            'ObjectDetection': ObjectDetection,
+            'ObjectClassifyToRemainClassify': ObjectClassifyToRemainClassify,
+            'RemainDetection': RemainDetection,
+            'ShowResults': ShowResults
+        }
+        self.support_module = support_module
+        self.working_flow_cfg = working_flow_cfg
+        self.steps = list()
+        # 構建主模塊實例對象同時保存
+        for k, v in working_flow_cfg.items():
+            k_ = copy.deepcopy(k)
+            stage_name = k_.get('type', None)
+            module_cls = get_cls_from_dict(support_module, k_)
+            module = module_cls(k_['config_file'])
+            input, output, call_api = k_.get('input', None), k_.get('output', None), k_.get('call_api', None)
+            assert input is not None and output is not None, '需提供輸入以及輸出資料'
+            assert call_api is not None, '需要提供要呼叫哪些函數'
+            if not list_of_list(input):
+                input = [input]
+            if not list_of_list(output):
+                output = [output]
+            if not list_of_list(call_api):
+                call_api = [call_api]
+            assert len(input) == len(output) == len(call_api), '輸入以及輸出長度需要與使用的api數量相同'
+            module_data = dict(stage_name=stage_name, module=module, input=input, output=output, call_api=call_api)
+            self.steps.append(module_data)
+
+    def __call__(self, step_add_input=None):
+        # 進行主模塊傳遞，每個輸入都會是以dict拆開的方式傳入
+        # step_add_input = 可以在指定的子模塊的指定函數前添加參數，會是dict(dict)型態，第一個是指定哪個step第二個會是第幾個函數
+        # step編號是以1起頭(建議的寫法)，函數編號是以0為起頭(強制規定的)
+        last_output = dict()
+        for step_info in self.steps:
+            # 獲取本層參數
+            stage_name = step_info.get('stage_name')
+            module = step_info.get('module')
+            inputs = step_info.get('input')
+            outputs = step_info.get('output')
+            call_apis = step_info.get('call_api')
+            for index, (input, output, call_api) in enumerate(zip(inputs, outputs, call_apis)):
+                # 整理要輸入的資料包括檢查是否有缺失以及添加額外參數
+                current_input = self.get_current_input(stage_name, index, last_output, step_add_input, input)
+                # 通過一層主模塊
+                results = module(call_api, **current_input)
+                # 整理返回結果，如果返回的是list或是tuple就會根據output整理成dict格式
+                last_output = self.parse_output(stage_name, results, output)
+        return last_output
+
+    @staticmethod
+    def get_current_input(stage_name, index, last_output, step_add_input, expect_input):
+        # 檢查要輸入的資料是否有缺失，如果有需要過程中添加資料的會添加上去
+        assert isinstance(last_output, dict), '本層輸入需要是dict型態，若型態錯誤請修正'
+        add_input = step_add_input.get(stage_name, None)
+        if add_input is not None:
+            add_input = add_input[str(index)]
+        if add_input is not None:
+            assert isinstance(add_input, dict)
+            last_output.update(add_input)
+        for expect_input_name in expect_input:
+            assert expect_input_name in last_output.keys(), f'{stage_name}缺少{expect_input}輸入資料'
+        return last_output
+
+    @staticmethod
+    def parse_output(stage_name, results, expect_outputs):
+        # 如果是list或是tuple型態就會按照默認的排序將資料對上，長度必須與指定的output相同
+        outputs = dict()
+        assert isinstance(results, (dict, tuple, list)), 'step的輸出結果需要是[dict, tuple, list]型態'
+        if isinstance(results, dict):
+            # 只會保留指定的輸出，如果有缺少就會報錯
+            for expect_output in expect_outputs:
+                out = results.get(expect_output, None)
+                assert out is not None, f'{stage_name}預定輸出{expect_output}但是沒有找到該資料'
+                outputs[expect_output] = out
+        else:
+            # 根據輸出的順序給定輸出的名稱
+            assert len(results) == len(expect_outputs), f'{stage_name}的預定輸出長度與接收到的輸出長度不同'
+            for idx, expect_output in enumerate(expect_outputs):
+                outputs[expect_output] = results[idx]
+        return outputs
+
+    def __repr__(self):
+        # 展示出當前有支援那些主模塊
+        print('Current support module: ')
+        for module_name in self.support_module.keys():
+            print(module_name)
+        # 將當前指定的config配置打印出來
+        print('Current structure: ')
+        print(self.working_flow_cfg)

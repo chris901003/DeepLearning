@@ -1,5 +1,4 @@
 {
   "type": "ReadPictureFromVideo",
-  "camera_id": 0,
-  "api": "get_single_picture"
+  "video_path": "./test.pm4"
 }
