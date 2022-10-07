@@ -11,28 +11,27 @@
     "config_file": "./config/object_detection_cfg.json",
     "call_api": ["detect_single_picture"],
     "inputs": [["image", "image_type"]],
-    "outputs": [["image", "picture", "category_from_object_detection", "id"]]
+    "outputs": [["image", "track_object_info"]]
   },
   "step3": {
     "type": "ObjectClassifyToRemainClassify",
     "config_file": "./config/object_classify_to_remain_classify_cfg.json",
     "call_api": ["get_remain_id"],
-    "inputs": [["image", "picture", "category_from_object_detection", "id"]],
-    "outputs": [["image", "picture", "category_from_object_detection", "category_to_remain", "id"]]
+    "inputs": [["image", "track_object_info"]],
+    "outputs": [["image", "track_object_info"]]
   },
   "step4": {
     "type": "RemainDetection",
     "config_file": "./config/remain_detection_cfg.json",
     "call_api": ["remain_detection"],
-    "inputs": [["image", "picture", "category_from_object_detection", "category_to_remain", "id"]],
-    "outputs": [["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain"]]
+    "inputs": [["image", "track_object_info"]],
+    "outputs": [["image", "track_object_info"]]
   },
   "step5": {
     "type": "ShowResults",
     "config_file": "./config/show_results.json",
     "call_api": ["show_results"],
-    "inputs": [["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain"]],
-    "outputs": [["image", "picture", "category_from_object_detection", "category_to_remain", "id", "remain",
-      "result_image"]]
+    "inputs": [["image", "track_object_info"]],
+    "outputs": [["image", "track_object_info"]]
   }
 }
