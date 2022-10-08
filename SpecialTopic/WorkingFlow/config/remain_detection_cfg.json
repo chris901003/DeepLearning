@@ -1,6 +1,7 @@
 {
   "type": "VitRemainDetection",
-  "phi": "m",
+  "remain_module_file": "./prepare/remain_module_cfg.json",
   "classes_path": "./prepare/remain_detection_classes.txt",
-  "pretrained": "./prepare/remain_pretrained_x.pth"
+  "save_last_period": 60,
+  "strict_down": false
 }

@@ -17,7 +17,7 @@
     "type": "ObjectClassifyToRemainClassify",
     "config_file": "./config/object_classify_to_remain_classify_cfg.json",
     "call_api": ["get_remain_id"],
-    "inputs": [["image", "track_object_info"]],
+    "inputs": [["image", "track_object_info", "using_dict_name"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step4": {

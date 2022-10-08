@@ -49,6 +49,11 @@ type = 說明要使用哪個子模塊
   - output: [image, track_object_info, detect_results]
     - image = 傳入的圖像，這裡不會對傳入圖像做任何更動
     - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
     - detect_results = 當前目標檢測出的結果(要將force_get_detect開啟才會傳送，實際上線時不會使用)
 ##### 流程解釋:
 透過指定模型進行目標檢測，將結果進行分析。目標對象會分成等待追蹤以及正在追蹤兩個類別
@@ -62,13 +67,64 @@ type = 說明要使用哪個子模塊
 對照表，將目標檢測出的類別id轉換到剩餘量檢測的id，如此才可以調用正確的類別分類網路
 ##### api說明:
 - get_remain_id: 獲取剩餘量對應的id
+  - input: [image, track_object_info, using_dict_name]
+    - image = 圖像資料，當前畫面的圖像
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+    - using_dict_name = 要使用哪個映射字典
+  - output: [image, track_object_info]
+    - image = 圖像資料，當前畫面的圖像
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
+      - remain_category_id = 在剩餘量檢測時使用到的模型ID(新增)
 
 ### remain_detection_cfg
 剩餘量檢測模型設定
+##### 參數說明:
+- remain_module_file = 剩餘量模型設定，因為不同類別食物會使用不同剩餘量模型，所以需要寫成一個配置文件
+  - 內部結構 = dict(dict)，表示那個類別的會使用哪個參數，第二個dict會指定模型大小以及預訓練權重位置
+- classes_path = 剩餘量類別文件，如果有需要可以根據不同類別有不同剩餘量的類別檔案(目前還沒有寫)
+- save_last_period = 一個追蹤ID的剩餘量資料可以保存多久，需要保存的目的是因為我們不會每幀都檢測一次剩餘量，因為意義不大反而增加負擔
+- strict_down = 對於剩餘量的判斷是否要嚴格下降
 ##### api說明:
 - remain_detection: 對於剩餘量進行檢測
+  - input: [image, track_object_info]
+    - image = 圖像資料，一定要是原始圖像，因為會對該圖像擷取需要的部分進行剩餘量判斷
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
+      - remain_category_id = 在剩餘量檢測時使用到的模型ID
+      - category_from_remain = 剩餘量的類別(新增)
 
 ### show_results
 將結果顯示出來
+##### 文件說明
+- triangles: 打印矩形匡資料的都會在這裡
+  - type = 說明給的座標資料型態，最後都會轉成[xmin, ymin, xmax, ymax]型態
+  - val_name = 要從哪個Key獲取資料，只能從一個Key進行獲取，所以需要先打包好
+  - color = 匡的顏色，不填寫會有默認值
+  - thick = 匡的粗度，不填寫會有默認值
+- texts: 文字相關資料都會在這裡
+  - prefix = 字串開頭部分，如果不需要可以不要填或是用空
+  - suffix = 字串結尾部份，如果不需要可以不要填或是用空
+  - val_name = 將哪些資料寫到圖像上，這裡會盡可能的轉成str，如果無法轉換就會報錯
+  - sep = 多個值之間的格開方式
+  - color = 文字顏色，不填寫會有默認值
+  - text_size = 文字大小，不填寫會有默認值
+  - thick = 文字粗度，不填寫會有默認值
 ##### api說明:
 - show_results: 將結果畫在圖上並且將圖像返回
+  - input: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image]
+    - image = 標註好的圖像，如果有需要保存就可以直接保存

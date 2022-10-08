@@ -1,7 +1,7 @@
 {
   "type": "YoloxObjectDetection",
   "phi": "l",
-  "pretrained": "./prepare/object_detection_pretrained.pth",
+  "pretrained": "./checkpoint/object_detection/yolox_l.pth",
   "classes_path": "./prepare/object_detection_classes.txt",
   "confidence": 0.7,
   "nms": 0.3,
