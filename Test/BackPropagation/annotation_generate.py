@@ -4,7 +4,7 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image-folder', type=str, default=r'C:\Dataset\mnist_png\training')
+    parser.add_argument('--image-folder', type=str, default='/Users/huanghongyan/Downloads/mnist_png/training')
     args = parser.parse_args()
     return args
 
@@ -16,6 +16,8 @@ def main():
     support_image_format = ['.png', '.PNG', '.jpg', '.JPG']
     results = list()
     for image_folder_name in images_folder_name:
+        if image_folder_name[0] == '.':
+            continue
         image_folder_path = os.path.join(image_folder, image_folder_name)
         images_name = os.listdir(image_folder_path)
         for image_name in images_name:
