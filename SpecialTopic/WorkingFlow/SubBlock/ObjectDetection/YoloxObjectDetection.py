@@ -244,7 +244,7 @@ class YoloxObjectDetection:
                     self.mod_frame_index >= self.last_track_send:
                 continue
             data = dict(position=track_info['position'][-1], category_from_object_detection=track_info['label'],
-                        object_score=track_info['scores'].mean(), track_id=track_index,
+                        object_score=round(track_info['scores'].mean() * 100, 2), track_id=track_index,
                         using_last=(self.output_countdown == 0))
             results.append(data)
         self.output_countdown -= 1

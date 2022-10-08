@@ -1,3 +1,11 @@
 {
-  "type": "DrawResultsOnPicture"
+  "type": "DrawResultsOnPicture",
+  "triangles": [
+    {"type":  "yxyx", "val_name": "position", "color": [0, 255, 0], "thick": 3}
+  ],
+  "texts": [
+    {"prefix": "Object: ", "val_name": ["object_score", "category_from_object_detection"], "suffix": "", "sep": "|"},
+    {"prefix": "Remain: ", "val_name": ["track_id", "category_from_remain"], "suffix": "", "sep": "|"},
+    {"prefix": "Other: ", "val_name": ["using_last"], "suffix": "", "sep": ""}
+  ]
 }
