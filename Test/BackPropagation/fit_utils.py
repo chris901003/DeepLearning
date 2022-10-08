@@ -14,7 +14,8 @@ def fit_one_epoch(model, epoch, Epoch, train_dataloader, test_dataloader, lr, nu
         labels[label[0]] = 1
         model.back_propagate(output, labels, lr)
         cnt += 1
-        pbar.set_postfix(**{'acc': acc / cnt})
+        pbar.set_postfix(**{'acc': acc / cnt,
+                            'lr': lr})
         if cnt == 1000:
             cnt = 0
             acc = 0

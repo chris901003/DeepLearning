@@ -25,9 +25,10 @@ class MnistDataset(Dataset):
         image = cv2.imread(image_path)
         if image.ndim == 3:
             image = image[:, :, 0]
-        # image = image / 255.0
-        # image = image - self.norm[None, None, -1]
-        # image = image / self.std[None, None, -1]
+        image = np.rot90(image)
+        image = image / 255.0
+        image = image - self.norm[None, None, -1]
+        image = image / self.std[None, None, -1]
         label = results.get('label')
         results = {'image': image, 'label': label}
         return results

@@ -1,7 +1,5 @@
 import argparse
 import os
-
-import numpy as np
 from torch.utils.data import DataLoader
 from model import FullyConnectionModel
 from dataset import MnistDataset
@@ -11,7 +9,7 @@ from fit_utils import fit_one_epoch
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--Epoch', type=int, default=10)
-    parser.add_argument('--lr', type=int, default=1e-3)
+    parser.add_argument('--lr', type=int, default=1e-1)
     parser.add_argument('--num-classes', type=int, default=10)
     parser.add_argument('--train-annotation-path', type=str, default='./train_annotation.txt')
     parser.add_argument('--eval-annotation-path', type=str, default='./eval_annotation.txt')
@@ -57,6 +55,7 @@ def main():
     test_dataloader = DataLoader(**test_dataloader_cfg)
     for epoch in range(1, args.Epoch + 1):
         fit_one_epoch(model, epoch, args.Epoch, train_dataloader, test_dataloader, args.lr, num_classes)
+        args.lr = args.lr * 0.1
 
 
 if __name__ == '__main__':
