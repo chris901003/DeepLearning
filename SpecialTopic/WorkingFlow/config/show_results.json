@@ -1,7 +1,7 @@
 {
   "type": "DrawResultsOnPicture",
   "triangles": [
-    {"type":  "yxyx", "val_name": "position", "color": [0, 255, 0], "thick": 3}
+    {"type":  "xyxy", "val_name": "position", "color": [0, 255, 0], "thick": 3}
   ],
   "texts": [
     {"prefix": "Object: ", "val_name": ["object_score", "category_from_object_detection"], "suffix": "", "sep": "|"},

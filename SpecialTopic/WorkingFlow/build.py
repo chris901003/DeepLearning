@@ -24,21 +24,21 @@ class WorkingSequence:
         self.steps = list()
         # 構建主模塊實例對象同時保存
         for k, v in working_flow_cfg.items():
-            k_ = copy.deepcopy(k)
-            stage_name = k_.get('type', None)
-            module_cls = get_cls_from_dict(support_module, k_)
-            module = module_cls(k_['config_file'])
-            input, output, call_api = k_.get('input', None), k_.get('output', None), k_.get('call_api', None)
-            assert input is not None and output is not None, '需提供輸入以及輸出資料'
+            v_ = copy.deepcopy(v)
+            stage_name = v_.get('type', None)
+            module_cls = get_cls_from_dict(support_module, v_)
+            module = module_cls(v_['config_file'])
+            inputs, outputs, call_api = v_.get('inputs', None), v_.get('outputs', None), v_.get('call_api', None)
+            assert inputs is not None and outputs is not None, '需提供輸入以及輸出資料'
             assert call_api is not None, '需要提供要呼叫哪些函數'
-            if not list_of_list(input):
-                input = [input]
-            if not list_of_list(output):
-                output = [output]
-            if not list_of_list(call_api):
+            if not list_of_list(inputs):
+                inputs = [inputs]
+            if not list_of_list(outputs):
+                outputs = [outputs]
+            if not isinstance(call_api, list):
                 call_api = [call_api]
-            assert len(input) == len(output) == len(call_api), '輸入以及輸出長度需要與使用的api數量相同'
-            module_data = dict(stage_name=stage_name, module=module, input=input, output=output, call_api=call_api)
+            assert len(inputs) == len(outputs) == len(call_api), '輸入以及輸出長度需要與使用的api數量相同'
+            module_data = dict(stage_name=stage_name, module=module, input=inputs, output=outputs, call_api=call_api)
             self.steps.append(module_data)
 
     def __call__(self, step_add_input=None):
@@ -57,7 +57,7 @@ class WorkingSequence:
                 # 整理要輸入的資料包括檢查是否有缺失以及添加額外參數
                 current_input = self.get_current_input(stage_name, index, last_output, step_add_input, input)
                 # 通過一層主模塊
-                results = module(call_api, **current_input)
+                results = module(call_api, current_input)
                 # 整理返回結果，如果返回的是list或是tuple就會根據output整理成dict格式
                 last_output = self.parse_output(stage_name, results, output)
         return last_output
@@ -80,7 +80,8 @@ class WorkingSequence:
     def parse_output(stage_name, results, expect_outputs):
         # 如果是list或是tuple型態就會按照默認的排序將資料對上，長度必須與指定的output相同
         outputs = dict()
-        assert isinstance(results, (dict, tuple, list)), 'step的輸出結果需要是[dict, tuple, list]型態'
+        if not isinstance(results, (dict, tuple, list)):
+            results = [results]
         if isinstance(results, dict):
             # 只會保留指定的輸出，如果有缺少就會報錯
             for expect_output in expect_outputs:
@@ -94,7 +95,7 @@ class WorkingSequence:
                 outputs[expect_output] = results[idx]
         return outputs
 
-    def __repr__(self):
+    def get_build_info(self):
         # 展示出當前有支援那些主模塊
         print('Current support module: ')
         for module_name in self.support_module.keys():

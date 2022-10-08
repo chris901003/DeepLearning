@@ -1,5 +1,5 @@
 import argparse
-import os
+import cv2
 from SpecialTopic.WorkingFlow.utils import parser_cfg
 from SpecialTopic.WorkingFlow.build import WorkingSequence
 
@@ -18,6 +18,13 @@ def main():
     args = args_parse()
     working_flow_cfg = parser_cfg(args.working_flow_cfg)
     working_flow = WorkingSequence(working_flow_cfg)
+    step_add_input = {'ObjectClassifyToRemainClassify': {'0': {'using_dict_name': 'FoodDetection9'}}}
+    while True:
+        result = working_flow(step_add_input=step_add_input)
+        result_image = result['image']
+        cv2.imshow('result', result_image)
+        if cv2.waitKey(1) == ord('q'):
+            break
 
 
 if __name__ == '__main__':
