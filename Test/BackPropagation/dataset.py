@@ -56,6 +56,6 @@ class MnistDataset(Dataset):
         for info in batch:
             images.append(info['image'])
             labels.append(info['label'])
-        images = np.array(images).squeeze(0)
+        images = np.array(images)
         labels = np.array(labels)
         return images, labels
