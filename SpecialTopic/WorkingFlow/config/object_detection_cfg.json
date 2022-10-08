@@ -6,5 +6,6 @@
   "confidence": 0.7,
   "nms": 0.3,
   "filter_edge": "False",
-  "cfg": "auto"
+  "cfg": "auto",
+  "new_track_box": 10
 }

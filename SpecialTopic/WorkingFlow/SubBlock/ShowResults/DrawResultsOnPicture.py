@@ -66,7 +66,7 @@ class DrawResultsOnPicture:
                 cv2.putText(result_image, info,
                             (draw_position[0] + 30, draw_position[1] + 30 * (index + 1)),
                             cv2.FONT_HERSHEY_SIMPLEX, text_size, color, thick, cv2.LINE_AA)
-        return result_image
+        return result_image, track_object_info
 
     @staticmethod
     def get_string_type(val):

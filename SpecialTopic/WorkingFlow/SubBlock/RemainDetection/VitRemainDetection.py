@@ -79,7 +79,7 @@ class VitRemainDetection:
 
     def update_detection(self, image, position, track_id, remain_category_id):
         image_height, image_width = image.shape[:2]
-        ymin, xmin, ymax, xmax = position
+        xmin, ymin, xmax, ymax = position
         ymin, xmin, ymax, xmax = int(ymin), int(xmin), int(ymax), int(xmax)
         ymin, xmin = max(0, ymin), max(0, xmin)
         ymax, xmax = min(image_height, ymax), min(image_width, xmax)
@@ -138,6 +138,7 @@ def test():
                 ymin, xmin, ymax, xmax = box
                 if ymin < 0 or xmin < 0 or ymax >= image_height or xmax >= image_width:
                     continue
+                box = xmin, ymin, xmax, ymax
                 info = dict(position=box, category_from_object_detection='Noodle', object_score=score, track_id=index,
                             using_last=False, remain_category_id='5')
                 data.append(info)
@@ -146,7 +147,7 @@ def test():
             for result in results:
                 position = result['position']
                 category_from_remain = result['category_from_remain']
-                ymin, xmin, ymax, xmax = position
+                xmin, ymin, xmax, ymax = position
                 ymin, xmin, ymax, xmax = int(ymin), int(xmin), int(ymax), int(xmax)
                 ymin, xmin = max(0, ymin), max(0, xmin)
                 ymax, xmax = min(image_height, ymax), min(image_width, xmax)

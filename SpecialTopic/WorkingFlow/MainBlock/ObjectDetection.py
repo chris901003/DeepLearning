@@ -1,4 +1,5 @@
 import copy
+import os
 from SpecialTopic.WorkingFlow.utils import parser_cfg
 from SpecialTopic.ST.utils import get_cls_from_dict
 
@@ -13,6 +14,10 @@ class ObjectDetection:
         cfg_ = copy.deepcopy(cfg)
         self.cfg = cfg
         module_cls = get_cls_from_dict(support_module, cfg_)
+        if 'pretrained' in cfg_.keys():
+            pretrained = cfg_.get('pretrained')
+            if not os.path.isfile(pretrained):
+                cfg_['pretrained'] = 'none'
         self.module = module_cls(**cfg_)
 
     def __call__(self, call_api, inputs):
