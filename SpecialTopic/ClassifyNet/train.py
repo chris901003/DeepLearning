@@ -24,7 +24,7 @@ def parse_args():
     # 提供類別文件
     parser.add_argument('--classes-path', type=str, default='./classes.txt')
     # 如果在標註文件中的圖像路徑使用的是相對路徑，可以透過data-prefix變成絕對路徑
-    parser.add_argument('-data-prefix', type=str, default='')
+    parser.add_argument('--data-prefix', type=str, default='')
     # 訓練標註文件位置
     parser.add_argument('--train-annotation-path', type=str, default='./train_annotation.txt')
     # 驗證標註文件位置，如果設定none就會自動拿train同時作為驗證
