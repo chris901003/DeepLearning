@@ -1,5 +1,4 @@
 import copy
-
 from .utils import get_cls_from_dict
 from torch import nn
 

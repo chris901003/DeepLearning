@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import os
 from typing import Union
+import numpy as np
 import torch.nn.functional as F
 from SpecialTopic.ST.net.layer import PatchEmbedNormal, MultiheadAttention
 from SpecialTopic.ST.build import build_backbone, build_head, build_norm, build_activation, build_dropout
@@ -305,10 +306,31 @@ class Segformer(nn.Module):
         if not os.path.exists(pretrained):
             print('未使用預訓練權重，全部從隨機權重開始')
             pretrained = 'none'
+        self.pretrained = pretrained
         self.backbone = build_backbone(backbone)
         self.decode_head = build_head(decode_head)
+        if pretrained != 'none':
+            self.init_weights_pretrained()
 
     def forward(self, images, labels, with_loss=True):
         feat = self.backbone(images)
         loss = self.decode_head(feat, labels, with_loss)
         return loss
+
+    def init_weights_pretrained(self):
+        pretrained_dict = torch.load(self.pretrained, map_location='cpu')
+        if 'state_dict' in pretrained_dict.keys():
+            pretrained_dict = pretrained_dict['state_dict']
+        model_dict = self.state_dict()
+        load_key, no_load_key, temp_dict = [], [], {}
+        for k, v in pretrained_dict.items():
+            new_layer_name = k
+            if new_layer_name in model_dict.keys() and np.shape(model_dict[new_layer_name]) == np.shape(v):
+                temp_dict[new_layer_name] = v
+                load_key.append(new_layer_name)
+            else:
+                no_load_key.append(new_layer_name)
+        print("\nSuccessful Load Key:", str(load_key)[:500], "……\nSuccessful Load Key Num:", len(load_key))
+        print("\nFail To Load Key:", str(no_load_key)[:500], "……\nFail To Load Key num:", len(no_load_key))
+        model_dict.update(temp_dict)
+        self.load_state_dict(model_dict)

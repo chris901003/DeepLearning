@@ -1,7 +1,7 @@
 import argparse
 import torch
 from SpecialTopic.ST.utils import get_classes, get_model_cfg
-from SpecialTopic.ST.build import build_detector
+from SpecialTopic.ST.build import build_detector, build_dataset
 
 
 def parse_args():
@@ -13,7 +13,8 @@ def parse_args():
     # 一個batch的大小，如果顯存不夠就將這裡條小
     parser.add_argument('--batch-size', type=int, default=2)
     # 預訓練權重，這裡給的會是主幹的預訓練權重
-    parser.add_argument('--pretrained', type=str, default='none')
+    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/segformer_mit-b2_512x512_16'
+                                                          '0k_ade20k_20220620_114047-64e4feca.pth')
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
@@ -78,10 +79,27 @@ def main():
     model_cfg['pretrained'] = args.pretrained
     model_cfg['decode_head']['num_classes'] = num_classes
     model = build_detector(model_cfg)
-    image = torch.rand((2, 3, 512, 512))
-    target = torch.randint(0, 9, size=(2, 1, 512, 512))
-    output = model(image, target)
-    print('f')
+    # image = torch.rand((2, 3, 512, 512))
+    # target = torch.randint(0, 9, size=(2, 1, 512, 512))
+    # output = model(image, target)
+    train_dataset_cfg = {
+        'type': 'SegformerDataset',
+        'annotation_file': args.tain_annotation_path,
+        'data_name': 'ADE20KDataset',
+        'data_prefix': args.data_prefix,
+        'pipeline': [
+            {'type': 'LoadImageFromFile'},
+            {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+            {'type': 'Resize', 'img_scale': (2048, 512), 'ratio_range': (0.5, 2.0)},
+            {'type': 'RandomCrop', 'crop_size': (512, 512), 'cat_max_ratio': 0.75},
+            {'type': 'RandomFlip', 'prob': 0.5},
+            {'type': 'PhotoMetricDistortion'},
+            {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+            {'type': 'Pad', 'size': (512, 512), 'pad_val': 0, 'seg_pad_val': 255},
+            {'type': 'Collect', 'keys': ['img', 'gt_sematic_seg']}
+        ]
+    }
+    train_dataset = build_dataset(train_dataset_cfg)
 
 
 if __name__ == '__main__':
