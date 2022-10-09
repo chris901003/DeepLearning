@@ -38,6 +38,8 @@ class ConvModule(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias='auto',
                  conv_cfg=None, norm_cfg=None, act_cfg='Default', inplace=True, order=('conv', 'norm', 'act')):
         super(ConvModule, self).__init__()
+        if act_cfg == 'Default':
+            act_cfg = dict(type='ReLU')
         assert conv_cfg is None or isinstance(conv_cfg, dict)
         assert norm_cfg is None or isinstance(norm_cfg, dict)
         assert act_cfg is None or isinstance(act_cfg, dict)

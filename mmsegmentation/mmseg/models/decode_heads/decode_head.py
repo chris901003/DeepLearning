@@ -310,7 +310,7 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         else:
             seg_weight = None
         # 將標註的tensor從第一個維度展平
-        # seg_label shape = [batch_size, height * width]
+        # seg_label shape = [batch_size, height, width]
         seg_label = seg_label.squeeze(1)
 
         if not isinstance(self.loss_decode, nn.ModuleList):
