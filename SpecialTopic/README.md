@@ -64,3 +64,9 @@
 
 #### EatPoseDetection
 檢測吃飯動作
+
+#### ClassifyNet
+分類模型，主要用來檢測剩餘量資料
+
+#### SegmentationNet
+分割模型，主要也是解決剩餘量資料，對於固體的食物可以使用
