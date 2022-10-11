@@ -3,8 +3,9 @@ from torch import nn
 from typing import Union
 import math
 import torch.nn.functional as F
+from SpecialTopic.ST.utils import to_2tuple
 from .basic import BaseConv, DWConv, ConvModule
-from ..build import build_activation, build_norm
+from ..build import build_activation, build_norm, build_conv, build_dropout
 
 
 class CSPLayer(nn.Module):
@@ -272,6 +273,34 @@ class PatchEmbed(nn.Module):
         return x
 
 
+class PatchEmbedNormal(nn.Module):
+    def __init__(self, in_channels=3, embed_dims=768, kernel_size=16, stride=None, padding=0, conv_type='Default',
+                 norm_cfg=None, bias=True):
+        super(PatchEmbedNormal, self).__init__()
+        if conv_type == 'Default':
+            conv_type = dict(type='Conv')
+        self.embed_dims = embed_dims
+        if stride is None:
+            stride = kernel_size
+        kernel_size = to_2tuple(kernel_size)
+        stride = to_2tuple(stride)
+        padding = to_2tuple(padding)
+        self.projection = build_conv(conv_type, in_channels=in_channels, out_channels=embed_dims,
+                                     kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if norm_cfg is not None:
+            self.norm = build_norm(norm_cfg, embed_dims)[1]
+        else:
+            self.norm = None
+
+    def forward(self, x):
+        x = self.projection(x)
+        out_size = (x.shape[2], x.shape[3])
+        x = x.flatten(2).transpose(1, 2)
+        if self.norm is not None:
+            x = self.norm(x)
+        return x, out_size
+
+
 class VitBlock(nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_ratio=0., attn_drop_ratio=0.,
                  drop_path_ratio=0., act_layer='Default', norm_layer='Default'):
@@ -383,8 +412,8 @@ class InvertedResidual(nn.Module):
         block.add_module(
             name='conv_3x3',
             module=ConvModule(
-                in_channels=hidden_dim, out_channels=hidden_dim, stride=stride, kernel_size=3, padding=1, groups=hidden_dim,
-                conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
+                in_channels=hidden_dim, out_channels=hidden_dim, stride=stride, kernel_size=3, padding=1,
+                groups=hidden_dim, conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
         block.add_module(
             name='red_1x1',
             module=ConvModule(
@@ -538,3 +567,43 @@ class MobileVitBlock(nn.Module):
         fm = self.conv_proj(fm)
         fm = self.fusion(torch.cat((res, fm), dim=1))
         return fm
+
+
+class MultiheadAttention(nn.Module):
+    def __init__(self, embed_dims, num_heads, attn_drop=0., proj_drop=0., dropout_layer='Default', batch_first=False,
+                 **kwargs):
+        # 這裡比較特別的是直接使用pytorch官方給的注意力模塊，所以如果遇到預訓練權重是使用官方的attention模塊就用這個
+        super(MultiheadAttention, self).__init__()
+        if dropout_layer == 'Default':
+            dropout_layer = dict(type='Dropout', p=0.)
+        self.embed_dims = embed_dims
+        self.num_heads = num_heads
+        self.batch_first = batch_first
+        self.attn = nn.MultiheadAttention(embed_dims, num_heads, attn_drop, **kwargs)
+        self.proj_drop = nn.Dropout(proj_drop)
+        self.drop_layer = build_dropout(dropout_layer) if dropout_layer is not None else nn.Identity()
+
+    def forward(self, query, key=None, value=None, identity=None, query_pos=None, key_pos=None, attn_mask=None,
+                key_padding_mask=None, **kwargs):
+        if key is None:
+            key = query
+        if value is None:
+            value = key
+        if identity is None:
+            identity = query
+        if key_pos is None:
+            if query_pos is not None:
+                if query_pos.shape == key.shape:
+                    key_pos = query_pos
+        if query_pos is not None:
+            query += query_pos
+        if key_pos is not None:
+            key = key + key_pos
+        if self.batch_first:
+            query = query.tranpose(0, 1)
+            key = key.transpose(0, 1)
+            value = value.tranpose(0, 1)
+        out = self.attn(query=query, key=key, value=value, attn_mask=attn_mask, key_padding_mask=key_padding_mask)[0]
+        if self.batch_first:
+            out = out.transpose(0, 1)
+        return identity + self.drop_layer(self.proj_drop(out))

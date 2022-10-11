@@ -1,3 +1,4 @@
+import copy
 from .utils import get_cls_from_dict
 from torch import nn
 
@@ -8,12 +9,14 @@ def build_detector(detector_cfg):
     from .net.resnet import ResNet
     from .net.VIT import VIT
     from .net.MobileVit import MobileVit
+    from .net.Segformer import Segformer
     support_detector = {
         'YoloBody': YoloBody,
         'Recognizer3D': Recognizer3D,
         'ResNet': ResNet,
         'VIT': VIT,
-        'MobileVit': MobileVit
+        'MobileVit': MobileVit,
+        'Segformer': Segformer
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
@@ -26,13 +29,15 @@ def build_backbone(backbone_cfg):
     from .net.resnet import ResnetExtract
     from .net.VIT import VisionTransformer
     from .net.MobileVit import MobileVitExtract
+    from .net.Segformer import MixVisionTransformer
     support_backbone = {
         'YOLOPAFPN': YOLOPAFPN,
         'CSPDarknet': CSPDarknet,
         'ResNet3d': ResNet3d,
         'ResnetExtract': ResnetExtract,
         'VisionTransformer': VisionTransformer,
-        'MobileVitExtract': MobileVitExtract
+        'MobileVitExtract': MobileVitExtract,
+        'MixVisionTransformer': MixVisionTransformer
     }
     backbone_cls = get_cls_from_dict(support_backbone, backbone_cfg)
     backbone = backbone_cls(**backbone_cfg)
@@ -45,12 +50,14 @@ def build_head(head_cfg):
     from .net.resnet import ResnetHead
     from .net.VIT import VitHead
     from .net.MobileVit import MobileVitHead
+    from .net.Segformer import SegformerHead
     support_head = {
         'YOLOXHead': YOLOXHead,
         'I3DHead': I3DHead,
         'ResnetHead': ResnetHead,
         'VitHead': VitHead,
-        'MobileVitHead': MobileVitHead
+        'MobileVitHead': MobileVitHead,
+        'SegformerHead': SegformerHead
     }
     head_cls = get_cls_from_dict(support_head, head_cfg)
     head = head_cls(**head_cfg)
@@ -81,7 +88,7 @@ def build_activation(act_cfg):
 
 
 def build_conv(conv_cfg, *args, **kwargs):
-    conv_cfg_ = conv_cfg.copy()
+    conv_cfg_ = copy.deepcopy(conv_cfg)
     support_conv = {
         'Conv1d': nn.Conv1d,
         'Conv2d': nn.Conv2d,
@@ -113,6 +120,18 @@ def build_norm(norm_cfg, num_features, postfix=''):
     return name, layer
 
 
+def build_dropout(dropout_cfg):
+    from SpecialTopic.ST.net.layer import DropPath
+    dropout_cfg_ = copy.deepcopy(dropout_cfg)
+    support_dropout_layer = {
+        'Dropout': nn.Dropout,
+        'DropPath': DropPath
+    }
+    dropout_cls = get_cls_from_dict(support_dropout_layer, dropout_cfg_)
+    dropout = dropout_cls(**dropout_cfg_)
+    return dropout
+
+
 def build_loss(loss_cfg):
     from .net.yolox import YOLOLoss
     support_loss = {
@@ -125,12 +144,14 @@ def build_loss(loss_cfg):
 
 
 def build_dataset(dataset_cfg):
-    from .dataset.dataset import YoloDataset, VideoDataset, RemainingDataset
+    from .dataset.dataset import YoloDataset, VideoDataset, RemainingDataset, SegformerDataset
     support_dataset = {
         'YoloDataset': YoloDataset,
         'VideoDataset': VideoDataset,
-        'RemainingDataset': RemainingDataset
+        'RemainingDataset': RemainingDataset,
+        'SegformerDataset': SegformerDataset
     }
-    dataset_cls = get_cls_from_dict(support_dataset, dataset_cfg)
-    dataset = dataset_cls(**dataset_cfg)
+    dataset_cfg_ = copy.deepcopy(dataset_cfg)
+    dataset_cls = get_cls_from_dict(support_dataset, dataset_cfg_)
+    dataset = dataset_cls(**dataset_cfg_)
     return dataset

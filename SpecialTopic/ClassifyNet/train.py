@@ -11,7 +11,7 @@ from SpecialTopic.ST.build import build_detector, build_dataset
 
 def parse_args():
     parser = argparse.ArgumentParser('使用分類網路進行剩餘量判斷')
-    # 選擇使用的模型主幹
+    # 選擇使用的模型主幹，目前支援[ResNet, VIT, MobileVit]
     parser.add_argument('--model-type', type=str, default='VIT')
     # 使用的模型大小，這裡支援的尺寸會與使用的模型主幹有關
     parser.add_argument('--phi', type=str, default='m')

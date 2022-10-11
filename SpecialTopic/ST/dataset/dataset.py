@@ -165,3 +165,69 @@ class RemainingDataset(Dataset):
         images = torch.stack(images)
         labels = torch.stack(labels)
         return images, labels
+
+
+class SegformerDataset(Dataset):
+    def __init__(self, annotation_file, pipeline, data_name, data_prefix='', test_mode=False, ignore_index=255,
+                 reduce_zero_label=False):
+        self.annotation_file = annotation_file
+        self.data_prefix = data_prefix
+        self.test_mode = test_mode
+        self.ignore_index = ignore_index
+        self.reduce_zero_label = reduce_zero_label
+        self.data_name = data_name
+        self.CLASSES, self.PALETTE = self.get_classes_and_palette()
+        self.image_infos = self.load_annotations()
+        self.pipeline = Compose(pipeline)
+
+    def __getitem__(self, idx):
+        if self.test_mode:
+            return self.prepare_test_img(idx)
+        else:
+            return self.prepare_train_img(idx)
+
+    def prepare_train_img(self, idx):
+        results = self.image_infos[idx]
+        return self.pipeline(results)
+
+    def prepare_test_img(self, idx):
+        results = self.image_infos[idx]
+        results.pop('label_path')
+        return self.pipeline(results)
+
+    def __len__(self):
+        return len(self.image_infos)
+
+    def load_annotations(self):
+        results = list()
+        assert os.path.exists(self.annotation_file), '給定的標註文件不存在'
+        with open(self.annotation_file, 'r') as f:
+            infos = f.readlines()
+        for info in infos:
+            image_path, label_path = info.strip().split(' ')
+            if self.data_prefix != '':
+                image_path = os.path.join(self.data_prefix, image_path)
+                label_path = os.path.join(self.data_prefix, label_path)
+            data = dict(image_path=image_path, label_path=label_path)
+            results.append(data)
+        return results
+
+    def get_classes_and_palette(self):
+        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset
+        support_dataset = {
+            'ADE20KDataset': ADE20KDataset
+        }
+        info = support_dataset.get(self.data_name, None)
+        assert info is not None, f'沒有{self.data_name}的表，如果有需要自行添加'
+        return info['CLASSES'], info['PALETTE']
+
+    @staticmethod
+    def train_collate_fn(batch):
+        labels, images = list(), list()
+        for info in batch:
+            label = info['gt_sematic_seg'][None, :, :]
+            label = torch.from_numpy(label)
+            labels.append(label)
+            img = info['img'].transpose(2, 0, 1)
+            img = torch.from_numpy(img)
+            images.append(img)

@@ -11,13 +11,18 @@ class Compose:
         from .pipeline_recognizer3d import FormatShape, ToTensor, ThreeCrop
         from .pipeline_recognizer3d import Resize as Recognizer3dResize
         from .pipeline_classify import LoadRemainingAnnotation, ResizeSingle, NormalizeSingle
+        import SpecialTopic.ST.dataset.pipeline_segmentation as pipeline_segmentation
         support_pipeline = {
             'LoadInfoFromAnno': LoadInfoFromAnno, 'Resize': Resize, 'ResizeAndAugmentation': ResizeAndAugmentation,
             'Mosaic': Mosaic, 'Collect': Collect, 'PyAVInit': PyAVInit, 'SampleFrames': SampleFrames,
             'PyAVDecode': PyAVDecode, 'MultiScaleCrop': MultiScaleCrop, 'Flip': Flip, 'Normalize': Normalize,
             'FormatShape': FormatShape, 'ToTensor': ToTensor, 'Recognizer3dResize': Recognizer3dResize,
             'ThreeCrop': ThreeCrop, 'LoadRemainingAnnotation': LoadRemainingAnnotation, 'ResizeSingle': ResizeSingle,
-            'NormalizeSingle': NormalizeSingle
+            'NormalizeSingle': NormalizeSingle, 'LoadImageFromFileSegformer': pipeline_segmentation.LoadImageFormFile,
+            'LoadAnnotationsSegformer': pipeline_segmentation.LoadAnnotations, 'PadMMlab': pipeline_segmentation.Pad,
+            'ResizeMMlab': pipeline_segmentation.Resize, 'RandomCropMMlab': pipeline_segmentation.RandomCrop,
+            'RandomFlipMMlab': pipeline_segmentation.RandomFlip, 'NormalizeMMlab': pipeline_segmentation.Normalize,
+            'PhotoMetricDistortionSegformer': pipeline_segmentation.PhotoMetricDistortion
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:
@@ -104,6 +109,16 @@ def imflip_(img, direction='horizontal'):
         return cv2.flip(img, -1, img)
 
 
+def imflip(img, direction='horizontal'):
+    assert direction in ['horizontal', 'vertical', 'diagonal']
+    if direction == 'horizontal':
+        return np.flip(img, axis=1)
+    elif direction == 'vertical':
+        return np.flip(img, axis=0)
+    else:
+        return np.flip(img, axis=(0, 1))
+
+
 def imnormalize_(img, mean, std, to_rgb=True):
     assert img.dtype != np.uint8
     mean = np.float64(mean.reshape(1, -1))
@@ -113,6 +128,11 @@ def imnormalize_(img, mean, std, to_rgb=True):
     cv2.subtract(img, mean, img)
     cv2.multiply(img, std_inv, img)
     return img
+
+
+def imnormalize(img, mean, std, to_rgb=True):
+    img = img.copy().astype(np.float32)
+    return imnormalize_(img, mean, std, to_rgb)
 
 
 def to_tensor(data):
@@ -125,3 +145,46 @@ def to_tensor(data):
     if isinstance(data, float):
         return torch.FloatTensor([data])
     raise TypeError('Can not convert to tensor')
+
+
+def imrescale(img, scale, return_scale=False, interpolation='bilinear'):
+    h, w = img.shape[:2]
+    new_size, scale_factor = rescale_size((w, h), scale, return_scale=True)
+    rescale_img = imresize(img, new_size, interpolation=interpolation)
+    if return_scale:
+        return rescale_img, scale_factor
+    else:
+        return rescale_img
+
+
+def impad(img, *, shape=None, padding=None, pad_val=0, padding_mode='constant'):
+    assert (shape is not None) ^ (padding is not None)
+    if shape is not None:
+        width = max(shape[1] - img.shape[1], 0)
+        height = max(shape[0] - img.shape[0], 0)
+        padding = (0, 0, width, height)
+    if isinstance(pad_val, tuple):
+        assert len(pad_val) == img.shape[-1]
+    if isinstance(padding, tuple) and len(padding) in [2, 4]:
+        if len(padding) == 2:
+            padding = (padding[0], padding[1], padding[0], padding[1])
+    elif isinstance(padding, int):
+        padding = (padding, padding, padding, padding)
+    else:
+        raise ValueError('給定的padding需要長度為2或是4或是直接給一個數')
+    assert padding_mode in ['constant', 'edge', 'reflect', 'symmetric']
+    border_type = {
+        'constant': cv2.BORDER_CONSTANT,
+        'edge': cv2.BORDER_REPLICATE,
+        'reflect': cv2.BORDER_REFLECT_101,
+        'symmetric': cv2.BORDER_REFLECT
+    }
+    img = cv2.copyMakeBorder(img, padding[1], padding[3], padding[0], padding[2], border_type[padding_mode],
+                             value=pad_val)
+    return img
+
+
+def impad_to_multiple(img, divisor, pad_val=0):
+    pad_h = int(np.ceil(img.shape[0] / divisor)) * divisor
+    pad_w = int(np.ceil(img.shape[1] / divisor)) * divisor
+    return impad(img, shape=(pad_h, pad_w), pad_val=pad_val)
