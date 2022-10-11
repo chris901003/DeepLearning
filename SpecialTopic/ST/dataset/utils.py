@@ -11,13 +11,18 @@ class Compose:
         from .pipeline_recognizer3d import FormatShape, ToTensor, ThreeCrop
         from .pipeline_recognizer3d import Resize as Recognizer3dResize
         from .pipeline_classify import LoadRemainingAnnotation, ResizeSingle, NormalizeSingle
+        import SpecialTopic.ST.dataset.pipeline_segmentation as pipeline_segmentation
         support_pipeline = {
             'LoadInfoFromAnno': LoadInfoFromAnno, 'Resize': Resize, 'ResizeAndAugmentation': ResizeAndAugmentation,
             'Mosaic': Mosaic, 'Collect': Collect, 'PyAVInit': PyAVInit, 'SampleFrames': SampleFrames,
             'PyAVDecode': PyAVDecode, 'MultiScaleCrop': MultiScaleCrop, 'Flip': Flip, 'Normalize': Normalize,
             'FormatShape': FormatShape, 'ToTensor': ToTensor, 'Recognizer3dResize': Recognizer3dResize,
             'ThreeCrop': ThreeCrop, 'LoadRemainingAnnotation': LoadRemainingAnnotation, 'ResizeSingle': ResizeSingle,
-            'NormalizeSingle': NormalizeSingle
+            'NormalizeSingle': NormalizeSingle, 'LoadImageFromFileSegformer': pipeline_segmentation.LoadImageFormFile,
+            'LoadAnnotationsSegformer': pipeline_segmentation.LoadAnnotations, 'PadMMlab': pipeline_segmentation.Pad,
+            'ResizeMMlab': pipeline_segmentation.Resize, 'RandomCropMMlab': pipeline_segmentation.RandomCrop,
+            'RandomFlipMMlab': pipeline_segmentation.RandomFlip, 'NormalizeMMlab': pipeline_segmentation.Normalize,
+            'PhotoMetricDistortionSegformer': pipeline_segmentation.PhotoMetricDistortion
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:
@@ -143,7 +148,7 @@ def to_tensor(data):
 
 
 def imrescale(img, scale, return_scale=False, interpolation='bilinear'):
-    h, w = img.shae[:2]
+    h, w = img.shape[:2]
     new_size, scale_factor = rescale_size((w, h), scale, return_scale=True)
     rescale_img = imresize(img, new_size, interpolation=interpolation)
     if return_scale:

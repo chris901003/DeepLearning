@@ -41,6 +41,7 @@ class LoadAnnotations:
         assert label_path is not None, '需提供label_path以獲取標註圖像'
         assert os.path.exists(label_path), f'給定的{label_path}不存在'
         label_image = cv2.imread(label_path)
+        label_image = label_image[:, :, 0:1]
         if self.reduce_zero_label:
             label_image[label_image == 0] = 255
             label_image = label_image - 1

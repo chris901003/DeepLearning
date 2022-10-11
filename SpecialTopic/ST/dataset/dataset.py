@@ -198,7 +198,7 @@ class SegformerDataset(Dataset):
     def __len__(self):
         return len(self.image_infos)
 
-    def load_annotation(self):
+    def load_annotations(self):
         results = list()
         assert os.path.exists(self.annotation_file), '給定的標註文件不存在'
         with open(self.annotation_file, 'r') as f:
@@ -220,3 +220,14 @@ class SegformerDataset(Dataset):
         info = support_dataset.get(self.data_name, None)
         assert info is not None, f'沒有{self.data_name}的表，如果有需要自行添加'
         return info['CLASSES'], info['PALETTE']
+
+    @staticmethod
+    def train_collate_fn(batch):
+        labels, images = list(), list()
+        for info in batch:
+            label = info['gt_sematic_seg'][None, :, :]
+            label = torch.from_numpy(label)
+            labels.append(label)
+            img = info['img'].transpose(2, 0, 1)
+            img = torch.from_numpy(img)
+            images.append(img)
