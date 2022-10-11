@@ -1,11 +1,12 @@
-import os
 import socket
 import numpy as np
 import cv2
 
 
-class Webcam:
-    def __init__(self, pi_ip="10.201.35.39", pi_port=10900, fps=10, w_h=[1280, 960]):
+class ReadPictureFromPi:
+    def __init__(self, pi_ip="192.168.0.144", pi_port=10900, fps=10, w_h='Default'):
+        if w_h == 'Default':
+            w_h = [1280, 960]
         if type(fps) != int:
             raise ValueError("fps 須為整數")
         resolution_set = [[640, 480], [800, 600], [1280, 720], [1280, 960], [1920, 1080]]
@@ -32,6 +33,16 @@ class Webcam:
             else:
                 break
         self.w_h = w_h
+        self.support_api = {'get_img': self.get_img}
+
+    def __call__(self, call_api, input=None):
+        func = self.support_api.get(call_api, None)
+        assert func is not None, f'Read picture from pi沒有提供{call_api}函數'
+        if input is not None:
+            results = func(**input)
+        else:
+            results = func()
+        return results
 
     def get_img(self):
         try:
@@ -50,12 +61,17 @@ class Webcam:
         self.client.close()
 
 
-test = Webcam()
-os.system('pause')
-wb_img = test.get_img()
-print("here")
+def test():
+    module = ReadPictureFromPi()
+    while True:
+        wb_img = module(call_api='get_img')
+        cv2.namedWindow('test', 0)
+        cv2.resizeWindow('test', 960, 1280)
+        cv2.imshow("test", wb_img)
+        if cv2.waitKey(1) == ord('q'):
+            break
 
-cv2.namedWindow('test', 0)
-cv2.resizeWindow('test', 960, 1280)
-cv2.imshow("test", wb_img)
-cv2.waitKey()
+
+if __name__ == '__main__':
+    print('Testing Read picture from pi')
+    test()
