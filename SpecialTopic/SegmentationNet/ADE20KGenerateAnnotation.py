@@ -45,7 +45,7 @@ def main():
     val_anno_path = os.path.join(anno_file_path, args.val_annotation_file_name)
     generate_annotation_file('train_annotation.txt', train_image_path, train_anno_path)
     if args.with_val:
-        generate_annotation_file('val_annotation.txt', val_image_path, val_anno_path)
+        generate_annotation_file('eval_annotation.txt', val_image_path, val_anno_path)
 
 
 if __name__ == '__main__':

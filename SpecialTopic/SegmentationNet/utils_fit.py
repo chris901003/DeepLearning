@@ -107,7 +107,7 @@ def fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, Total_
             save_dict = model.state_dict()
         save_name = os.path.join(save_path, f'{weight_name}_best_train.pth')
         torch.save(save_dict, save_name)
-    if best_val_loss and training_state['val_loss'] > (eval_loss / len(val_dataloader)):
+    if best_val_loss and training_state['val_loss'] > (eval_loss / len(eval_dataloader)):
         if save_optimizer:
             save_dict = {
                 'model_weight': model.state_dict(),

@@ -20,8 +20,7 @@ def parse_args():
     # 多少個batch會進行權重更新，可以透過這種方式模擬大batch size的情況，通常可以增加正確率
     parser.add_argument('--optimizer-step-period', type=int, default=1)
     # 預訓練權重，這裡給的會是主幹的預訓練權重
-    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/segformer_mit-b2_512x512_16'
-                                                          '0k_ade20k_20220620_114047-64e4feca.pth')
+    parser.add_argument('--pretrained', type=str, default='none')
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
@@ -64,7 +63,7 @@ def parse_args():
     parser.add_argument('--weight-name', type=str, default='auto')
 
     # DataLoader中要使用的cpu核心數
-    parser.add_argument('--num-workers', type=int, default=1)
+    parser.add_argument('--num-workers', type=int, default=8)
     # 是否需要將訓練過程傳送email
     parser.add_argument('--send-email', action='store_true')
     # 要使用哪個電子郵件發送
@@ -149,7 +148,8 @@ def main():
             {'type': 'RandomCropMMlab', 'crop_size': (512, 512), 'cat_max_ratio': 0.75},
             {'type': 'RandomFlipMMlab', 'prob': 0.5},
             {'type': 'PhotoMetricDistortionSegformer'},
-            {'type': 'NormalizeMMlab', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+            {'type': 'NormalizeMMlab', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375],
+             'to_rgb': True},
             {'type': 'PadMMlab', 'size': (512, 512), 'pad_val': 0, 'seg_pad_val': 255},
             {'type': 'Collect', 'keys': ['img', 'gt_sematic_seg']}
         ]
