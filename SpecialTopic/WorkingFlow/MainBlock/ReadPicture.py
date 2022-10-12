@@ -7,9 +7,11 @@ class ReadPicture:
     def __init__(self, cfg_path):
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromVideo import ReadPictureFromVideo
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromCamera import ReadPictureFromCamera
+        from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromPi import ReadPictureFromPi
         support_module = {
             'ReadPictureFromVideo': ReadPictureFromVideo,
-            'ReadPictureFromCamera': ReadPictureFromCamera
+            'ReadPictureFromCamera': ReadPictureFromCamera,
+            'ReadPictureFromPi': ReadPictureFromPi
         }
         cfg = parser_cfg(cfg_path)
         self.cfg = cfg

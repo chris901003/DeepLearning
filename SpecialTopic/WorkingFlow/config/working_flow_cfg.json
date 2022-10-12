@@ -1,8 +1,8 @@
 {
   "step1": {
     "type": "ReadPicture",
-    "config_file": "./config/get_picture_from_camera_cfg.json",
-    "call_api": ["get_single_picture"],
+    "config_file": "./config/get_picture_from_pi.json",
+    "call_api": ["get_img"],
     "inputs": [[]],
     "outputs": [["image", "image_type"]]
   },
