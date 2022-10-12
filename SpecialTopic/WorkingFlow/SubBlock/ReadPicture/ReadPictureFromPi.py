@@ -54,7 +54,7 @@ class ReadPictureFromPi:
         while byte_buffer.__len__() < (self.w_h[0] * self.w_h[1] * 3):
             byte_buffer += self.client.recv(1024*8)
         img = np.frombuffer(byte_buffer, dtype=np.uint8).reshape([self.w_h[1], self.w_h[0], 3])
-        return img
+        return img, 'ndarray'
 
     def __del__(self):
         self.client.send("end".encode())

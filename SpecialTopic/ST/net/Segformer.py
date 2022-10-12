@@ -241,7 +241,7 @@ class SegformerHead(BaseDecodeHead):
         self.fusion_conv = ConvModule(in_channels=self.channels * num_inputs, out_channels=self.channels, kernel_size=1,
                                       conv_cfg=conv_cfg, norm_cfg=self.norm_cfg)
 
-    def forward(self, inputs, labels, with_loss=True):
+    def forward(self, inputs, labels, topk=(1, 5), with_loss=True):
         inputs = self._transform_inputs(inputs)
         outs = list()
         for idx in range(len(inputs)):
@@ -262,11 +262,11 @@ class SegformerHead(BaseDecodeHead):
         labels = labels.squeeze(1)
         loss = F.cross_entropy(seg_logit, labels, reduction='none', ignore_index=self.ignore_index).mean()
         losses['loss'] = loss
-        losses['acc'] = self.accuracy(seg_logit, labels, ignore_index=self.ignore_index)
+        losses['acc'] = self.accuracy(seg_logit, labels, topk=topk, ignore_index=self.ignore_index)
         return losses
 
     @staticmethod
-    def accuracy(pred, target, topk=1, thresh=None, ignore_index=None):
+    def accuracy(pred, target, topk: Union[int, tuple, list] = 1, thresh=None, ignore_index=None):
         assert isinstance(topk, (int, tuple))
         if isinstance(topk, int):
             topk = (topk, )
@@ -314,7 +314,7 @@ class Segformer(nn.Module):
 
     def forward(self, images, labels, with_loss=True):
         feat = self.backbone(images)
-        loss = self.decode_head(feat, labels, with_loss)
+        loss = self.decode_head(feat, labels, with_loss=with_loss)
         return loss
 
     def init_weights_pretrained(self):
@@ -325,6 +325,9 @@ class Segformer(nn.Module):
         load_key, no_load_key, temp_dict = [], [], {}
         for k, v in pretrained_dict.items():
             new_layer_name = k
+            if 'conv_seg' in k:
+                str_idx = k.find('conv_seg')
+                new_layer_name = k[:str_idx] + 'cls_seg.' + k[str_idx + 9:]
             if new_layer_name in model_dict.keys() and np.shape(model_dict[new_layer_name]) == np.shape(v):
                 temp_dict[new_layer_name] = v
                 load_key.append(new_layer_name)

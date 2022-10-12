@@ -1,0 +1,7 @@
+{
+  "type": "ReadPictureFromPi",
+  "pi_ip": "192.168.0.144",
+  "pi_port": 10900,
+  "fps": 10,
+  "w_h": "Default"
+}

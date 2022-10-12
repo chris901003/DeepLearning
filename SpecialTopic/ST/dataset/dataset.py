@@ -226,8 +226,11 @@ class SegformerDataset(Dataset):
         labels, images = list(), list()
         for info in batch:
             label = info['gt_sematic_seg'][None, :, :]
-            label = torch.from_numpy(label)
+            label = torch.from_numpy(label).to(torch.long)
             labels.append(label)
             img = info['img'].transpose(2, 0, 1)
             img = torch.from_numpy(img)
             images.append(img)
+        labels = torch.stack(labels)
+        images = torch.stack(images)
+        return images, labels

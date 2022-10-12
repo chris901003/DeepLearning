@@ -3,7 +3,8 @@ import copy
 import torch
 import os
 from torch.utils.data import DataLoader
-from SpecialTopic.ST.utils import get_classes, get_model_cfg
+from SpecialTopic.SegmentationNet.utils_fit import fit_one_epoch
+from SpecialTopic.ST.utils import get_classes, get_model_cfg, get_logger
 from SpecialTopic.ST.build import build_detector, build_dataset
 from SpecialTopic.ST.net.lr_scheduler import build_lr_scheduler
 
@@ -24,7 +25,7 @@ def parse_args():
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
-    parser.add_argument('--classes-path', type=str, default='/Users/huanghongyan/Downloads/data_annotation/classes.txt')
+    parser.add_argument('--classes-path', type=str, default='./classes.txt')
     # 訓練圖像資料的前綴路徑，為了可以將標註文件內容寫成相對路徑所使用
     parser.add_argument('--data-prefix', type=str, default='')
     # 訓練使用的標註文件
@@ -123,11 +124,14 @@ def main():
             model_weights = pretrained_dict
         if 'optimizer_weights' in pretrained_dict.keys():
             optimizer_weights = pretrained_dict['optimizer_weights']
+            assert 'last_epoch' in pretrained_dict.keys(), '需提供最後訓練時的Epoch'
+            args.Init_Epoch = pretrained_dict['last_epoch']
         else:
             optimizer_weights = None
         model.load_state_dict(model_weights)
         if optimizer_weights is not None:
             optimizer.load_state_dict(optimizer_weights)
+    last_epoch = args.Init_Epoch if args.Init_Epoch != 0 else -1
     lr_scheduler_cfg = None
     if lr_scheduler_cfg is not None:
         lr_scheduler = build_lr_scheduler(model, lr_scheduler_cfg)
@@ -175,8 +179,45 @@ def main():
         scaler = GradScaler()
     else:
         scaler = None
-    t = next(iter(train_dataloader))
-    print('f')
+    training_state = dict(train_loss=10000, val_loss=10000)
+    best_train_loss = args.best_train_loss
+    best_val_loss = args.best_eval_loss
+    save_optimizer = args.save_optimizer
+    save_info = {
+        'train_loss': list(), 'val_loss': list(), 'train_acc': list(), 'val_acc': list()
+    }
+    if args.send_email:
+        logger = get_logger(save_info=save_info, email_sender=args.email_sender, email_key=args.email_key)
+    else:
+        logger = get_logger(save_info=save_info)
+    save_path = args.save_path
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    optimizer_step_period = args.optimizer_step_period
+    assert optimizer_step_period >= 1, '多少個Epoch進行學習率調整需要至少大於1'
+    for epoch in range(args.Init_Epoch, args.Total_Epoch):
+        if epoch > args.Freeze_Epoch and not UnFreeze_flag:
+            batch_size = Unfreeze_batch_size
+            nbs = 64
+            lr_limit_max = 1e-3 if args.optimizer_type == 'adamW' else 5e-2
+            lr_limit_min = 3e-4 if args.optimizer_type == 'adamW' else 5e-4
+            Init_lr_fit = min(max(batch_size / nbs * Init_lr, lr_limit_min), lr_limit_max)
+            Min_lr_fit = min(max(batch_size / nbs * Min_lr, lr_limit_min * 1e-2), lr_limit_max * 1e-2)
+            last_epoch = epoch
+            lr_scheduler_cfg = None
+            if lr_scheduler_cfg is not None:
+                lr_scheduler = build_lr_scheduler(model, lr_scheduler_cfg)
+            else:
+                lr_scheduler = None
+            for param in model.parameters():
+                param.require_grad = True
+            train_dataloader_cfg['batch_size'] = batch_size
+            train_dataloader = DataLoader(**train_dataloader_cfg)
+        fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, args.Total_Epoch, train_dataloader,
+                      eval_dataloader, fp16, scaler, args.save_period, save_path, training_state, best_train_loss,
+                      best_val_loss, save_optimizer, args.weight_name, logger, args.send_to, args.save_log_period)
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
 
 if __name__ == '__main__':
