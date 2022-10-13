@@ -31,6 +31,8 @@ def parse_args():
     parser.add_argument('--train-annotation-path', type=str, default='./train_annotation.txt')
     # 驗證使用的標註文件，如果沒有找到該標註文件就會使用訓練文件當作驗證文件
     parser.add_argument('--eval-annotation-path', type=str, default='./eval_annotation.txt')
+    # 要使用哪個CLASSES與PLATTE
+    parser.add_argument('--data-name', type=str, default='ADE20KDataset')
     # 自動使用fp16，如果沒有關閉就會在使用gpu訓練時自動開啟，開啟後可以節省一半的顯存
     parser.add_argument('--auto-fp16', action='store_false')
     # 自動使用cudnn，當檢測到使用gpu訓練時會自動開啟cudnn，如果模型當中沒有使用到卷積層就不會有效果
@@ -141,7 +143,7 @@ def main():
     train_dataset_cfg = {
         'type': 'SegformerDataset',
         'annotation_file': args.train_annotation_path,
-        'data_name': 'ADE20KDataset',
+        'data_name': args.data_name,
         'data_prefix': args.data_prefix,
         'pipeline': [
             {'type': 'LoadImageFromFileSegformer'},

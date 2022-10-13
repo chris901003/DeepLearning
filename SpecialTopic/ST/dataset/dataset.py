@@ -214,9 +214,10 @@ class SegformerDataset(Dataset):
         return results
 
     def get_classes_and_palette(self):
-        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset
+        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood
         support_dataset = {
-            'ADE20KDataset': ADE20KDataset
+            'ADE20KDataset': ADE20KDataset,
+            'FoodAndNotFood': FoodAndNotFood
         }
         info = support_dataset.get(self.data_name, None)
         assert info is not None, f'沒有{self.data_name}的表，如果有需要自行添加'
