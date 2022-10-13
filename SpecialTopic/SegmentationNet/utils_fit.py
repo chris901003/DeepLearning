@@ -101,11 +101,13 @@ def fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, Total_
     print('Total Acc: %.3f || Val Acc : %.3f' % (train_acc / len(train_dataloader), eval_acc / len(eval_dataloader)))
 
     if (epoch + 1) % mIoU_cal_period == 0:
+        pbar = tqdm(total=len(mIoU_dataloader), desc=f'Epoch {epoch + 1}/{Total_Epoch}', postfix=dict, miniters=0.3)
         model = model.eval()
         results = list()
         for iteration, (images, labels_path) in enumerate(mIoU_dataloader):
-            images = images.to(device)
-            outputs = model(images, with_loss=False)
+            with torch.no_grad():
+                images = images.to(device)
+                outputs = model(images, with_loss=False)
             labels = cv2.imread(labels_path[0])[:, :, 0]
             seg_pred = F.interpolate(input=outputs, size=images.shape[2:], mode='bilinear', align_corners=False)
             seg_pred = F.interpolate(input=seg_pred, size=labels.shape[:2], mode='bilinear', align_corners=False)
@@ -114,8 +116,10 @@ def fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, Total_
             seg_pred = seg_pred.cpu().numpy()[0]
             result = mIoU_dataset.pre_eval(seg_pred, labels, iteration)
             results.extend(result)
+            pbar.update(1)
         metric = mIoU_dataset.evaluate(results)
         logger.append_info('mIoU', metric['summary']['IoU'])
+        pbar.close()
 
     if best_train_loss and training_state['train_loss'] > (train_loss / len(train_dataloader)):
         if save_optimizer:
@@ -165,4 +169,5 @@ def fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, Total_
                 logger.send_email(subject='Segformer Net Loss', send_to=send_to, image_info=image_loss)
                 image_acc = os.path.join(logger.logger_root, f'{epoch + 1}_acc.png')
                 logger.send_email(subject='Segformer Net Acc', send_to=send_to, image_info=image_acc)
-
+                image_acc = os.path.join(logger.logger_root, f'{epoch + 1}_mIoU.png')
+                logger.send_email(subject='Segformer Net mIoU', send_to=send_to, image_info=image_acc)

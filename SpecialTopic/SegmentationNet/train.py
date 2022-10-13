@@ -20,8 +20,7 @@ def parse_args():
     # 多少個batch會進行權重更新，可以透過這種方式模擬大batch size的情況，通常可以增加正確率
     parser.add_argument('--optimizer-step-period', type=int, default=1)
     # 預訓練權重，這裡給的會是主幹的預訓練權重
-    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/segformer_mit-b2_512x512_'
-                                                          '160k_ade20k_20220620_114047-64e4feca.pth')
+    parser.add_argument('--pretrained', type=str, default='none')
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
@@ -208,7 +207,7 @@ def main():
     best_val_loss = args.best_eval_loss
     save_optimizer = args.save_optimizer
     save_info = {
-        'train_loss': list(), 'val_loss': list(), 'train_acc': list(), 'val_acc': list()
+        'train_loss': list(), 'val_loss': list(), 'train_acc': list(), 'val_acc': list(), 'mIoU': list()
     }
     if args.send_email:
         logger = get_logger(save_info=save_info, email_sender=args.email_sender, email_key=args.email_key)
