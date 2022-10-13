@@ -49,9 +49,10 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
         pipeline = Compose(pipeline_cfg)
         model.pipeline = pipeline
     if with_color_platte is not None and with_color_platte != 'none' and isinstance(with_color_platte, str):
-        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset
+        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood
         support_platte = {
-            'ADE20KDataset': ADE20KDataset
+            'ADE20KDataset': ADE20KDataset,
+            'FoodAndNotFood': FoodAndNotFood
         }
         platte = support_platte.get(with_color_platte, None)
         assert platte is not None, '目前不支援該資料集'
@@ -63,13 +64,15 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
     return model
 
 
-def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=False):
+def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=False, mask=None):
     image = copy.deepcopy(origin_image)
     assert palette is not None, '需要提供調色盤，否則無法作畫'
     palette = np.array(palette)
     assert palette.shape[1] == 3
     assert len(palette.shape) == 2
     assert 0 < opacity <= 1.0
+    if mask is not None:
+        seg_pred[mask] = -1
     color_seg = np.zeros((seg_pred.shape[0], seg_pred.shape[1], 3), dtype=np.uint8)
     for label, color in enumerate(palette):
         color_seg[seg_pred == label, :] = color
@@ -90,7 +93,8 @@ def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=Fal
     return image, color_seg
 
 
-def detect_single_picture(model, device, image_info, opacity=0.5, CLASSES=None, PALETTE=None, with_class=False):
+def detect_single_picture(model, device, image_info, threshold=0.7, opacity=0.5, CLASSES=None, PALETTE=None,
+                          with_class=False):
     if isinstance(image_info, str):
         image = cv2.imread(image_info)
     elif isinstance(image_info, np.ndarray):
@@ -104,17 +108,19 @@ def detect_single_picture(model, device, image_info, opacity=0.5, CLASSES=None, 
     data = model.pipeline(data)
     image = data['img'][0].unsqueeze(dim=0)
     model, image = model.to(device), image.to(device)
-    output = model(image, with_loss=False)
+    with torch.no_grad():
+        output = model(image, with_loss=False)
     CLASSES = CLASSES if CLASSES is not None else model.CLASSES
     PALETTE = PALETTE if PALETTE is not None else model.PALETTE
     assert CLASSES is not None and PALETTE is not None, '需提供CLASSES與PALETTE資訊才可以做圖'
     seg_pred = F.interpolate(input=output, size=image.shape[2:], mode='bilinear', align_corners=False)
     seg_pred = F.interpolate(input=seg_pred, size=origin_image.shape[:2], mode='bilinear', align_corners=False)
     seg_pred = F.softmax(seg_pred, dim=1)
+    mask = seg_pred < threshold
     seg_pred = seg_pred.argmax(dim=1)
     seg_pred = seg_pred.cpu().numpy()[0]
     draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=model.PALETTE, classes=model.CLASSES,
-                                            opacity=opacity, with_class=with_class)
+                                            opacity=opacity, with_class=with_class, mask=mask)
     return draw_image_mix, draw_image
 
 
