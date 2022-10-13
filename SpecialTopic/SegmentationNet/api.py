@@ -63,7 +63,7 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
     return model
 
 
-def image_draw(origin_image, seg_pred, palette, opacity):
+def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=False):
     image = copy.deepcopy(origin_image)
     assert palette is not None, '需要提供調色盤，否則無法作畫'
     palette = np.array(palette)
@@ -76,10 +76,21 @@ def image_draw(origin_image, seg_pred, palette, opacity):
     color_seg = color_seg[..., ::-1]
     image = image * (1 - opacity) + color_seg * opacity
     image = image.astype(np.uint8)
+    if with_class:
+        classes_set = set(seg_pred.flatten())
+        color2classes = {classes[idx]: palette[idx] for idx in classes_set}
+        image_height, image_width = image.shape[:2]
+        ymin, ymax = image_height - 30, image_height - 10
+        for idx, (class_name, color) in enumerate(color2classes.items()):
+            cv2.rectangle(image, (20, ymin), (40, ymax), color[::-1].tolist(), -1)
+            cv2.putText(image, class_name, (50, ymax), cv2.FONT_HERSHEY_SIMPLEX,
+                        1, (89, 214, 210), 2, cv2.LINE_AA)
+            ymin -= 30
+            ymax -= 30
     return image, color_seg
 
 
-def detect_single_picture(model, device, image_info, opacity=0.5, CLASSES=None, PALETTE=None):
+def detect_single_picture(model, device, image_info, opacity=0.5, CLASSES=None, PALETTE=None, with_class=False):
     if isinstance(image_info, str):
         image = cv2.imread(image_info)
     elif isinstance(image_info, np.ndarray):
@@ -102,7 +113,8 @@ def detect_single_picture(model, device, image_info, opacity=0.5, CLASSES=None, 
     seg_pred = F.softmax(seg_pred, dim=1)
     seg_pred = seg_pred.argmax(dim=1)
     seg_pred = seg_pred.cpu().numpy()[0]
-    draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=model.PALETTE, opacity=opacity)
+    draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=model.PALETTE, classes=model.CLASSES,
+                                            opacity=opacity, with_class=with_class)
     return draw_image_mix, draw_image
 
 

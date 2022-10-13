@@ -9,11 +9,11 @@ from tqdm import tqdm
 def args_parse():
     parser = argparse.ArgumentParser()
     # 圖像資料夾位置
-    parser.add_argument('--image-folder-path', type=str, default='/Users/huanghongyan/Downloads/fish')
+    parser.add_argument('--image-folder-path', type=str, default='./image')
     # 標註文件資料夾位置
-    parser.add_argument('--annotation-folder-path', type=str, default='/Users/huanghongyan/Downloads/fish')
+    parser.add_argument('--annotation-folder-path', type=str, default='./annotation')
     # 圖像保存位置
-    parser.add_argument('--save-folder-path', type=str, default='/Users/huanghongyan/Downloads/fish')
+    parser.add_argument('--save-folder-path', type=str, default='./save')
     # 將0設定成背景，如果關閉背景就會默認設定成255
     parser.add_argument('--zero-background', action='store_false')
     args = parser.parse_args()
@@ -48,6 +48,8 @@ def main():
         image = cv2.imread(image_path)
         image_height, image_width = image.shape[:2]
         full_val = 0 if zero_background else 255
+        food_val = 1 if zero_background else 0
+        not_food_val = 2 if zero_background else 1
         seg_image = np.full((image_height, image_width, 3), full_val, dtype=np.uint8)
         shapes_info = annotations['shapes']
         foods_points = None
@@ -59,9 +61,9 @@ def main():
             elif label == 'NotFood':
                 not_foods_points = np.array(to_int(shape_info['points']))
         if not_foods_points is not None:
-            cv2.fillPoly(seg_image, [not_foods_points], (2, 2, 2))
+            cv2.fillPoly(seg_image, [not_foods_points], (not_food_val, not_food_val, not_food_val))
         if foods_points is not None:
-            cv2.fillPoly(seg_image, [foods_points], (1, 1, 1))
+            cv2.fillPoly(seg_image, [foods_points], (food_val, food_val, food_val))
         save_name = os.path.splitext(image_name)[0] + '.png'
         save_path = os.path.join(save_folder_path, save_name)
         cv2.imwrite(save_path, seg_image)
