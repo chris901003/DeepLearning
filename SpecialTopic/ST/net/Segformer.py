@@ -312,7 +312,7 @@ class Segformer(nn.Module):
         if pretrained != 'none':
             self.init_weights_pretrained()
 
-    def forward(self, images, labels, with_loss=True):
+    def forward(self, images, labels=None, with_loss=True):
         feat = self.backbone(images)
         loss = self.decode_head(feat, labels, with_loss=with_loss)
         return loss

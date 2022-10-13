@@ -22,7 +22,9 @@ class Compose:
             'LoadAnnotationsSegformer': pipeline_segmentation.LoadAnnotations, 'PadMMlab': pipeline_segmentation.Pad,
             'ResizeMMlab': pipeline_segmentation.Resize, 'RandomCropMMlab': pipeline_segmentation.RandomCrop,
             'RandomFlipMMlab': pipeline_segmentation.RandomFlip, 'NormalizeMMlab': pipeline_segmentation.Normalize,
-            'PhotoMetricDistortionSegformer': pipeline_segmentation.PhotoMetricDistortion
+            'PhotoMetricDistortionSegformer': pipeline_segmentation.PhotoMetricDistortion,
+            'ImageToTensorMMlab': pipeline_segmentation.ImageToTensor,
+            'MultiScaleFlipAugSegformer': pipeline_segmentation.MultiScaleFlipAug
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:
