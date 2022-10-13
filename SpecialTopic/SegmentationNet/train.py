@@ -20,7 +20,8 @@ def parse_args():
     # 多少個batch會進行權重更新，可以透過這種方式模擬大batch size的情況，通常可以增加正確率
     parser.add_argument('--optimizer-step-period', type=int, default=1)
     # 預訓練權重，這裡給的會是主幹的預訓練權重
-    parser.add_argument('--pretrained', type=str, default='none')
+    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/segformer_mit-b2_512x512_'
+                                                          '160k_ade20k_20220620_114047-64e4feca.pth')
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
@@ -42,6 +43,8 @@ def parse_args():
     parser.add_argument('--Freeze-Epoch', type=int, default=50)
     # 總共會經過多少個Epoch
     parser.add_argument('--Total-Epoch', type=int, default=100)
+    # 多少個Epoch會進行mIoU計算，進行檢測時會將batch size設定成1，所以會比較花時間
+    parser.add_argument('--mIoU-cal-period', type=int, default=5)
     # 最大學習率
     parser.add_argument('--Init-lr', type=int, default=1e-2)
     # 優化器選擇類型
@@ -173,7 +176,28 @@ def main():
     eval_dataloader_cfg = copy.deepcopy(train_dataloader_cfg)
     eval_dataset = build_dataset(eval_dataset_cfg)
     eval_dataloader_cfg['dataset'] = eval_dataset
+    eval_dataloader_cfg['shuffle'] = False
     eval_dataloader = DataLoader(**eval_dataloader_cfg)
+    mIoU_dataset_cfg = copy.deepcopy(eval_dataset_cfg)
+    mIoU_dataset_cfg['reduce_zero_label'] = True
+    mIoU_dataset_cfg['pipeline'] = [
+        {'type': 'LoadImageFromFileSegformer'},
+        {'type': 'MultiScaleFlipAugSegformer', 'img_scale': (2048, 512), 'flip': False,
+         'transforms': [
+             {'type': 'ResizeMMlab', 'keep_ratio': True},
+             {'type': 'RandomFlipMMlab'},
+             {'type': 'NormalizeMMlab', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375],
+              'to_rgb': True},
+             {'type': 'ImageToTensorMMlab', 'keys': ['img']},
+             {'type': 'Collect', 'keys': ['img', 'label_path']}
+            ]}
+    ]
+    mIoU_dataset = build_dataset(mIoU_dataset_cfg)
+    mIoU_dataloader_cfg = copy.deepcopy(eval_dataloader_cfg)
+    mIoU_dataloader_cfg['dataset'] = mIoU_dataset
+    mIoU_dataloader_cfg['batch_size'] = 1
+    mIoU_dataloader_cfg['collate_fn'] = mIoU_dataset.test_collate_fn
+    mIoU_dataloader = DataLoader(**mIoU_dataloader_cfg)
     if fp16:
         from torch.cuda.amp import GradScaler
         scaler = GradScaler()
@@ -215,7 +239,8 @@ def main():
             train_dataloader = DataLoader(**train_dataloader_cfg)
         fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, args.Total_Epoch, train_dataloader,
                       eval_dataloader, fp16, scaler, args.save_period, save_path, training_state, best_train_loss,
-                      best_val_loss, save_optimizer, args.weight_name, logger, args.send_to, args.save_log_period)
+                      best_val_loss, save_optimizer, args.weight_name, logger, args.send_to, args.save_log_period,
+                      mIoU_dataset, mIoU_dataloader, args.mIoU_cal_period)
         if lr_scheduler is not None:
             lr_scheduler.step()
 

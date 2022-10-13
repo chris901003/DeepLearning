@@ -5,6 +5,7 @@ import copy
 import os
 from torch.utils.data.dataset import Dataset
 from .utils import preprocess_input, Compose
+from SpecialTopic.ST.dataset.segmentation_eval_utils import intersect_and_union, pre_eval_to_metrics
 
 
 class YoloDataset(Dataset):
@@ -234,3 +235,45 @@ class SegformerDataset(Dataset):
         labels = torch.stack(labels)
         images = torch.stack(images)
         return images, labels
+
+    @staticmethod
+    def test_collate_fn(batch):
+        images, labels_path = list(), list()
+        for info in batch:
+            image = info['img'][0]
+            images.append(image)
+            labels_path.append(info['label_path'][0])
+        images = torch.stack(images)
+        return images, labels_path
+
+    def pre_eval(self, preds, seg_map, indices):
+        if not isinstance(indices, list):
+            indices = [indices]
+        if not isinstance(preds, list):
+            preds = [preds]
+        pre_eval_results = list()
+        for pred, index in zip(preds, indices):
+            pre_eval_results.append(
+                intersect_and_union(
+                    pred, seg_map, len(self.CLASSES), self.ignore_index, label_map=dict(),
+                    reduce_zero_label=self.reduce_zero_label))
+        return pre_eval_results
+
+    def evaluate(self, results, metric='mIoU'):
+        if isinstance(metric, str):
+            metric = [metric]
+        allowed_metric = ['mIoU']
+        if not set(metric).issubset(set(allowed_metric)):
+            raise KeyError
+        eval_results = dict()
+        ret_metrics = pre_eval_to_metrics(results, metric)
+        class_names = self.CLASSES
+        ret_metrics_summary = {ret_metric: np.round(np.nanmean(ret_metric_value) * 100, 2)
+                               for ret_metric, ret_metric_value in ret_metrics.items()}
+        ret_metrics.pop('aAcc', None)
+        ret_metrics_class = {ret_metric: np.round(ret_metric_value * 100, 2)
+                             for ret_metric, ret_metric_value in ret_metrics.items()}
+        ret_metrics_class.update({'Class': class_names})
+        eval_results['summary'] = ret_metrics_summary
+        eval_results['each_one'] = ret_metrics_class
+        return eval_results
