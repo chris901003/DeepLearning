@@ -3,6 +3,7 @@ import os
 import json
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 
 def parse_args():
@@ -66,6 +67,7 @@ def main():
     num_background = len(background_images_name)
     images_name = [image_name for image_name in os.listdir(images_folder)
                    if os.path.splitext(image_name)[1] in support_image_format]
+    pbar = tqdm(total=len(images_name))
     for image_name in images_name:
         name = os.path.splitext(image_name)[0]
         image_path = os.path.join(images_folder, image_name)
@@ -106,6 +108,7 @@ def main():
         cv2.imwrite(save_image_path, result_image)
         with open(save_annotation_path, 'w') as f:
             json.dump(annotation_info, f, indent=4)
+        pbar.update(1)
     print(f'Generate {len(images_name)}')
 
 

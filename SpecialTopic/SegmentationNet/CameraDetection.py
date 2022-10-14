@@ -38,7 +38,7 @@ def main():
         ret, img = cap.read()
         if ret:
             with torch.no_grad():
-                results = detect_single_picture(model, device, img, with_class=True)
+                results = detect_single_picture(model, device, img, with_class=True, threshold=0.8)
             draw_image_mix = results[0]
             cTime = time.time()
             fps = 1 / (cTime - pTime)

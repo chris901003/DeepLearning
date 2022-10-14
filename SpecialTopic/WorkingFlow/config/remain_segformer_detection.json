@@ -1,0 +1,12 @@
+{
+  "type": "SegformerRemainDetection",
+  "remain_module_file": "./prepare/remain_segformer_module_cfg.json",
+  "classes_path": "./prepare/remain_segformer_detection_classes.txt",
+  "with_color_platte": "FoodAndNotFood",
+  "save_last_period": 60,
+  "strict_down": false,
+  "reduce_mode": {
+    "type": "momentum", "alpha": 0.9
+  },
+  "area_mode": "pixel_mode"
+}

@@ -71,11 +71,9 @@ def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=Fal
     assert palette.shape[1] == 3
     assert len(palette.shape) == 2
     assert 0 < opacity <= 1.0
-    if mask is not None:
-        seg_pred[mask] = -1
     color_seg = np.zeros((seg_pred.shape[0], seg_pred.shape[1], 3), dtype=np.uint8)
     for label, color in enumerate(palette):
-        color_seg[seg_pred == label, :] = color
+        color_seg[(seg_pred == label) & mask[label], :] = color
     color_seg = color_seg[..., ::-1]
     image = image * (1 - opacity) + color_seg * opacity
     image = image.astype(np.uint8)
@@ -94,7 +92,7 @@ def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=Fal
 
 
 def detect_single_picture(model, device, image_info, threshold=0.7, opacity=0.5, CLASSES=None, PALETTE=None,
-                          with_class=False):
+                          with_class=False, with_draw=True):
     if isinstance(image_info, str):
         image = cv2.imread(image_info)
     elif isinstance(image_info, np.ndarray):
@@ -116,9 +114,11 @@ def detect_single_picture(model, device, image_info, threshold=0.7, opacity=0.5,
     seg_pred = F.interpolate(input=output, size=image.shape[2:], mode='bilinear', align_corners=False)
     seg_pred = F.interpolate(input=seg_pred, size=origin_image.shape[:2], mode='bilinear', align_corners=False)
     seg_pred = F.softmax(seg_pred, dim=1)
-    mask = seg_pred < threshold
+    mask = (seg_pred > threshold).squeeze(dim=0).cpu().numpy()
     seg_pred = seg_pred.argmax(dim=1)
     seg_pred = seg_pred.cpu().numpy()[0]
+    if not with_draw:
+        return seg_pred
     draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=model.PALETTE, classes=model.CLASSES,
                                             opacity=opacity, with_class=with_class, mask=mask)
     return draw_image_mix, draw_image

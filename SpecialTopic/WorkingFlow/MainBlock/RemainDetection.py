@@ -6,8 +6,10 @@ from SpecialTopic.ST.utils import get_cls_from_dict
 class RemainDetection:
     def __init__(self, cfg_path):
         from SpecialTopic.WorkingFlow.SubBlock.RemainDetection.VitRemainDetection import VitRemainDetection
+        from SpecialTopic.WorkingFlow.SubBlock.RemainDetection.SegformerRemainDetection import SegformerRemainDetection
         support_module = {
-            'VitRemainDetection': VitRemainDetection
+            'VitRemainDetection': VitRemainDetection,
+            'SegformerRemainDetection': SegformerRemainDetection
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)

@@ -253,6 +253,7 @@ class SegformerHead(BaseDecodeHead):
             )
         out = self.fusion_conv(torch.cat(outs, dim=1))
         out = self.cls_seg(out)
+        topk = tuple([min(k, self.num_classes) for k in topk])
         if not with_loss:
             # 這裡輸出的圖像只會是[128x128]的圖像，如果要應用上去需要進行差值運算
             return out
