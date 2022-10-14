@@ -47,3 +47,6 @@ _background_
 
 ### ExtractCocoPicture
 將coco數據集當中指定類別擷取出來
+
+### rename_labelme
+將labelme的圖像以及標注文件進行重命名

@@ -6,9 +6,13 @@ import shutil
 
 def args_parse():
     parser = argparse.ArgumentParser()
+    # 圖像資料資料夾
     parser.add_argument('--images-folder', type=str, default='./images')
+    # 標註文件資料夾，如果圖像與標註文件在相同資料夾就填一樣就可以
     parser.add_argument('--annotations-folder', type=str, default='./annotations')
+    # 要保存新圖像檔名的資料夾
     parser.add_argument('--save-images-folder', type=str, default='./save_images')
+    # 要保存新標註文件的資料夾
     parser.add_argument('--save-annotations-folder', type=str, default='./save_annotations')
     args = parser.parse_args()
     return args
