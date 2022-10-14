@@ -31,7 +31,7 @@ def resize(image, output_height, output_width, keep_ratio=True, with_scale=False
     origin_height, origin_width = image.shape[:2]
     if keep_ratio:
         scale = min(output_height / origin_height, output_width / origin_width)
-        new_height, new_width = origin_height * scale, origin_width * scale
+        new_height, new_width = int(origin_height * scale), int(origin_width * scale)
         image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
     else:
         image = cv2.resize(image, (output_width, output_height), interpolation=cv2.INTER_NEAREST)
@@ -55,13 +55,17 @@ def main():
     keep_ratio = args.keep_ratio
     new_ratio = args.new_ratio
     assert os.path.exists(images_folder) and os.path.exists(annotations_folder)
+    if not os.path.exists(save_images_folder):
+        os.mkdir(save_images_folder)
+    if not os.path.exists(save_annotations_folder):
+        os.mkdir(save_annotations_folder)
     support_image_format = ['.jpg', '.JPG', '.jpeg', '.JPEG']
     background_images_name = [background_name for background_name in os.listdir(background_folder)
                               if os.path.splitext(background_name)[1] in support_image_format]
     background_images_path = [os.path.join(background_folder, image_name) for image_name in background_images_name]
     num_background = len(background_images_name)
     images_name = [image_name for image_name in os.listdir(images_folder)
-                   if os.path.splitext(image_name) in support_image_format]
+                   if os.path.splitext(image_name)[1] in support_image_format]
     for image_name in images_name:
         name = os.path.splitext(image_name)[0]
         image_path = os.path.join(images_folder, image_name)
@@ -71,21 +75,21 @@ def main():
             annotation_info = json.load(f)
         image = cv2.imread(image_path)
         image_height, image_width = image.shape[:2]
-        background_index = np.random.randint(low=0, high=num_background, size=1)
+        background_index = np.random.randint(low=0, high=num_background)
         background_image = cv2.imread(background_images_path[background_index])
-        output_height = np.random.randint(low=min(image_height, output_size_range[0]),
-                                          high=max(image_height, output_size_range[1]), size=1)
-        output_width = np.random.randint(low=min(image_width, output_size_range[0]),
-                                         high=max(image_width, output_size_range[1]), size=1)
+        output_height = np.random.randint(low=max(image_height, output_size_range[0]),
+                                          high=max(image_height + 1, output_size_range[1]))
+        output_width = np.random.randint(low=max(image_width, output_size_range[0]),
+                                         high=max(image_width + 1, output_size_range[1]))
         background_image = resize(image=background_image, output_height=output_height, output_width=output_width,
-                                  keep_ratio=keep_ratio)
+                                  keep_ratio=False)
         image_scale = np.random.uniform(new_ratio[0], new_ratio[1], size=1)
         new_image_height, new_image_width = int(image_height * image_scale), int(image_width * image_width)
-        image, image_scale = resize(image, new_image_height, new_image_width, with_scale=True)
+        image, image_scale = resize(image, new_image_height, new_image_width, with_scale=True, keep_ratio=keep_ratio)
         background_image_height, background_image_width = background_image.shape[:2]
         image_height, image_width = image.shape[:2]
-        x_offset = np.random.randint(low=0, high=background_image_width - image_width, size=1)
-        y_offset = np.random.randint(low=0, high=background_image_height - image_height, size=1)
+        x_offset = np.random.randint(low=0, high=background_image_width - image_width + 1)
+        y_offset = np.random.randint(low=0, high=background_image_height - image_height + 1)
         result_image = background_image
         result_image[y_offset:y_offset + image_height, x_offset:x_offset + image_width, :] = image
         for shape in annotation_info['shapes']:
@@ -93,11 +97,15 @@ def main():
                 x = x * image_scale[1] + x_offset
                 y = y * image_scale[0] + y_offset
                 shape['points'][index] = [x, y]
+        annotation_info['imageData'] = None
+        annotation_info['imagePath'] = image_name
+        annotation_info['imageHeight'] = background_image_height
+        annotation_info['imageWidth'] = background_image_width
         save_image_path = os.path.join(save_images_folder, image_name)
         save_annotation_path = os.path.join(save_annotations_folder, name + '.json')
         cv2.imwrite(save_image_path, result_image)
         with open(save_annotation_path, 'w') as f:
-            json.dump(save_annotation_path, f)
+            json.dump(annotation_info, f, indent=4)
     print(f'Generate {len(images_name)}')
 
 

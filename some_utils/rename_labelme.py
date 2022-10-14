@@ -43,7 +43,7 @@ def main():
         new_image_path = os.path.join(save_images_folder, str(index) + '.jpg')
         new_annotation_path = os.path.join(save_annotations_folder, str(index) + '.json')
         with open(new_annotation_path, 'w') as f:
-            json.dump(annotation_info, f)
+            json.dump(annotation_info, f, indent=4)
         shutil.copyfile(image_path, new_image_path)
     print(f'Rename {len(images_name)}')
 
