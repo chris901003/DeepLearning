@@ -1,7 +1,7 @@
 {
   "type": "VitRemainDetection",
-  "remain_module_file": "./prepare/remain_module_cfg.json",
-  "classes_path": "./prepare/remain_detection_classes.txt",
+  "remain_module_file": "./prepare/remain_vit_module_cfg.json",
+  "classes_path": "./prepare/remain_vit_detection_classes.txt",
   "save_last_period": 60,
   "strict_down": false
 }

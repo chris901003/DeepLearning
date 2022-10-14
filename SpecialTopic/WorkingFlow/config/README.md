@@ -128,3 +128,33 @@ type = 說明要使用哪個子模塊
     - track_object_info = 經過一系列操作後要傳到下個模塊的資料
   - output: [image]
     - image = 標註好的圖像，如果有需要保存就可以直接保存
+
+### remain_segformer_detection
+使用分割網路將食物以及盤子進行分割，透過計算比例獲取剩餘量
+##### 文件說明
+- remain_module_file = 設定每種不同食物的模型大小以及權重
+- classes_path = 類別標籤文件
+- save_last_period = 一個index的圖像資訊會被保留多久
+- with_color_platte = 調色盤選擇
+- strict_down = 強制剩餘量只會往下降
+- reduce_mode = 剩餘量模式(以下為選項)
+  - momentum = 會參考上次的剩餘量來決定本次的剩餘量
+    - alpha = 比例超參數
+- area_mode = 計算面積的方式
+  - area_mode = 強制碗需要包住食物
+  - pixel_mode = 直接計算每個類別有多少得像素就是有多少
+##### api說明
+- remain_detection: 對於剩餘量進行檢測
+  - input: [image, track_object_info]
+    - image = 圖像資料，一定要是原始圖像，因為會對該圖像擷取需要的部分進行剩餘量判斷
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
+      - remain_category_id = 在剩餘量檢測時使用到的模型ID
+      - category_from_remain = 剩餘量的類別(新增)

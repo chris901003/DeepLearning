@@ -64,6 +64,6 @@ ADE20KDataset = {
                 [102, 255, 0], [92, 0, 255]]
 }
 FoodAndNotFood = {
-    'CLASSES': ('Food', 'NotFood'),
-    'PALETTE': [[255, 0, 0], [0, 255, 0]]
+    'CLASSES': ('Food', 'NotFood', 'BackGround'),
+    'PALETTE': [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
 }

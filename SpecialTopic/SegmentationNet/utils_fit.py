@@ -119,6 +119,7 @@ def fit_one_epoch(model, device, optimizer, optimizer_step_period, epoch, Total_
             pbar.update(1)
         metric = mIoU_dataset.evaluate(results)
         logger.append_info('mIoU', metric['summary']['IoU'])
+        print(f'mIoU: {metric["summary"]["IoU"]}')
         pbar.close()
 
     if best_train_loss and training_state['train_loss'] > (train_loss / len(train_dataloader)):

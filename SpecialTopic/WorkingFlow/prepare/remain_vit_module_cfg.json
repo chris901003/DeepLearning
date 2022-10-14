@@ -1,0 +1,11 @@
+{
+  "0": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_0.pth"},
+  "1": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_1.pth"},
+  "2": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_2.pth"},
+  "3": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_3.pth"},
+  "4": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_4.pth"},
+  "5": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_5.pth"},
+  "6": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_6.pth"},
+  "7": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_7.pth"},
+  "8": {"phi": "m", "pretrained":  "./checkpoint/remain/vit_8.pth"}
+}
