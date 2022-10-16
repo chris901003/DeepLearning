@@ -121,7 +121,7 @@ def detect_single_picture(model, device, image_info, threshold=0.7, opacity=0.5,
         return seg_pred
     draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=model.PALETTE, classes=model.CLASSES,
                                             opacity=opacity, with_class=with_class, mask=mask)
-    return draw_image_mix, draw_image
+    return draw_image_mix, draw_image, seg_pred
 
 
 def test():

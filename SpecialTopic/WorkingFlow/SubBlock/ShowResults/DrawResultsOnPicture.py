@@ -5,9 +5,10 @@ from SpecialTopic.ST.utils import get_cls_from_dict
 
 
 class DrawResultsOnPicture:
-    def __init__(self, triangles, texts):
+    def __init__(self, triangles, texts, pictures):
         self.triangles = triangles
         self.texts = texts
+        self.pictures = pictures
         self.support_position_type = {
             'xyxy': self.get_xyxy, 'yxyx': self.get_yxyx, 'xcycwh': self.get_xcycwh, 'xmymwh': self.get_xmymwh
         }
@@ -25,7 +26,8 @@ class DrawResultsOnPicture:
         result_image = copy.deepcopy(image)
         result_image = self.draw_triangle(result_image, track_object_info)
         result_image = self.write_text(result_image, track_object_info)
-        return result_image
+        result_image = self.paste_picture(result_image, track_object_info)
+        return result_image, track_object_info
 
     def draw_triangle(self, result_image, track_object_info):
         image_height, image_width = result_image.shape[:2]
@@ -52,7 +54,7 @@ class DrawResultsOnPicture:
             vals_name = text_info.get('val_name', None)
             assert vals_name is not None, '需要指定文字的參數'
             sep = text_info.get('sep', ' ')
-            color = text_info.get('color', (210, 214, 89))
+            color = text_info.get('color', (0, 0, 255))
             text_size = text_info.get('text_size', 1)
             thick = text_info.get('thick', 2)
             for track_info in track_object_info:
@@ -66,7 +68,27 @@ class DrawResultsOnPicture:
                 cv2.putText(result_image, info,
                             (draw_position[0] + 30, draw_position[1] + 30 * (index + 1)),
                             cv2.FONT_HERSHEY_SIMPLEX, text_size, color, thick, cv2.LINE_AA)
-        return result_image, track_object_info
+        return result_image
+
+    def paste_picture(self, result_image, track_object_info):
+        image_height, image_width = result_image.shape[:2]
+        for picture_info in self.pictures:
+            val_name = picture_info.get('val_name', None)
+            position_name = picture_info.get('position', None)
+            opacity = picture_info.get('opacity', 0.5)
+            assert val_name is not None and position_name is not None, '缺少圖像變數名稱以及座標變數名稱'
+            for track_info in track_object_info:
+                picture = track_info.get(val_name, None)
+                position = track_info.get(position_name, None)
+                assert picture is not None and position is not None, '缺少變數名稱'
+                xmin, ymin, xmax, ymax = position
+                xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+                xmin, ymin = max(0, xmin), max(0, ymin)
+                xmax, ymax = min(image_width, xmax), min(image_height, ymax)
+                picture = cv2.resize(picture, (xmax - xmin, ymax - ymin))
+                result_image[ymin:ymax, xmin:xmax] = result_image[ymin:ymax, xmin:xmax] * \
+                                                     (1 - opacity) + picture * opacity
+        return result_image
 
     @staticmethod
     def get_string_type(val):

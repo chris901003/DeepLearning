@@ -50,7 +50,7 @@ class YoloxObjectDetection:
         # 當前是第幾幀，該數字超過一定值後會歸0，反正也不會衝突到，因為超過average_time_check後前面圖像會刪除
         self.current_frame_index = 0
         self.mod_frame_index = max(average_time_check, new_track_box) * 10
-        self.output_countdown = average_time_output
+        self.output_countdown = average_time_output - 1
         # 目前有被追蹤的標註匡，track_index會作為key，其餘作為value
         # 需要保存資料[position(ndarray), scores(ndarray), label(str), frame_index(list)]
         self.track_box = dict()
@@ -249,7 +249,7 @@ class YoloxObjectDetection:
             results.append(data)
         self.output_countdown -= 1
         if self.output_countdown < 0:
-            self.output_countdown = self.average_time_output
+            self.output_countdown = self.average_time_output - 1
         return results
 
     def get_num_wait_tracking_object(self):

@@ -7,5 +7,8 @@
     {"prefix": "Object: ", "val_name": ["object_score", "category_from_object_detection"], "suffix": "", "sep": "|"},
     {"prefix": "Remain: ", "val_name": ["track_id", "category_from_remain"], "suffix": "", "sep": "|"},
     {"prefix": "Other: ", "val_name": ["using_last"], "suffix": "", "sep": ""}
+  ],
+  "pictures": [
+    {"val_name": "remain_color_picture", "position": "position", "opacity": 0.5}
   ]
 }
