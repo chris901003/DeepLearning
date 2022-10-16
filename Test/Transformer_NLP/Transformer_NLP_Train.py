@@ -25,7 +25,7 @@ class WordDataset(Dataset):
         self.p = self.p / self.p.sum()
 
     def __getitem__(self, idx):
-        n = np.random.randint(30, 48)
+        n = np.random.randint(30, 49)
         x = np.random.choice(self.generate_word, size=n, replace=True, p=self.p)
         x = x.tolist()
 
@@ -175,25 +175,34 @@ class MultiHead(nn.Module):
         # q, k, v shape = [batch_size, len=50, channel=32]
         batch_size = q.shape[0]
         clone_q = q.clone()
+        # 這裡是先做歸一化再進行接下來的層結構，根據實驗表示先進行歸一化最後準確率會較高
         q = self.norm(q)
         k = self.norm(k)
         v = self.norm(v)
+        # 獲取QKV映射值
         q = self.fc_q(q)
         k = self.fc_k(k)
         v = self.fc_v(v)
+        # 將多頭部分分出來
         # [b, len, channel] -> [b, len, head, channel_per_head] -> [b, head, len, channel_per_head]
         q = q.reshape(batch_size, 50, 4, 8).permute(0, 2, 1, 3)
         k = k.reshape(batch_size, 50, 4, 8).permute(0, 2, 1, 3)
         v = v.reshape(batch_size, 50, 4, 8).permute(0, 2, 1, 3)
+        # 進行多頭注意力，這裡會將mask部分放入
         score = self.attention(q, k, v, mask)
+        # 會將注意力結果通過一層全連接層最後dropout
         score = self.dropout(self.out_fc(score))
+        # 添加捷徑分支結果
         score = score + clone_q
         return score
 
     @staticmethod
     def attention(q, k, v, mask):
+        # 進行注意力機制
         score = torch.matmul(q, k.permute(0, 1, 3, 2))
+        # 這裡需要調整score，會根據每個頭分到的channel深度進行調整
         score /= 8**0.5
+        # 將mask為True的部分設定成負無窮，這樣通過softmax後會無限接近0，這樣就可以達成效果
         score = score.masked_fill_(mask, -float('inf'))
         score = torch.softmax(score, dim=-1)
         score = torch.matmul(score, v)
@@ -276,6 +285,7 @@ def main():
     }
     dataloader = WordDataloader(dataloader_cfg)
     model = Transformer()
+    model.load_state_dict(torch.load('best_weight.pth'))
     model = model.to(device)
     loss_func = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-3)
