@@ -8,5 +8,9 @@
   "reduce_mode": {
     "type": "momentum", "alpha": 0.9
   },
-  "area_mode": "pixel_mode"
+  "area_mode": {
+    "type": "bbox_mode", "main_classes_idx": 0
+  },
+  "check_init_ratio_frame": 5,
+  "with_draw": true
 }

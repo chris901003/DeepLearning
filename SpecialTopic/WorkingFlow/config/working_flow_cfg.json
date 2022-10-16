@@ -1,8 +1,8 @@
 {
   "step1": {
     "type": "ReadPicture",
-    "config_file": "./config/get_picture_from_pi.json",
-    "call_api": ["get_img"],
+    "config_file": "./config/get_picture_from_camera_cfg.json",
+    "call_api": ["get_single_picture"],
     "inputs": [[]],
     "outputs": [["image", "image_type"]]
   },
@@ -22,7 +22,7 @@
   },
   "step4": {
     "type": "RemainDetection",
-    "config_file": "./config/remain_detection_cfg.json",
+    "config_file": "./config/remain_segformer_detection.json",
     "call_api": ["remain_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]

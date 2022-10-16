@@ -121,6 +121,10 @@ type = 說明要使用哪個子模塊
   - color = 文字顏色，不填寫會有默認值
   - text_size = 文字大小，不填寫會有默認值
   - thick = 文字粗度，不填寫會有默認值
+- pictures: 將圖像貼到指定位置上
+  - val_name = 獲取圖像的變數名稱
+  - position = 要貼到的座標位置
+  - opacity = 透明度
 ##### api說明:
 - show_results: 將結果畫在圖上並且將圖像返回
   - input: [image, track_object_info]
@@ -142,7 +146,17 @@ type = 說明要使用哪個子模塊
     - alpha = 比例超參數
 - area_mode = 計算面積的方式
   - area_mode = 強制碗需要包住食物
+    - main_classes_idx = 主要對象在分割網路中的哪個類別index(食物)
+    - sub_classes_idx = 次要對象在分割網路中的哪個類別index(碗)
   - pixel_mode = 直接計算每個類別有多少得像素就是有多少
+    - main_classes_idx = 主要對象在分割網路中的哪個類別index(食物)
+    - sub_classes_idx = 次要對象在分割網路中的哪個類別index(碗)
+  - bbox_mode = 使用標註匡作為整個背景點醋量
+    - main_classes_idx = 主要對象在分割網路中的哪個類別index(食物)
+- check_init_ratio_frame = 有新目標要檢測剩餘量時需要以前多少幀作為100%的比例
+  - 如果直接將(食物/(食物+碗))作為剩餘量判斷會有嚴重錯誤，因為可以知道這樣即使是滿的時候也不會是100%，
+  所以這裡會是以前幾幀的佔比作為100%的標準，需要多幾幀是為了避免有誤測
+- with_draw = 如果有需要獲取分割網路出來的色圖就設定為True，會在track_object_info當中多一個remain_color_picture
 ##### api說明
 - remain_detection: 對於剩餘量進行檢測
   - input: [image, track_object_info]
@@ -157,4 +171,5 @@ type = 說明要使用哪個子模塊
       - track_id = 追蹤的ID
       - using_last = 是否需要進行之後層結構的判斷
       - remain_category_id = 在剩餘量檢測時使用到的模型ID
-      - category_from_remain = 剩餘量的類別(新增)
+      - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
+      - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
