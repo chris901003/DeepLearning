@@ -7,5 +7,6 @@
   "nms": 0.3,
   "filter_edge": "False",
   "cfg": "auto",
-  "new_track_box": 10
+  "new_track_box": 10,
+  "average_time_output": 1
 }

@@ -245,7 +245,7 @@ class YoloxObjectDetection:
                 continue
             data = dict(position=track_info['position'][-1], category_from_object_detection=track_info['label'],
                         object_score=round(track_info['scores'].mean() * 100, 2), track_id=track_index,
-                        using_last=(self.output_countdown == 0))
+                        using_last=(self.output_countdown != 0))
             results.append(data)
         self.output_countdown -= 1
         if self.output_countdown < 0:

@@ -22,7 +22,7 @@ def get_data():
         13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26
     ])
     p = p / p.sum()
-    n = random.randint(30, 48)
+    n = np.random.randint(30, 49)
     x = np.random.choice(words, size=n, replace=True, p=p)
     x = x.tolist()
 
@@ -38,9 +38,9 @@ def get_data():
     x = ['<SOS>'] + x + ['<EOS>']
     y = ['<SOS>'] + y + ['<EOS>']
     x = x + ['<PAD>'] * 50
-    y = y + ['<PAD>'] * 51
+    y = y + ['<PAD>'] * 50
     x = x[:50]
-    y = y[:51]
+    y = y[:50]
     x = [zidian_x[i] for i in x]
     y = [zidian_y[i] for i in y]
     x = torch.LongTensor(x)

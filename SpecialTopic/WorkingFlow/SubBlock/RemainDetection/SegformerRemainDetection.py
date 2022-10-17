@@ -169,6 +169,7 @@ class SegformerRemainDetection:
         if pred.ndim == 3:
             pred = pred.squeeze(axis=-1)
         result = self.area_func(pred)
+        print(f'Track id: {track_id}, pred: {result}')
         if track_id not in self.keep_last.keys():
             data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list())
             self.keep_last[track_id] = data
@@ -178,7 +179,7 @@ class SegformerRemainDetection:
             result = self.get_standard_remain(track_id)
         else:
             last_remain = self.keep_last[track_id]['remain']
-            result = self.reduce_func(result, last_remain)
+            result = self.reduce_func(result, last_remain) if last_remain != -1 else result
             if self.strict_down:
                 result = min(result, self.keep_last[track_id]['remain'])
             self.keep_last[track_id]['remain'] = result
