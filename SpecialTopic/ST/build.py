@@ -10,13 +10,15 @@ def build_detector(detector_cfg):
     from .net.VIT import VIT
     from .net.MobileVit import MobileVit
     from .net.Segformer import Segformer
+    from .net.RemainEatingTime import RemainEatingTime
     support_detector = {
         'YoloBody': YoloBody,
         'Recognizer3D': Recognizer3D,
         'ResNet': ResNet,
         'VIT': VIT,
         'MobileVit': MobileVit,
-        'Segformer': Segformer
+        'Segformer': Segformer,
+        'RemainEatingTime': RemainEatingTime
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
@@ -30,6 +32,7 @@ def build_backbone(backbone_cfg):
     from .net.VIT import VisionTransformer
     from .net.MobileVit import MobileVitExtract
     from .net.Segformer import MixVisionTransformer
+    from .net.RemainEatingTime import RemainEatingTimeBackbone
     support_backbone = {
         'YOLOPAFPN': YOLOPAFPN,
         'CSPDarknet': CSPDarknet,
@@ -37,7 +40,8 @@ def build_backbone(backbone_cfg):
         'ResnetExtract': ResnetExtract,
         'VisionTransformer': VisionTransformer,
         'MobileVitExtract': MobileVitExtract,
-        'MixVisionTransformer': MixVisionTransformer
+        'MixVisionTransformer': MixVisionTransformer,
+        'RemainEatingTimeBackbone': RemainEatingTimeBackbone
     }
     backbone_cls = get_cls_from_dict(support_backbone, backbone_cfg)
     backbone = backbone_cls(**backbone_cfg)
@@ -51,13 +55,15 @@ def build_head(head_cfg):
     from .net.VIT import VitHead
     from .net.MobileVit import MobileVitHead
     from .net.Segformer import SegformerHead
+    from .net.RemainEatingTime import RemainEatingTimeHead
     support_head = {
         'YOLOXHead': YOLOXHead,
         'I3DHead': I3DHead,
         'ResnetHead': ResnetHead,
         'VitHead': VitHead,
         'MobileVitHead': MobileVitHead,
-        'SegformerHead': SegformerHead
+        'SegformerHead': SegformerHead,
+        'RemainEatingTimeHead': RemainEatingTimeHead
     }
     head_cls = get_cls_from_dict(support_head, head_cfg)
     head = head_cls(**head_cfg)
