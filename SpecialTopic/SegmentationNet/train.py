@@ -137,7 +137,7 @@ def main():
     last_epoch = args.Init_Epoch if args.Init_Epoch != 0 else -1
     lr_scheduler_cfg = None
     if lr_scheduler_cfg is not None:
-        lr_scheduler = build_lr_scheduler(model, lr_scheduler_cfg)
+        lr_scheduler = build_lr_scheduler(optimizer, lr_scheduler_cfg)
     else:
         lr_scheduler = None
     train_dataset_cfg = {

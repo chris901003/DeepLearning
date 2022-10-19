@@ -3,6 +3,7 @@ import torch
 from random import sample, shuffle
 import copy
 import os
+import pickle
 from torch.utils.data.dataset import Dataset
 from .utils import preprocess_input, Compose
 from SpecialTopic.ST.dataset.segmentation_eval_utils import intersect_and_union, pre_eval_to_metrics
@@ -278,3 +279,50 @@ class SegformerDataset(Dataset):
         eval_results['summary'] = ret_metrics_summary
         eval_results['each_one'] = ret_metrics_class
         return eval_results
+
+
+class RemainEatingTimeDataset(Dataset):
+    def __init__(self, train_annotation_path, dataset_variable_setting, pipeline_cfg):
+        self.train_annotation_path = train_annotation_path
+        annotations = self.load_annotation()
+        self.annotations = annotations
+        self.dataset_variable = dict()
+        for variable_name, value in dataset_variable_setting.items():
+            if value == 'Default':
+                value = annotations.get(variable_name, None)
+                assert value is not None, f'train annotation當中沒有{variable_name}'
+            self.dataset_variable[variable_name] = value
+        for pipeline_info in pipeline_cfg:
+            if 'need_variable' in pipeline_info.keys():
+                variables = dict()
+                for variable_key, variable_value in pipeline_info['need_variable'].items():
+                    variable = self.dataset_variable.get(variable_key, None)
+                    assert variable is not None, f'在dataset當中無法獲取{variable_key}資訊'
+                    variables[variable_key] = variable
+                pipeline_info['variables'] = variables
+                pipeline_info.pop('need_variable')
+        self.pipeline = Compose(pipeline_cfg)
+
+    def __getitem__(self, idx):
+        results = self.annotations['datas'][idx]
+        results = self.pipeline(results)
+        return results
+
+    def __len__(self):
+        return len(self.annotations['datas'])
+
+    def load_annotation(self):
+        assert os.path.exists(self.train_annotation_path), '給定的訓練標注文檔不存在'
+        with open(self.train_annotation_path, 'rb') as f:
+            results = pickle.load(f)
+        return results
+
+    @staticmethod
+    def collate_fn_train(batch):
+        remain, time_remain = list(), list()
+        for info in batch:
+            remain.append(torch.from_numpy(info['food_remain_data']))
+            time_remain.append(torch.from_numpy(info['time_remain_data']))
+        remain = torch.stack(remain)
+        time_remain = torch.stack(time_remain)
+        return remain, time_remain

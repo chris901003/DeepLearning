@@ -9,9 +9,9 @@ from tqdm import tqdm
 def args_parse():
     parser = argparse.ArgumentParser()
     # 圖像資料夾位置
-    parser.add_argument('--image-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\1014_FriedRice')
+    parser.add_argument('--image-folder-path', type=str, default='./images')
     # 標註文件資料夾位置
-    parser.add_argument('--annotation-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\1014_FriedRice')
+    parser.add_argument('--annotation-folder-path', type=str, default='./annotations')
     # 圖像保存位置
     parser.add_argument('--save-folder-path', type=str, default='./save')
     # 總共有哪些類別，這裡的順序會與到時圖像的時候相同，所以如果要避免被覆蓋就需要調整順序
@@ -61,12 +61,15 @@ def main():
         for shape_info in shapes_info:
             label = shape_info['label']
             point = np.array(to_int(shape_info['points']))
-            points_dict[label] = point
+            if label not in points_dict.keys():
+                points_dict[label] = list()
+            points_dict[label].append(point)
         for label in labels:
             points = points_dict.get(label, None)
             assert points is not None, f'{image_name}沒有標到{label}請不要這麼走心'
             color = labels2labels2_idx[label]
-            cv2.fillPoly(seg_image, [points], (color, color, color))
+            for point in points:
+                cv2.fillPoly(seg_image, [point], (color, color, color))
         save_name = os.path.splitext(image_name)[0] + '.png'
         save_path = os.path.join(save_folder_path, save_name)
         cv2.imwrite(save_path, seg_image)

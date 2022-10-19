@@ -12,6 +12,7 @@ class Compose:
         from .pipeline_recognizer3d import Resize as Recognizer3dResize
         from .pipeline_classify import LoadRemainingAnnotation, ResizeSingle, NormalizeSingle
         import SpecialTopic.ST.dataset.pipeline_segmentation as pipeline_segmentation
+        from .pipeline_remain_eating_time import FormatRemainEatingData
         support_pipeline = {
             'LoadInfoFromAnno': LoadInfoFromAnno, 'Resize': Resize, 'ResizeAndAugmentation': ResizeAndAugmentation,
             'Mosaic': Mosaic, 'Collect': Collect, 'PyAVInit': PyAVInit, 'SampleFrames': SampleFrames,
@@ -24,7 +25,8 @@ class Compose:
             'RandomFlipMMlab': pipeline_segmentation.RandomFlip, 'NormalizeMMlab': pipeline_segmentation.Normalize,
             'PhotoMetricDistortionSegformer': pipeline_segmentation.PhotoMetricDistortion,
             'ImageToTensorMMlab': pipeline_segmentation.ImageToTensor,
-            'MultiScaleFlipAugSegformer': pipeline_segmentation.MultiScaleFlipAug
+            'MultiScaleFlipAugSegformer': pipeline_segmentation.MultiScaleFlipAug,
+            'FormatRemainEatingData': FormatRemainEatingData
         }
         self.pipelines = list()
         for pipeline_cfg in pipelines_cfg:

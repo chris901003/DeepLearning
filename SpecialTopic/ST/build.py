@@ -150,12 +150,13 @@ def build_loss(loss_cfg):
 
 
 def build_dataset(dataset_cfg):
-    from .dataset.dataset import YoloDataset, VideoDataset, RemainingDataset, SegformerDataset
+    from .dataset.dataset import YoloDataset, VideoDataset, RemainingDataset, SegformerDataset, RemainEatingTimeDataset
     support_dataset = {
         'YoloDataset': YoloDataset,
         'VideoDataset': VideoDataset,
         'RemainingDataset': RemainingDataset,
-        'SegformerDataset': SegformerDataset
+        'SegformerDataset': SegformerDataset,
+        'RemainEatingTimeDataset': RemainEatingTimeDataset
     }
     dataset_cfg_ = copy.deepcopy(dataset_cfg)
     dataset_cls = get_cls_from_dict(support_dataset, dataset_cfg_)
