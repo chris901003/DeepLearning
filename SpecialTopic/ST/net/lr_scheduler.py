@@ -53,6 +53,7 @@ def build_lr_scheduler(optimizer, lr_scheduler_cfg):
     support_lr_scheduler = {
         # 這裡的type就會是torch當中的lr_schedule的其中一種方式
         'cos_lr_scheduler': {'type': torch.optim.lr_scheduler.LambdaLR, 'lambda': cos_lr_scheduler},
+        'StepLR': {'type': torch.optim.lr_scheduler.StepLR},
         'MultiStepLR': {'type': torch.optim.lr_scheduler.MultiStepLR},
         'ExponentialLR': {'type': torch.optim.lr_scheduler.ExponentialLR},
         'CosineAnnealingLR': {'type': torch.optim.lr_scheduler.CosineAnnealingLR},
