@@ -5,6 +5,8 @@ import os
 from torch.utils.data import DataLoader
 from SpecialTopic.ST.build import build_detector, build_dataset
 from SpecialTopic.ST.net.lr_scheduler import build_lr_scheduler
+from SpecialTopic.ST.utils import get_logger
+from SpecialTopic.RemainEatingTime.utils_fit import fit_one_epoch
 
 
 def parse_args():
@@ -12,7 +14,7 @@ def parse_args():
     # 模型大小
     parser.add_argument('--phi', type=str, default='m')
     # 一個batch的大小
-    parser.add_argument('--batch-size', type=int, default=2)
+    parser.add_argument('--batch-size', type=int, default=8)
     # 預訓練權重位置
     parser.add_argument('--pretrained', type=str, default='none')
     # 加載上次訓練到一半的資料
@@ -35,9 +37,9 @@ def parse_args():
     # 最終epoch數
     parser.add_argument('--Total-Epoch', type=int, default=100)
     # 最大學習率
-    parser.add_argument('--Init-lr', type=int, default=1e-2)
+    parser.add_argument('--Init-lr', type=int, default=2e-3)
     # 優化器選擇
-    parser.add_argument('--optimizer-type', type=str, default='sgd')
+    parser.add_argument('--optimizer-type', type=str, default='adam')
     # 學習率退火曲線
     parser.add_argument('--lr-decay-type', type=str, default='cos')
     # 多少個epoch強制保存權重
@@ -186,7 +188,19 @@ def main():
         scaler = GradScaler()
     else:
         scaler = None
-    training_state = dict()
+    training_state = dict(train_loss=10000, eval_loss=10000)
+    save_period = args.save_period
+    save_info = {'train_loss': list(), 'val_loss': list(), 'train_acc': list(), 'val_acc': list()}
+    logger = get_logger(save_info=save_info)
+    save_path = args.save_path
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    for epoch in range(args.Init_Epoch, args.Total_Epoch):
+        fit_one_epoch(model, device, optimizer, epoch, args.Total_Epoch, train_dataloader,
+                      eval_dataloader, fp16, scaler, save_period, save_path, training_state,
+                      args.save_optimizer, args.weight_name, logger)
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
 
 if __name__ == '__main__':

@@ -1,14 +1,15 @@
 from functools import partial
 
 
-def cal(a, b, c):
-    print(a + b + c)
+class Test:
+    def __init__(self):
+        self.a = 123
 
 
 def main():
-    cfg = dict(b=10, c=20)
-    func = partial(cal, **cfg)
-    func(20)
+    t = Test()
+    if hasattr(t, 'a'):
+        print('a')
 
 
 if __name__ == '__main__':

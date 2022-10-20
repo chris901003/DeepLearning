@@ -10,7 +10,7 @@ from tqdm import tqdm
 def parse_args():
     parser = argparse.ArgumentParser()
     # 總共要生成多少資料
-    parser.add_argument('--num-datas', type=int, default=10)
+    parser.add_argument('--num-datas', type=int, default=20000)
     # 在x軸上的數值範圍，也就是剩餘時間的範圍
     # 在生成時會生成max_len的長度，起始點會從x-start-range中挑一個值出來作為開頭
     parser.add_argument('--axis-x-start-range', type=float, default=[0.0, 0.0], nargs='+')
@@ -32,7 +32,7 @@ def parse_args():
                                                              'time_pad_val', 'remain_SOS_val', 'time_SOS_val',
                                                              'remain_EOS_val', 'time_EOS_val'], nargs='+')
     # 是否需要將生成的資料畫成折線圖，如果不需要的話就設定成none
-    parser.add_argument('--plot-data-picture-path', type=str, default='./save')
+    parser.add_argument('--plot-data-picture-path', type=str, default='none')
     # 資料保存位置
     parser.add_argument('--data-save-path', type=str, default='./train_annotation.pickle')
     args = parser.parse_args()
