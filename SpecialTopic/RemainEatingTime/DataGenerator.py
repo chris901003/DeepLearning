@@ -10,7 +10,7 @@ from tqdm import tqdm
 def parse_args():
     parser = argparse.ArgumentParser()
     # 總共要生成多少資料
-    parser.add_argument('--num-datas', type=int, default=20000)
+    parser.add_argument('--num-datas', type=int, default=50000)
     # 在x軸上的數值範圍，也就是剩餘時間的範圍
     # 在生成時會生成max_len的長度，起始點會從x-start-range中挑一個值出來作為開頭
     parser.add_argument('--axis-x-start-range', type=float, default=[0.0, 0.0], nargs='+')
@@ -83,8 +83,9 @@ def generate_data(num_datas, axis_x_start_range, axis_x_end_range, axis_y_range,
         food_remain_clip = food_remain[start_index: end_index + 1]
         time_remain_clip = time_remain[start_index: end_index + 1]
         # 這裡將完整時段以及經過提取中間部分的都進行回傳
-        data = dict(food_remain=food_remain, time_remain=time_remain)
-        results.append(data)
+        if np.random.random() > 0.7:
+            data = dict(food_remain=food_remain, time_remain=time_remain)
+            results.append(data)
         data = dict(food_remain=food_remain_clip, time_remain=time_remain_clip)
         results.append(data)
         pbar.update(1)

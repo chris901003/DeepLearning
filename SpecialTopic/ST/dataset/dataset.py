@@ -322,7 +322,7 @@ class RemainEatingTimeDataset(Dataset):
         remain, time_remain = list(), list()
         for info in batch:
             remain.append(torch.from_numpy(info['food_remain_data']))
-            time_remain.append(torch.from_numpy(info['time_remain_data']))
+            time_remain.append(torch.LongTensor(info['time_remain_data']))
         remain = torch.stack(remain)
         time_remain = torch.stack(time_remain)
         return remain, time_remain
