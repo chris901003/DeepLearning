@@ -34,7 +34,7 @@ class PositionEmbedding(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, embed_dim, heads, encoder_layers, attention_norm, mlp_ratio, dropout_ratio=0.):
         super(Encoder, self).__init__()
-        self.layers = list()
+        self.layers = nn.ModuleList()
         for _ in range(encoder_layers):
             self.layers.append(EncoderLayer(embed_dim, heads, attention_norm, mlp_ratio, dropout_ratio))
 
@@ -59,7 +59,7 @@ class EncoderLayer(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, embed_dim, heads, decoder_layers, attention_norm, mlp_ratio, dropout_ratio):
         super(Decoder, self).__init__()
-        self.layers = list()
+        self.layers = nn.ModuleList()
         for _ in range(decoder_layers):
             self.layers.append(DecoderLayer(embed_dim, heads, attention_norm, mlp_ratio, dropout_ratio))
 
@@ -226,7 +226,7 @@ class RemainEatingTimeHead(nn.Module):
         loss = self.loss_func(pred, labels)
         loss_dict['loss'] = loss
         pred = pred.argmax(1)
-        correct = (pred == labels).sum().item()
+        correct = (pred == labels).sum()
         accuracy = correct / len(pred)
         loss_dict['acc'] = accuracy
         return loss_dict
