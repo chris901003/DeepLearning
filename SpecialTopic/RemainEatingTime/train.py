@@ -14,7 +14,7 @@ def parse_args():
     # 模型大小
     parser.add_argument('--phi', type=str, default='m')
     # 一個batch的大小
-    parser.add_argument('--batch-size', type=int, default=8)
+    parser.add_argument('--batch-size', type=int, default=256)
     # 預訓練權重位置
     parser.add_argument('--pretrained', type=str, default='none')
     # 加載上次訓練到一半的資料
@@ -51,7 +51,7 @@ def parse_args():
     # 權重名稱
     parser.add_argument('--weight-name', type=str, default='auto')
     # 在Dataloader當中使用
-    parser.add_argument('--num-workers', type=int, default=1)
+    parser.add_argument('--num-workers', type=int, default=8)
     args = parser.parse_args()
     return args
 

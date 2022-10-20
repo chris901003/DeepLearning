@@ -121,7 +121,7 @@ def detect_single_remain_time(model, food_remain, pipeline=None, device='auto'):
 def test():
     model = init_model(phi='m', setting_file_path='./train_annotation.pickle', pretrained='./save/auto_eval.pth')
     food_remain = [100, 97, 93, 90, 90, 89, 86, 85, 85, 84, 82, 81, 79, 76, 76, 75, 75, 73, 73, 72, 71, 67, 61, 59, 58,
-                   58, 55, 49, 49, 47, 45, 45, 44, 42, 41, 39, 34, 28, 24, 24, 20, 16, 14, 11, 7, 6, 6, 4, 3, 1, 0]
+                   58, 55, 49, 49, 45, 44, 42, 34, 28, 24, 24, 20, 16, 14, 11, 7, 4, 3, 1, 0]
     for idx in range(len(food_remain)):
         cur_food_remain = food_remain[:idx + 1]
         results = detect_single_remain_time(model, cur_food_remain)

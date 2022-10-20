@@ -191,6 +191,7 @@ class RemainEatingTimeBackbone(nn.Module):
     @staticmethod
     def mask_tril(data, pad, len):
         tril = 1 - torch.tril(torch.ones(1, len, len, dtype=torch.long))
+        tril = tril.to(data.device)
         mask = data == pad
         mask = mask.unsqueeze(1).long()
         mask = mask + tril
