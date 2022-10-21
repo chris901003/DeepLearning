@@ -10,6 +10,7 @@ class WorkingSequence:
         from SpecialTopic.WorkingFlow.MainBlock.ObjectClassifyToRemainClassify import ObjectClassifyToRemainClassify
         from SpecialTopic.WorkingFlow.MainBlock.RemainDetection import RemainDetection
         from SpecialTopic.WorkingFlow.MainBlock.ShowResults import ShowResults
+        from SpecialTopic.WorkingFlow.MainBlock.RemainTimeDetection import RemainTimeDetection
         # 整個流程初始化框架
         support_module = {
             # 列出有哪些支援的主模塊
@@ -17,6 +18,7 @@ class WorkingSequence:
             'ObjectDetection': ObjectDetection,
             'ObjectClassifyToRemainClassify': ObjectClassifyToRemainClassify,
             'RemainDetection': RemainDetection,
+            'RemainTimeDetection': RemainTimeDetection,
             'ShowResults': ShowResults
         }
         self.support_module = support_module

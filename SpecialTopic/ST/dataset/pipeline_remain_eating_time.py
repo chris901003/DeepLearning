@@ -24,8 +24,8 @@ class FormatRemainEatingData:
         food_remain_data = results.get('food_remain', None)
         time_remain_data = results.get('time_remain', None)
         assert food_remain_data is not None and time_remain_data is not None, '需提供食物剩餘量以及時間剩餘量資料'
-        food_remain_data = [self.variables['remain_to_index'][remain_str] for remain_str in food_remain_data]
-        time_remain_data = [self.variables['time_to_index'][remain_str] for remain_str in time_remain_data]
+        food_remain_data = [self.variables['remain_to_index'][int(remain_str)] for remain_str in food_remain_data]
+        time_remain_data = [self.variables['time_to_index'][int(remain_str)] for remain_str in time_remain_data]
         food_remain_data = np.array(food_remain_data)
         time_remain_data = np.array(time_remain_data)
         food_remain_data = np.concatenate(([self.variables['remain_SOS_val']], food_remain_data,

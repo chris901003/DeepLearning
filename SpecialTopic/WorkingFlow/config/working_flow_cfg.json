@@ -28,6 +28,13 @@
     "outputs": [["image", "track_object_info"]]
   },
   "step5": {
+    "type": "RemainTimeDetection",
+    "config_file": "./config/remain_time_transformer_detection.json",
+    "call_api": ["remain_time_detection"],
+    "inputs": [["image", "track_object_info"]],
+    "outputs": [["image", "track_object_info"]]
+  },
+  "step6": {
     "type": "ShowResults",
     "config_file": "./config/show_results.json",
     "call_api": ["show_results"],

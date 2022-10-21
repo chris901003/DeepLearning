@@ -30,7 +30,7 @@ class MnistDataset(Dataset):
         image = image - self.norm[None, None, -1]
         image = image / self.std[None, None, -1]
         label = results.get('label')
-        results = {'image': image, 'label': label}
+        results = {'image': image, 'label': label, 'image_path': image_path}
         return results
 
     def __len__(self):
@@ -53,9 +53,11 @@ class MnistDataset(Dataset):
     @staticmethod
     def collate_fn(batch):
         images, labels = list(), list()
+        images_path = list()
         for info in batch:
             images.append(info['image'])
             labels.append(info['label'])
+            images_path.append(info['image_path'])
         images = np.array(images)
         labels = np.array(labels)
-        return images, labels
+        return images, labels, images_path

@@ -1,0 +1,13 @@
+{
+  "type": "RemainTimeTransformerDetection",
+  "model_cfg": {
+    "phi": "m",
+    "setting_file_path": "./prepare/remain_time/remain_time_transformer_detection.pickle",
+    "pretrained": "./checkpoint/remain_time/remain_time_transformer_detection.pth"
+  },
+  "time_gap": 5,
+  "min_remain_detection": 10,
+  "reduce_mode_buffer": {"type": "mean"},
+  "reduce_mode_output": {"type": "momentum", "alpha": 0.7},
+  "keep_time": 60
+}

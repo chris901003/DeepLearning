@@ -10,7 +10,7 @@ from fit_utils import fit_one_epoch_with_batch, fit_one_epoch_without_batch
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pretrained-path', type=str, default='./checkpoint/1.pickle')
+    parser.add_argument('--pretrained-path', type=str, default='./checkpoint/3.pickle')
     parser.add_argument('--Epoch', type=int, default=10)
     parser.add_argument('--lr', type=int, default=1e-1)
     parser.add_argument('--batch_size', type=int, default=1)
@@ -81,13 +81,14 @@ def main():
                 layer.weights = weights[index]
             else:
                 print(f'Layer {index + 1} not load')
+    save_path = './410985048.txt'
     for epoch in range(1, args.Epoch + 1):
         if batch_size == 1:
             fit_one_epoch_without_batch(model, epoch, args.Epoch, train_dataloader, test_dataloader, args.lr,
-                                        num_classes)
+                                        num_classes, save_path)
         else:
             fit_one_epoch_with_batch(model, epoch, args.Epoch, train_dataloader, test_dataloader, args.lr,
-                                     num_classes)
+                                     num_classes, save_path)
         save_weight(model, args.save_weight_path, epoch)
         args.lr = args.lr * 0.1
 
