@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 from SpecialTopic.ST.dataset.utils import Compose
 from SpecialTopic.ST.build import build_detector
+from SpecialTopic.ST.utils import parser_cfg
 
 
 def load_json(setting_file_path):
@@ -24,17 +25,12 @@ def init_model(phi, setting_file_path, pretrained):
         pretrained = 'none'
         print('未載入訓練權重出來的結果會是無效的')
     assert os.path.exists(setting_file_path), '給定的參數檔案資料不存在'
+    setting_info = parser_cfg(setting_file_path)
     if os.path.splitext(setting_file_path)[1] == '.py':
-        # import python文件時需要將文件方在當前目錄下，並且直接給檔名就可以了
         # 並且資料的字典變數名稱需要是setting
-        setting_info = __import__(os.path.splitext(setting_file_path)[0])
         setting = setting_info.setting
-    elif os.path.splitext(setting_file_path)[1] == '.json':
-        setting = load_json(setting_file_path)
-    elif os.path.splitext(setting_file_path)[1] == '.pickle':
-        setting = load_pickle(setting_file_path)
     else:
-        raise NotImplementedError('尚未實作')
+        setting = setting_info
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     variables = {
         'max_len': setting['max_len'],
@@ -127,7 +123,7 @@ def test():
         results = detect_single_remain_time(model, cur_food_remain)
         EOS_index = results.index(model.variables['time_EOS_val'])
         results = results[:EOS_index]
-        result = results[idx] if idx < len(results) else results[-1]
+        result = results[idx + 1] if idx + 1 < len(results) else results[-1]
         print(f'Current Time: {idx}, Remain Time: {result}')
         print(results)
     ans = [idx for idx in range(len(food_remain))]

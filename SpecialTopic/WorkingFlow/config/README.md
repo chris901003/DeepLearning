@@ -173,3 +173,7 @@ type = 說明要使用哪個子模塊
       - remain_category_id = 在剩餘量檢測時使用到的模型ID
       - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
       - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
+
+### remain_time_transformer_detection
+使用類似自然語言概念進行預測，這裡使用的會是基於transformer架構的nlp模型
+
