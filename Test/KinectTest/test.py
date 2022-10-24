@@ -1,6 +1,7 @@
 from openni import openni2
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -20,14 +21,17 @@ def main():
     depth_stream.start()
     # 開始獲取rgb圖像資料
     color_stream.start()
+    # 獲取色帶，這裡可以改成其他色帶看會不會更加清楚
+    color_palette = plt.cm.get_cmap('jet_r')(range(255))
+    depth_image_height, depth_image_width = (480, 640)
 
     while True:
         # 獲取深度圖像資料
         frame = depth_stream.read_frame()
         # 這裡獲取出來的資料會是，shape [204800, 3]所以需要進行reshape
         dframe_data = np.array(frame.get_buffer_as_triplet())
-        # 將資料進行reshape，最後的shape [480, 640, 2]，這裡的深度資訊佔兩個channel深度
-        dframe_data = dframe_data.reshape([480, 640, 2])
+        # 將資料進行reshape，最後的shape [depth_image_height, depth_image_width, 2]，這裡的深度資訊佔兩個channel深度
+        dframe_data = dframe_data.reshape([depth_image_height, depth_image_width, 2])
         # 將兩層資料拆分開來，這裡會是float32格式
         dpt1 = np.asarray(dframe_data[:, :, 0], dtype='float32')
         dpt2 = np.asarray(dframe_data[:, :, 1], dtype='float32')
@@ -39,8 +43,17 @@ def main():
         min_depth = np.min(dpt)
         mid_depth = dpt[240][320]
         print(f'Max Depth: {max_depth}, Min Depth: {min_depth}, Mid Depth: {mid_depth}')
+        min_value, max_value = 300, 6000
+        dpt_clip = np.clip(dpt, min_value, max_value)
+        dpt_clip = (dpt_clip - min_value) / (max_value - min_value) * 253
+        dpt_clip = dpt_clip.astype(int)
+        color_map = np.zeros((depth_image_height, depth_image_width, 3))
+        for i in range(0, 255):
+            color_map[dpt_clip == i] = color_palette[i][:3]
+        for i in range(0, 255):
+            cv2.rectangle(color_map, (600, (i + 1) * 2), (620, (i + 2) * 2), color_palette[i][:3], -1)
         # 直接顯示，這裡其實應該要進行縮放
-        cv2.imshow('dpt', dpt)
+        cv2.imshow('dpt', color_map)
 
         # 獲取rgb圖像
         cframe = color_stream.read_frame()
@@ -61,6 +74,13 @@ def main():
     color_stream.stop()
     # 關閉整個設備
     dev.close()
+
+
+def test():
+    # 獲取色條
+    t = plt.cm.get_cmap('jet_r')(range(255))
+    plt.bar(range(255), range(255), color=t)
+    plt.show()
 
 
 if __name__ == '__main__':
