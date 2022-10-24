@@ -72,7 +72,7 @@ class YoloxObjectDetection:
             results = func(**input)
         return results
 
-    def detect_single_picture(self, image, image_type, force_get_detect=False):
+    def detect_single_picture(self, image, image_type, deep_image=None, deep_draw=None, force_get_detect=False):
         image = self.change_to_ndarray(image, image_type)
         self.image_height, self.image_width = image.shape[:2]
         detect_results = detect_image(model=self.object_detection_model, device=self.device, image_info=image,
@@ -123,6 +123,7 @@ class YoloxObjectDetection:
         results = self.prepare_output()
         # 更新目前最新的frame索引
         self.current_frame_index = (self.current_frame_index + 1) % self.mod_frame_index
+        image = dict(rgb_image=image, deep_image=deep_image, deep_draw=deep_draw)
         if force_get_detect:
             return image, results, detect_results
         else:

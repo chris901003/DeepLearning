@@ -22,6 +22,9 @@ type = 說明要使用哪個子模塊
 注意: 上層step的output請盡量保持與下層step相同，如果直接使用**kwargs帶過會導致不好維護
 如果覺得有缺少什麼參數可以直接修改並且發PR
 
+## ReadPicture
+
+---
 ### get_picture_cfg
 獲取圖像資料的方式\
 主要是從攝影機獲取圖像
@@ -36,6 +39,32 @@ type = 說明要使用哪個子模塊
     - new_camera_id = 新攝影機的id
   - output: []
 
+### get_deep_picture_from_deepcamera
+獲取圖像的方式，這裡主要會透過深度攝影機獲取圖像深度資料，同時也可以獨立從其他攝影機獲取rgb圖像
+##### 參數說明:
+- color_palette_type = 色彩條選擇
+- color_palette_range = 色彩範圍，這裡需要根據使用的色彩條選擇範圍
+- deep_image_height = 深度圖高度
+- deep_image_width = 深度圖寬度
+- rgb_camera = rgb圖像的攝影機，如果是Default就會是直接使用深度攝影機的rgb鏡頭\
+ 如果是要額外使用其他攝影機就需要提供對應ID，同時需要處理RGB圖像與深度圖像的關係
+- rgb_image_height = 彩色圖高度
+- rgb_image_width = 彩色圖寬度
+- min_deep_value = 深度最小值
+- max_deep_value = 深度最大值
+- deep_match_rgb_cfg = 深度圖像映射到rgb圖像的方式，這裡傳入的需要是一個dict格式
+##### api說明:
+- get_single_picture: 獲取RGB圖像以及深度圖像資料
+  - input: None
+  - output: [rgb_image, image_type, deep_image, deep_draw]
+    - rbg_image = 彩色圖像，這裡會是指定的相機獲取的RGB圖像
+    - image_type = 圖像屬性類別
+    - deep_image = 深度圖像資訊，這裡的高寬會與RGB圖像相同
+    - deep_draw = 會依據不同深度映射到調色盤上的顏色進行著色
+
+## ObjectDetection
+
+---
 ### object_detection_cfg
 指定使用哪個目標檢測模型\
 主要會將圖像進行目標檢測，同時會負責過濾短暫判別錯誤的標註對象，會給每個追蹤對象一個id方便接下來的模塊操作\
@@ -47,7 +76,8 @@ type = 說明要使用哪個子模塊
     - image_type = 圖像資料的型態，目前支援[ndarray, Image]
     - force_get_detect = 獲取當前檢測內容(在測試時可以使用，這樣就可以獲取當前狀態)
   - output: [image, track_object_info, detect_results]
-    - image = 傳入的圖像，這裡不會對傳入圖像做任何更動
+    - image = 傳入的圖像，這裡會將所有與圖像相關資料打包成dict，RGB圖像會在rgb_image當中 
+      如果有深度資料就會有deep_image以及deep_draw資料
     - track_object_info = 經過一系列操作後要傳到下個模塊的資料
       - position = 位置資訊
       - category_from_object_detection = 分類類別名稱
@@ -63,6 +93,9 @@ type = 說明要使用哪個子模塊
 ，被放到這裡的目標不會給予ID
 這裡匹配目標的方式是透過計算交並比獲取，所以只需調整比例就可以寬鬆的認定為同一個目標
 
+## ObjectClassifyToRemainClassify
+
+---
 ### object_classify_to_remain_classify
 對照表，將目標檢測出的類別id轉換到剩餘量檢測的id，如此才可以調用正確的類別分類網路
 ##### api說明:
@@ -81,6 +114,9 @@ type = 說明要使用哪個子模塊
       - using_last = 是否需要進行之後層結構的判斷
       - remain_category_id = 在剩餘量檢測時使用到的模型ID(新增)
 
+## RemainDetection
+
+---
 ### remain_detection_cfg
 剩餘量檢測模型設定
 ##### 參數說明:
@@ -104,34 +140,6 @@ type = 說明要使用哪個子模塊
       - using_last = 是否需要進行之後層結構的判斷
       - remain_category_id = 在剩餘量檢測時使用到的模型ID
       - category_from_remain = 剩餘量的類別(新增)
-
-### show_results
-將結果顯示出來
-##### 文件說明
-- triangles: 打印矩形匡資料的都會在這裡
-  - type = 說明給的座標資料型態，最後都會轉成[xmin, ymin, xmax, ymax]型態
-  - val_name = 要從哪個Key獲取資料，只能從一個Key進行獲取，所以需要先打包好
-  - color = 匡的顏色，不填寫會有默認值
-  - thick = 匡的粗度，不填寫會有默認值
-- texts: 文字相關資料都會在這裡
-  - prefix = 字串開頭部分，如果不需要可以不要填或是用空
-  - suffix = 字串結尾部份，如果不需要可以不要填或是用空
-  - val_name = 將哪些資料寫到圖像上，這裡會盡可能的轉成str，如果無法轉換就會報錯
-  - sep = 多個值之間的格開方式
-  - color = 文字顏色，不填寫會有默認值
-  - text_size = 文字大小，不填寫會有默認值
-  - thick = 文字粗度，不填寫會有默認值
-- pictures: 將圖像貼到指定位置上
-  - val_name = 獲取圖像的變數名稱
-  - position = 要貼到的座標位置
-  - opacity = 透明度
-##### api說明:
-- show_results: 將結果畫在圖上並且將圖像返回
-  - input: [image, track_object_info]
-    - image = 圖像資料，跟傳入時的圖像相同
-    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
-  - output: [image]
-    - image = 標註好的圖像，如果有需要保存就可以直接保存
 
 ### remain_segformer_detection
 使用分割網路將食物以及盤子進行分割，透過計算比例獲取剩餘量
@@ -174,6 +182,40 @@ type = 說明要使用哪個子模塊
       - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
       - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
 
+## ShowResults
+
+---
+### show_results
+將結果顯示出來
+##### 文件說明
+- triangles: 打印矩形匡資料的都會在這裡
+  - type = 說明給的座標資料型態，最後都會轉成[xmin, ymin, xmax, ymax]型態
+  - val_name = 要從哪個Key獲取資料，只能從一個Key進行獲取，所以需要先打包好
+  - color = 匡的顏色，不填寫會有默認值
+  - thick = 匡的粗度，不填寫會有默認值
+- texts: 文字相關資料都會在這裡
+  - prefix = 字串開頭部分，如果不需要可以不要填或是用空
+  - suffix = 字串結尾部份，如果不需要可以不要填或是用空
+  - val_name = 將哪些資料寫到圖像上，這裡會盡可能的轉成str，如果無法轉換就會報錯
+  - sep = 多個值之間的格開方式
+  - color = 文字顏色，不填寫會有默認值
+  - text_size = 文字大小，不填寫會有默認值
+  - thick = 文字粗度，不填寫會有默認值
+- pictures: 將圖像貼到指定位置上
+  - val_name = 獲取圖像的變數名稱
+  - position = 要貼到的座標位置
+  - opacity = 透明度
+##### api說明:
+- show_results: 將結果畫在圖上並且將圖像返回
+  - input: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image]
+    - image = 標註好的圖像，如果有需要保存就可以直接保存
+
+## RemainTimeDetection
+
+---
 ### remain_time_transformer_detection
 使用類似自然語言概念進行預測，這裡使用的會是基於transformer架構的nlp模型
 ##### 文件說明

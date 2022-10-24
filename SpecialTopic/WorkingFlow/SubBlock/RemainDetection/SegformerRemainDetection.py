@@ -143,12 +143,12 @@ class SegformerRemainDetection:
             return remain
 
     def update_detection(self, image, position, track_id, remain_category_id, with_draw=False):
-        image_height, image_width = image.shape[:2]
+        image_height, image_width = image['rgb_image'].shape[:2]
         xmin, ymin, xmax, ymax = position
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
         xmin, ymin = max(0, xmin), max(0, ymin)
         xmax, ymax = min(image_width, xmax), min(image_height, ymax)
-        picture = image[ymin:ymax, xmin:xmax, :]
+        picture = image['rgb_image'][ymin:ymax, xmin:xmax, :]
         if self.segformer_modules[remain_category_id] is None:
             pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
@@ -286,7 +286,8 @@ def test():
                 info = str(label) + '||' + str(category_from_remain)
                 cv2.putText(image, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 255), 2, cv2.LINE_AA)
-                image[ymin:ymax, xmin:xmax] = image[ymin:ymax, xmin:xmax] * (1 - 0.5) + remain_color_picture * 0.5
+                image['rgb_image'][ymin:ymax, xmin:xmax] = image['rgb_image'][ymin:ymax, xmin:xmax] * (1 - 0.5) + \
+                                                           remain_color_picture * 0.5
             cv2.imshow('img', image)
         if cv2.waitKey(1) == ord('q'):
             break
