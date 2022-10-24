@@ -78,12 +78,12 @@ class VitRemainDetection:
         return pred
 
     def update_detection(self, image, position, track_id, remain_category_id):
-        image_height, image_width = image.shape[:2]
+        image_height, image_width = image['rgb_image'].shape[:2]
         xmin, ymin, xmax, ymax = position
         ymin, xmin, ymax, xmax = int(ymin), int(xmin), int(ymax), int(xmax)
         ymin, xmin = max(0, ymin), max(0, xmin)
         ymax, xmax = min(image_height, ymax), min(image_width, xmax)
-        picture = image[ymin:ymax, xmin:xmax]
+        picture = image['rgb_image'][ymin:ymax, xmin:xmax]
         if self.modules[remain_category_id] is None:
             pred = 0
         else:

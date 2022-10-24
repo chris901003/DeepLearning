@@ -23,7 +23,7 @@ class DrawResultsOnPicture:
         return results
 
     def show_results(self, image, track_object_info):
-        result_image = copy.deepcopy(image)
+        result_image = copy.deepcopy(image['rgb_image'])
         result_image = self.draw_triangle(result_image, track_object_info)
         result_image = self.write_text(result_image, track_object_info)
         result_image = self.paste_picture(result_image, track_object_info)

@@ -1,0 +1,13 @@
+{
+  "type": "ReadPictureFromDeepCamera",
+  "color_palette_type": "jet_r",
+  "color_palette_range": 255,
+  "deep_image_height": 480,
+  "deep_image_width": 640,
+  "rgb_camera": "Default",
+  "rgb_image_height": 480,
+  "rgb_image_width": 640,
+  "min_deep_value": 300,
+  "max_deep_value": 6000,
+  "deep_math_rgb_cfg": "Default"
+}
