@@ -176,4 +176,40 @@ type = 說明要使用哪個子模塊
 
 ### remain_time_transformer_detection
 使用類似自然語言概念進行預測，這裡使用的會是基於transformer架構的nlp模型
-
+##### 文件說明
+- model_cfg = 模型配置
+  - phi = 模型大小
+  - setting_file_path = 模型當中配置參數，這個部分很重要，因為各種變數資料都會在這裡面，可以直接使用訓練時用的pickle檔
+  - pretrained = 訓練好的權重路徑
+- time_gap = 搜集多少時間的剩餘量檢測會放到剩餘時間檢測輸入
+  - 主要的目的是在判斷剩餘時間時是透過固定時間檢測剩餘量判斷
+- min_remain_detection = 同時可以要求最少要多少個剩餘量資料才會放到輸入當中
+  - 避免檢測剩餘量資料太少會造成大幅波動，透過限制至少要多少剩餘量檢測才放入到剩餘時間檢測的輸入
+- reduce_mode_buffer = 準備放入到剩餘時間檢測輸入時的資料率波方式
+  - type = 指定方式，目前只有提供[mean, maximum, minimum, reduce_filter_maximum_and_minimum_mean]，如果有想到更好的可以提出
+    - mean = 取平均值
+    - maximum = 取最大值
+    - minimum = 取最小值
+    - reduce_filter_maximum_and_minimum_mean = 去除最大最小值後取平均
+- reduce_mode_output = 輸出剩餘時間的率波方式
+  - type = 指定方式，目前只有提供[momentum]，如果有想到更好的可以提出
+    - momentum = 動量方式
+      - alpha = 超參數，建議設定[0.5-0.7]左右
+- keep_time = 一個追蹤對象在多久沒有追蹤到要拋棄
+##### api說明
+- remain_time_detection: 根據剩餘量與間隔時間檢測剩餘所需時間
+  - input: [image, track_object_info]
+    - image = 圖像資料，一定要是原始圖像，因為會對該圖像擷取需要的部分進行剩餘量判斷
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
+      - remain_category_id = 在剩餘量檢測時使用到的模型ID
+      - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
+      - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
+      - remain_time = 所需剩餘時間，會有可能跳出正在初始化(新)
