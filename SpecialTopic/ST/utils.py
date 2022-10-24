@@ -1,3 +1,4 @@
+import copy
 import os
 import pickle
 import json
@@ -38,10 +39,11 @@ def get_model_cfg(model_type, phi):
         'Segformer': SegformerConfig
     }
     model_cfg = support_model.get(model_type, None)
-    assert model_cfg is not None, f'沒有支持{model_type}模型配置文件，如果有需要請自行添加'
-    model_cfg = model_cfg.get(phi, None)
-    assert model_cfg is not None, f'{model_type}沒有支持{phi}的尺寸，如果有需要請自行添加'
-    return model_cfg
+    model_cfg_ = copy.deepcopy(model_cfg)
+    assert model_cfg_ is not None, f'沒有支持{model_type}模型配置文件，如果有需要請自行添加'
+    model_phi_cfg = model_cfg_.get(phi, None)
+    assert model_phi_cfg is not None, f'{model_type}沒有支持{phi}的尺寸，如果有需要請自行添加'
+    return model_phi_cfg
 
 
 def to_2tuple(x):
