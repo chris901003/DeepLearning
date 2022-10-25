@@ -16,6 +16,8 @@ def args_parse():
     parser.add_argument('--save-folder-path', type=str, default='./save')
     # 總共有哪些類別，這裡的順序會與到時圖像的時候相同，所以如果要避免被覆蓋就需要調整順序
     parser.add_argument('--labels', type=str, default=['NotFood', 'Food'], nargs='+')
+    # 是否需要嚴格規定每張圖像當中都需要有labels的標註，當strict_check_label為False時就不會嚴格檢查
+    parser.add_argument('--strict-check-label', action='store_false')
     # 要標註的idx，這裡的長度需要與labels相同
     parser.add_argument('--labels-idx', type=int, default=[2, 1], nargs='+')
     # 背景值
@@ -37,6 +39,7 @@ def main():
     labels = args.labels
     labels_idx = args.labels_idx
     background_val = args.background_val
+    strict_check_label = args.strict_check_label
     assert len(labels) == len(labels_idx), '標註名稱與標註值數量需要相同'
     labels2labels2_idx = {label: label_idx for label, label_idx in zip(labels, labels_idx)}
     assert os.path.exists(image_folder_path) and os.path.exists(annotation_folder_path), 'File is not exist'
@@ -66,7 +69,11 @@ def main():
             points_dict[label].append(point)
         for label in labels:
             points = points_dict.get(label, None)
-            assert points is not None, f'{image_name}沒有標到{label}請不要這麼走心'
+            if strict_check_label:
+                assert points is not None, f'{image_name}沒有標到{label}請不要這麼走心'
+            else:
+                if points is None:
+                    continue
             color = labels2labels2_idx[label]
             for point in points:
                 cv2.fillPoly(seg_image, [point], (color, color, color))
