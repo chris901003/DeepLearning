@@ -1,42 +1,42 @@
 {
   "step1": {
     "type": "ReadPicture",
-    "config_file": "./config/get_picture_from_camera_cfg.json",
+    "config_file": "./config/ReadPicture/get_picture_from_camera_cfg.json",
     "call_api": ["get_single_picture"],
     "inputs": [[]],
     "outputs": [["image", "image_type"]]
   },
   "step2": {
     "type": "ObjectDetection",
-    "config_file": "./config/object_detection_cfg.json",
+    "config_file": "./config/ObjectDetection/object_detection_cfg.json",
     "call_api": ["detect_single_picture"],
     "inputs": [["image", "image_type"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step3": {
     "type": "ObjectClassifyToRemainClassify",
-    "config_file": "./config/object_classify_to_remain_classify_cfg.json",
+    "config_file": "./config/ObjectClassifyToRemainClassify/object_classify_to_remain_classify_cfg.json",
     "call_api": ["get_remain_id"],
     "inputs": [["image", "track_object_info", "using_dict_name"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step4": {
     "type": "RemainDetection",
-    "config_file": "./config/remain_segformer_detection.json",
+    "config_file": "./config/RemainDetection/remain_segformer_detection.json",
     "call_api": ["remain_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step5": {
     "type": "RemainTimeDetection",
-    "config_file": "./config/remain_time_transformer_detection.json",
+    "config_file": "./config/RemainTimeDetection/remain_time_transformer_detection.json",
     "call_api": ["remain_time_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step6": {
     "type": "ShowResults",
-    "config_file": "./config/show_results.json",
+    "config_file": "./config/ShowResults/show_results.json",
     "call_api": ["show_results"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]

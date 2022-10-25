@@ -10,7 +10,7 @@ def args_parse():
     parser = argparse.ArgumentParser('All starting from here')
     # 設定每個模塊需要接收的資料以及輸出的結果
     parser.add_argument('--working-flow-cfg', type=str,
-                        default='./config/working_flow_cfg.json')
+                        default='./config/WorkingFlow/working_flow_cfg.json')
     # 如果有需要手動設定高寬就填上(height, width)，使用-1就是直接使用原始大小
     parser.add_argument('--show-window-size', type=int, default=[100, 200], nargs='+')
     # 如果不需要將過程轉成影片保存就改成none
