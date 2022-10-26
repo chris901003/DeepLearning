@@ -180,7 +180,7 @@ class SegformerRemainDetection:
         else:
             last_remain = self.keep_last[track_id]['remain']
             result = self.reduce_func(result, last_remain) if last_remain != -1 else result
-            if self.strict_down:
+            if self.strict_down and last_remain != -1:
                 result = min(result, self.keep_last[track_id]['remain'])
             self.keep_last[track_id]['remain'] = result
             self.keep_last[track_id]['last_frame'] = self.frame

@@ -62,10 +62,10 @@ class SegformerWithDeepRemainDetection:
         area_func = partial(area_func, **area_mode)
         reduce_func = get_cls_from_dict(support_reduce_mode, reduce_mode)
         reduce_func = partial(reduce_func, **reduce_mode)
-        init_deep_func = get_cls_from_dict(support_init_deep_mode, **init_deep_mode)
+        init_deep_func = get_cls_from_dict(support_init_deep_mode, init_deep_mode)
         init_deep_func = partial(init_deep_func, **init_deep_mode)
         if dynamic_init_deep_mode is not None:
-            dynamic_init_deep_func = get_cls_from_dict(support_dynamic_init_deep_mode, **dynamic_init_deep_mode)
+            dynamic_init_deep_func = get_cls_from_dict(support_dynamic_init_deep_mode, dynamic_init_deep_mode)
             dynamic_init_deep_func = partial(dynamic_init_deep_func, **dynamic_init_deep_mode)
         else:
             dynamic_init_deep_func = None
@@ -190,22 +190,22 @@ class SegformerWithDeepRemainDetection:
         # 深度值圖像
         depth_image = image['deep_image']
         # 根據深度值轉成顏色圖
-        depth_color = image.get('deep_color', None)
+        depth_color = image.get('deep_draw', None)
         image_height, image_width = rgb_image.shape[:2]
         xmin, ymin, xmax, ymax = position
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
         xmax, ymax = min(image_width, xmax), min(image_height, ymax)
         xmin, ymin = max(0, xmin), max(0, ymin)
-        rgb_picture = rgb_image[xmin:xmax, ymin:ymax, :]
+        rgb_picture = rgb_image[ymin:ymax, xmin:xmax, :]
         if self.segformer_modules[remain_category_id] is None:
             pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
             pred = segmentation_detect_single_picture(model=self.segformer_modules[remain_category_id],
                                                       device=self.device, image_info=rgb_picture,
                                                       with_draw=with_seg_draw)
-        depth_data = depth_image[xmin:xmax, ymin:ymax]
+        depth_data = depth_image[ymin:ymax, xmin:xmax]
         if with_depth_draw:
-            depth_color_picture = depth_color[xmin:xmax, ymin:ymax]
+            depth_color_picture = depth_color[ymin:ymax, xmin:xmax]
         else:
             depth_color_picture = None
         if with_seg_draw:
@@ -244,6 +244,8 @@ class SegformerWithDeepRemainDetection:
             total_volume = self.get_total_volume(track_id, seg_pred, depth_data)
             remain = self.get_remain_through_standard_remain(standard_remain, total_volume)
             result = self.reduce_func(last_remain, remain) if last_remain != -1 else remain
+            if self.strict_downs and last_remain != -1:
+                result = min(result, last_remain)
             if self.dynamic_init_deep_func is not None:
                 self.dynamic_init_deep_func(track_id, seg_pred, depth_data)
         return result
@@ -343,7 +345,7 @@ class SegformerWithDeepRemainDetection:
             return avg
 
     def remove_miss_object(self):
-        remove_keys = [track_id for track_id, track_info in self.keep_data.itmes()
+        remove_keys = [track_id for track_id, track_info in self.keep_data.items()
                        if (self.frame - track_info['last_frame'] + self.mod_frame)
                        % self.mod_frame > self.save_last_period]
         [self.keep_data.pop(k) for k in remove_keys]
@@ -391,3 +393,103 @@ class SegformerWithDeepRemainDetection:
         data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list(),
                     remain_seg_picture=None, remain_depth_picture=None, basic_deep=-1)
         return data
+
+
+def test():
+    import time
+    import cv2
+    from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromDeepCamera import ReadPictureFromDeepCamera
+    from SpecialTopic.WorkingFlow.SubBlock.ObjectDetection.YoloxObjectDetection import YoloxObjectDetection
+    deep_match_rgb_cfg = {
+        'type': 'custom_match', 'rgb_image_range': (10, 640, 0, 460), 'deep_image_range': (0, 630, 20, 480),
+        'horizon_flip': True, 'rgb_image_resize': (567, 414), 'rgb_image_match_deep': True
+    }
+    picture_reader = ReadPictureFromDeepCamera(rgb_camera=0, deep_match_rgb_cfg=deep_match_rgb_cfg, min_deep_value=300,
+                                               max_deep_value=1200)
+    object_detection_config = {
+        "phi": "l",
+        "pretrained": "./checkpoint/object_detection/yolox_l.pth",
+        "classes_path": "./prepare/object_detection_classes.txt",
+        "confidence": 0.7,
+        "nms": 0.3,
+        "filter_edge": False,
+        "cfg": "auto",
+        "new_track_box": 10,
+        "average_time_output": 1
+    }
+    object_detection_model = YoloxObjectDetection(**object_detection_config)
+    module_config = {
+        'remain_module_file': './prepare/remain_segformer_module_cfg.json',
+        'classes_path': './prepare/remain_segformer_detection_classes.txt',
+        'with_color_platte': 'FoodAndNotFood',
+        'save_last_period': 60,
+        'strict_down': False,
+        'reduce_mode': {
+            'type': 'momentum', 'alpha': 0.7
+        },
+        'area_mode': {
+            'type': 'volume_change', 'main_classes_idx': 0
+        },
+        'init_deep_mode': {
+            'type': 'target_seg_idx_mean', 'target_seg_idx': [1, 2]
+        },
+        'dynamic_init_deep_mode': {
+            'type': 'around_food', 'main_classes_idx': 0, 'sub_classes_idx': [1, 2], 'range_distance': [5, 10],
+            'sample_points': [5, 10], 'momentum_alpha': 0.5
+        },
+        'check_init_ratio_frame': 5,
+        'std_error': 0.5,
+        'with_seg_draw': True,
+        'with_depth_draw': True
+    }
+    remain_module = SegformerWithDeepRemainDetection(**module_config)
+    pTime = 0
+    while True:
+        picture_info = picture_reader(api_call='get_single_picture')
+        rgb_image, image_type, deep_image, deep_draw = picture_info
+        image_height, image_width = rgb_image.shape[:2]
+        image = dict(image=rgb_image, image_type=image_type, deep_image=deep_image, deep_draw=deep_draw,
+                     force_get_detect=True)
+        object_detection_result = object_detection_model(call_api='detect_single_picture', input=image)
+        image, track_object_info, detect_results = object_detection_result
+        for track_object in track_object_info:
+            track_object['remain_category_id'] = '0'
+        inputs = dict(image=image, track_object_info=track_object_info)
+        image, results = remain_module(call_api='remain_detection', inputs=inputs)
+        labels, scores, boxes = detect_results
+        for label, score, box in zip(labels, scores, boxes):
+            ymin, xmin, ymax, xmax = box
+            xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+            xmin, ymin = max(0, xmin), max(0, ymin)
+            xmax, ymax = min(image_width, xmax), min(image_height, ymax)
+            cv2.rectangle(rgb_image, (xmin, ymin), (xmax, ymax), (0, 0, 255), 3)
+
+        for result in results:
+            position = result['position']
+            category_from_remain = result['category_from_remain']
+            remain_color_picture = result['remain_color_picture']
+            remain_deep_picture = result['remain_deep_picture']
+            label = result['category_from_object_detection']
+            xmin, ymin, xmax, ymax = position
+            xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+            xmin, ymin = max(0, xmin), max(0, ymin)
+            xmax, ymax = min(image_width, xmax), min(image_height, ymax)
+            cv2.rectangle(rgb_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+            info = str(label) + '||' + str(category_from_remain)
+            cv2.putText(rgb_image, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
+                        1, (0, 0, 255), 2, cv2.LINE_AA)
+            rgb_image[ymin:ymax, xmin:xmax] = rgb_image[ymin:ymax, xmin:xmax] * 0.5 + remain_color_picture * 0.5
+            deep_draw[ymin:ymax, xmin:xmax] = deep_draw[ymin:ymax, xmin:xmax] * 0.5 + remain_deep_picture * 0.5
+        cTime = time.time()
+        fps = 1 / (cTime - pTime)
+        pTime = cTime
+        cv2.putText(rgb_image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+        cv2.imshow('rgb_image', rgb_image)
+        cv2.imshow('deep_image', deep_draw)
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+
+if __name__ == '__main__':
+    print('Testing Segformer with deep remain detection')
+    test()
