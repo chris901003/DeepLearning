@@ -12,7 +12,7 @@ def args_parse():
     parser.add_argument('--working-flow-cfg', type=str,
                         default='./config/WorkingFlow/working_flow_cfg.json')
     # 如果有需要手動設定高寬就填上(height, width)，使用-1就是直接使用原始大小
-    parser.add_argument('--show-window-size', type=int, default=[100, 200], nargs='+')
+    parser.add_argument('--show-window-size', type=int, default=-1, nargs='+')
     # 如果不需要將過程轉成影片保存就改成none
     parser.add_argument('--save-video', type=str, default='none')
     # 接下來還會有一堆下游工作，目前先處理這兩個的連動

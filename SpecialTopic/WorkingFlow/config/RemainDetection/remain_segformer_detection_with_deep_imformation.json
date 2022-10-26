@@ -1,0 +1,25 @@
+{
+  "type": "SegformerWithDeepRemainDetection",
+  "remain_module_file": "./prepare/remain_segformer_module_cfg.json",
+  "classes_path": "./prepare/remain_segformer_detection_classes.txt",
+  "with_color_platte": "FoodAndNotFood",
+  "save_last_period": 60,
+  "strict_down": false,
+  "reduce_mode": {
+    "type": "momentum", "alpha": 0.9
+  },
+  "area_mode": {
+    "type": "volume_change", "main_classes_idx": 0
+  },
+  "init_deep_mode": {
+    "type": "target_seg_idx_mean", "target_seg_idx": [1, 2]
+  },
+  "dynamic_init_deep_mode": {
+    "type": "around_food", "main_classes_idx": 0, "sub_classes_idx": [1, 2], "range_distance": [5, 10],
+    "sample_points": [5, 10], "momentum_alpha": 0.5
+  },
+  "check_init_ratio_frame": 5,
+  "std_error": 0.5,
+  "with_seg_draw": true,
+  "with_depth_draw": true
+}
