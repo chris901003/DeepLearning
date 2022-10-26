@@ -1,4 +1,6 @@
 import copy
+import logging
+from SpecialTopic.WorkingFlow.utils import create_logger
 from SpecialTopic.ST.utils import get_cls_from_dict
 from SpecialTopic.WorkingFlow.utils import list_of_list
 
@@ -23,6 +25,10 @@ class WorkingSequence:
         }
         self.support_module = support_module
         self.working_flow_cfg = working_flow_cfg
+        # 獲取log設定檔資料
+        self.log_config = working_flow_cfg.get('log_config', None)
+        log_config_ = copy.deepcopy(self.log_config)
+        self.app_logger = create_logger(log_config_)
         self.steps = list()
         # 構建主模塊實例對象同時保存
         for k, v in working_flow_cfg.items():

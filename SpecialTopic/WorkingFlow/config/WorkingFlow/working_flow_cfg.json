@@ -40,5 +40,49 @@
     "call_api": ["show_results"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]
+  },
+  "log_config": {
+    "log_link": "app",
+    "level": "debug",
+    "format": ["asctime", "name", "levelname", "message"],
+    "handler": [
+      {
+        "type": "FileHandler",
+        "save_path": "./log/app/log_save.log",
+        "level": "debug",
+        "format": null
+      },
+      {
+        "type": "StreamHandler",
+        "level": "debug",
+        "format": null
+      }
+    ],
+    "sub_log": [
+      {
+        "log_link": "ReadPicture",
+        "level": "debug"
+      },
+      {
+        "log_link": "ObjectDetection",
+        "level": "debug"
+      },
+      {
+        "log_link": "ObjectClassifyToRemainClassify",
+        "level": "debug"
+      },
+      {
+        "log_link": "RemainDetection",
+        "level": "debug"
+      },
+      {
+        "log_link": "RemainTimeDetection",
+        "level": "debug"
+      },
+      {
+        "log_link": "ShowResults",
+        "level": "debug"
+      }
+    ]
   }
 }
