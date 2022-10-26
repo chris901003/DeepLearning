@@ -24,6 +24,16 @@ def main():
     # 獲取色帶，這裡可以改成其他色帶看會不會更加清楚
     color_palette = plt.cm.get_cmap('jet_r')(range(255))
     depth_image_height, depth_image_width = (480, 640)
+    save_rgb_video_path = './rgb_video.mp4'
+    save_depth_video_path = './depth_video.mp4'
+    rgb_video_write = None
+    depth_video_write = None
+    if save_rgb_video_path != 'none':
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        rgb_video_write = cv2.VideoWriter(save_rgb_video_path, fourcc, 30, (640, 480))
+    if save_depth_video_path != 'none':
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        depth_video_write = cv2.VideoWriter(save_depth_video_path, fourcc, 30, (640, 480))
 
     while True:
         # 獲取深度圖像資料
@@ -43,7 +53,7 @@ def main():
         min_depth = np.min(dpt)
         mid_depth = dpt[240][320]
         print(f'Max Depth: {max_depth}, Min Depth: {min_depth}, Mid Depth: {mid_depth}')
-        min_value, max_value = 300, 6000
+        min_value, max_value = 600, 1000
         dpt_clip = np.clip(dpt, min_value, max_value)
         dpt_clip = (dpt_clip - min_value) / (max_value - min_value) * 253
         dpt_clip = dpt_clip.astype(int)
@@ -53,6 +63,7 @@ def main():
         for i in range(0, 255):
             cv2.rectangle(color_map, (600, (i + 1) * 2), (620, (i + 2) * 2), color_palette[i][:3], -1)
         # 直接顯示，這裡其實應該要進行縮放
+        color_map = (color_map * 255).astype(np.uint8)
         cv2.imshow('dpt', color_map)
 
         # 獲取rgb圖像
@@ -65,6 +76,10 @@ def main():
         B = cframe_data[:, :, 2]
         cframe_data = np.transpose(np.array([B, G, R]), [1, 2, 0])
         cv2.imshow('color', cframe_data)
+        if rgb_video_write is not None:
+            rgb_video_write.write(cframe_data)
+        if depth_video_write is not None:
+            depth_video_write.write(color_map)
 
         if cv2.waitKey(1) == ord('q'):
             break
