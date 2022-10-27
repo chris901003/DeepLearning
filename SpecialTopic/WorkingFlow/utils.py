@@ -79,6 +79,7 @@ def create_logger(log_config, log_name=None):
                 filename = handler_info.get('save_path', None)
                 assert filename is not None, '需提供保存log的路徑'
                 init_param['filename'] = filename
+                init_param['mode'] = 'w'
             handler_obj = handler_cls(**init_param)
             format_cfg = handler_info.get('format', None)
             if format_cfg is not None:
