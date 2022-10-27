@@ -6,7 +6,8 @@
 當模塊都有實作時只需要更改config配置文件就可以產生不同效果
 
 ### config
-存放配置文件的地方，所有的配置文件都會存放到config當中，裡面有關於config撰寫的README文件，詳細內容可以到裡面去看
+存放配置文件的地方，所有的配置文件都會存放到config當中，裡面有關於config撰寫的README文件，詳細內容可以到裡面去看\
+大部分的說明資料都會在config中的README當中，所以如果要詳細了解請到config當中的README查看
 
 ### MainBlock
 主模塊實作文件

@@ -26,17 +26,24 @@ class WorkingSequence:
         self.support_module = support_module
         self.working_flow_cfg = working_flow_cfg
         # 獲取log設定檔資料
-        self.log_config = working_flow_cfg.get('log_config', None)
+        self.log_config = working_flow_cfg.pop('log_config', None)
+        assert self.log_config is not None, '需要設定log設定檔'
         log_config_ = copy.deepcopy(self.log_config)
         self.app_logger = create_logger(log_config_)
+        logger = self.app_logger['logger']
         self.steps = list()
         # 構建主模塊實例對象同時保存
         for k, v in working_flow_cfg.items():
             v_ = copy.deepcopy(v)
             stage_name = v_.get('type', None)
+            stage_logger = self.app_logger['sub_log'].get(stage_name, None)
+            assert stage_logger is not None, f'缺少{stage_name}的log配置'
+            logger.debug(f'Working flow init stage name: {stage_name}')
             module_cls = get_cls_from_dict(support_module, v_)
-            module = module_cls(v_['config_file'])
+            # 會將主模塊的負模塊設定方式以及該模塊可以使用的logger對象傳入
+            module = module_cls(v_['config_file'], stage_logger)
             inputs, outputs, call_api = v_.get('inputs', None), v_.get('outputs', None), v_.get('call_api', None)
+            logger.debug(f'Stage {stage_name}, Input: {inputs}, Output: {outputs}, Call api: {call_api}')
             assert inputs is not None and outputs is not None, '需提供輸入以及輸出資料'
             assert call_api is not None, '需要提供要呼叫哪些函數'
             if not list_of_list(inputs):

@@ -256,3 +256,19 @@ type = 說明要使用哪個子模塊
       - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
       - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
       - remain_time = 所需剩餘時間，會有可能跳出正在初始化(新)
+
+## Log系統
+
+---
+在work_flow_cfg當中的key為log_config，所有的log設定都在此\
+本log系統由巢狀構成，模塊依據主模塊進行分類
+##### 文件說明
+- log_link = 與哪個模塊做連接，連接名稱會是每個step的type部分
+- level = 本層log的基礎level，注意這裡是會對log設定level不是handler
+- format = 統一格式設定，如果該log的handler中的模塊沒有特別設定format就會直接套用這裡的format
+- handler = 本log帶上的handler，會由list組成，可以有多個handler並且由type指定哪個handler
+  - type = 指定的handler類別
+  - save_path = 如果是FileHandler就會需要指定儲存檔案位置，其他的就不會需要設定
+  - level = 專門給此handler使用的訊息等級
+  - format = 專門給此handler使用的format方式，如果沒有設定就會用通用的
+- sub_log = 本log下的子模塊，由list構成，裡面的每個設定都會是dict且型態就是一個新的log設定資料

@@ -2,13 +2,20 @@ from SpecialTopic.WorkingFlow.utils import parser_cfg
 
 
 class ObjectClassifyToRemainClassify:
-    def __init__(self, cfg_path):
+    def __init__(self, cfg_path, logger):
+        """ 將目標檢測結果的類別映射到下個網路的類別
+        Args:
+            cfg_path: 直接為本主模塊的配置文件，這裡因為該模作業簡單所以沒有子模塊
+            logger: 保存運行過程中狀態的log實例化對象
+        """
         cfg = parser_cfg(cfg_path)
         self.cfg = cfg
         self.transfer_dict = self.build_transfer_dict()
         self.support_api = {
             'get_remain_id': self.get_remain_id
         }
+        # 將logger實例化對象保存下來，在過程中可以使用
+        self.logger = logger
 
     def build_transfer_dict(self):
         transfer_dict = dict()

@@ -59,6 +59,7 @@ class ReadPictureFromDeepCamera:
         self.support_api = {
             'get_single_picture': self.get_single_picture
         }
+        self.logger = None
 
     def __call__(self, api_call, input=None):
         func = self.support_api.get(api_call, None)
@@ -70,6 +71,14 @@ class ReadPictureFromDeepCamera:
         return results
 
     def get_single_picture(self):
+        """ 獲取一幀圖像
+        Returns:
+            rgb_image: 彩色圖像資料
+            ndarray: 輸出的資料型態
+            deep_image: 深度資料，每個點表示的就直接是該像素點的深度資料
+            deep_draw: 透過深度配合上色盤讓深度更加可視化
+        """
+        self.logger['logger'].debug('get single picture')
         deep_frame = self.depth_stream.read_frame()
         deep_frame_data = np.array(deep_frame.get_buffer_as_triplet())
         deep_frame_data = deep_frame_data.reshape([self.deep_image_height, self.deep_image_width, 2])
@@ -93,6 +102,12 @@ class ReadPictureFromDeepCamera:
         return rgb_image, 'ndarray', deep_image, deep_draw
 
     def draw_deep_image(self, deep_image):
+        """ 將深度資料用不同顏色來表示，增加可視化能力
+        Args:
+            deep_image: 深度圖像資料
+        Returns:
+            color_map: 根據不同深度以及色盤畫出的結果
+        """
         dpt_clip = np.clip(deep_image, self.min_deep_value, self.max_deep_value)
         dpt_clip = (dpt_clip - self.min_deep_value) / (self.max_deep_value - self.min_deep_value) * \
                    (self.color_palette_range - 2)
