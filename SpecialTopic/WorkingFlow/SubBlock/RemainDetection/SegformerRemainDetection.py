@@ -72,6 +72,7 @@ class SegformerRemainDetection:
         self.support_api = {
             'remain_detection': self.remain_detection
         }
+        self.logger = None
 
     def build_modules(self):
         modules_dict = dict()
@@ -98,6 +99,11 @@ class SegformerRemainDetection:
         return results
 
     def remain_detection(self, image, track_object_info):
+        """ 進行剩餘量檢測
+        Args:
+            image: 圖像相關資料
+            track_object_info: 正在追蹤對象資料
+        """
         with_draw = self.with_draw
         for track_object in track_object_info:
             position = track_object.get('position', None)
@@ -119,13 +125,17 @@ class SegformerRemainDetection:
                 if isinstance(results, (int, float)):
                     results = round(results * 100, 2)
             if with_draw:
+                self.logger['logger'].debug(f'Track ID: {track_id}, Remain: {results[0]}')
                 track_object['category_from_remain'] = results[0]
                 track_object['remain_color_picture'] = results[1]
             else:
+                self.logger['logger'].debug(f'Track ID: {track_id}, Remain: {results}')
                 track_object['category_from_remain'] = results
         return image, track_object_info
 
     def get_last_detection(self, track_id, with_draw=False):
+        """ 獲取最後一次檢測的結果
+        """
         if track_id not in self.keep_last.keys():
             return -1
         standard_remain = self.keep_last[track_id]['standard_remain']
@@ -143,6 +153,14 @@ class SegformerRemainDetection:
             return remain
 
     def update_detection(self, image, position, track_id, remain_category_id, with_draw=False):
+        """ 對當前圖像進行檢測，並且更新
+        Args:
+            image: 圖像相關資料
+            position: 座標相關資料
+            track_id: 正在追蹤對象ID
+            remain_category_id: 該追蹤對象要使用哪個分割網路權重
+            with_draw: 是否需要添加分割彩圖
+        """
         image_height, image_width = image['rgb_image'].shape[:2]
         xmin, ymin, xmax, ymax = position
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
@@ -150,7 +168,15 @@ class SegformerRemainDetection:
         xmax, ymax = min(image_width, xmax), min(image_height, ymax)
         picture = image['rgb_image'][ymin:ymax, xmin:xmax, :]
         if self.segformer_modules[remain_category_id] is None:
-            pred = np.full((image_height, image_width), 0, dtype=np.int)
+            self.logger['logger'].error(f'Track ID: {track_id}, Not have match remain detection model')
+            seg_height, seg_width = ymax - ymin, xmax - xmin
+            if with_draw:
+                draw_image_mix = np.full((seg_height, seg_width, 3), 0, dtype=np.int)
+                draw_image = np.full((seg_height, seg_width, 3), 0, dtype=np.int)
+                seg_pred = np.full((seg_height, seg_width), 0, dtype=np.int)
+                pred = (draw_image_mix, draw_image, seg_pred)
+            else:
+                pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
             pred = detect_single_picture(model=self.segformer_modules[remain_category_id], device=self.device,
                                          image_info=picture, with_draw=with_draw)
@@ -163,13 +189,14 @@ class SegformerRemainDetection:
             return result
 
     def save_to_keep_last(self, track_id, pred):
-        assert isinstance(pred, np.ndarray), 'pred資料需要是ndarray類型'
+        assert isinstance(pred, np.ndarray), self.logger['logger'].critical('pred資料需要是ndarray類型')
         if pred.ndim == 3 and pred.shape[2]:
+            self.logger['logger'].critical('預測出來的圖像需要是單通道')
             raise ValueError('預測出來的圖像需要是單通道')
         if pred.ndim == 3:
+            self.logger['logger'].debug('預測輸出通道多了channel維度，正常是不需要的')
             pred = pred.squeeze(axis=-1)
         result = self.area_func(pred)
-        print(f'Track id: {track_id}, pred: {result}')
         if track_id not in self.keep_last.keys():
             data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list())
             self.keep_last[track_id] = data
@@ -192,6 +219,7 @@ class SegformerRemainDetection:
         remove_keys = [track_id for track_id, track_info in self.keep_last.items()
                        if (self.frame - track_info['last_frame'] + self.mod_frame)
                        % self.mod_frame > self.save_last_period]
+        [self.logger['logger'].debug(f'Track ID: {k}, Delete') for k in remove_keys]
         [self.keep_last.pop(k) for k in remove_keys]
 
     def get_standard_remain(self, track_id):
@@ -242,6 +270,7 @@ class SegformerRemainDetection:
 
 
 def test():
+    import logging
     import cv2
     import torch
     from SpecialTopic.YoloxObjectDetection.api import init_model as init_object_detection
@@ -253,6 +282,13 @@ def test():
                                       classes_path='./prepare/remain_segformer_detection_classes.txt',
                                       with_color_platte='FoodAndNotFood', reduce_mode=dict(type='momentum', alpha=0),
                                       check_init_ratio_frame=5, with_draw=True)
+    logger = logging.getLogger('test')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    logger = dict(logger=logger, sub_log=None)
+    module.logger = logger
     cap = cv2.VideoCapture(0)
     while True:
         ret, image = cap.read()
