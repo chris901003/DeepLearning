@@ -43,45 +43,45 @@
   },
   "log_config": {
     "log_link": "app",
-    "level": "debug",
+    "level": "info",
     "format": ["asctime", "name", "levelname", "message"],
     "handler": [
       {
         "type": "FileHandler",
         "save_path": "./log/app/log_save.log",
-        "level": "debug",
+        "level": "info",
         "format": null
       },
       {
         "type": "StreamHandler",
-        "level": "debug",
+        "level": "info",
         "format": null
       }
     ],
     "sub_log": [
       {
         "log_link": "ReadPicture",
-        "level": "debug"
+        "level": "info"
       },
       {
         "log_link": "ObjectDetection",
-        "level": "debug"
+        "level": "info"
       },
       {
         "log_link": "ObjectClassifyToRemainClassify",
-        "level": "debug"
+        "level": "info"
       },
       {
         "log_link": "RemainDetection",
-        "level": "debug"
+        "level": "info"
       },
       {
         "log_link": "RemainTimeDetection",
-        "level": "debug"
+        "level": "info"
       },
       {
         "log_link": "ShowResults",
-        "level": "debug"
+        "level": "info"
       }
     ]
   }
