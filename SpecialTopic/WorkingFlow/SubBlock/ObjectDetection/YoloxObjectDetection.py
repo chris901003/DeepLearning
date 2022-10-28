@@ -105,7 +105,7 @@ class YoloxObjectDetection:
             detect_results: 從目標檢測網路出來的結果(只有開啟force_get_detect才會有的輸出)
         """
         self.logger['logger'].debug('detect_single_picture')
-        self.logger['logger'].info(f'Current frame {self.current_frame_index}')
+        self.logger['logger'].debug(f'Current frame {self.current_frame_index}')
         image = self.change_to_ndarray(image, image_type)
         self.image_height, self.image_width = image.shape[:2]
         detect_results = detect_image(model=self.object_detection_model, device=self.device, image_info=image,
@@ -361,6 +361,7 @@ def test():
                                   confidence=0.7, nms=0.3, filter_edge=True, cfg='auto', new_track_box=10)
     logger = logging.getLogger('test')
     logger.setLevel(logging.INFO)
+    logger = dict(logger=logger, sub_log=None)
     module.logger = logger
     cap = cv2.VideoCapture(0)
     while True:
@@ -377,7 +378,7 @@ def test():
                 position = position.tolist()
                 xmin, ymin, xmax, ymax = position
                 xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
-                score = str(round(result['object_score'] * 100, 2))
+                score = str(result['object_score'])
                 info = object_detection_label + '||' + score + '||' + str(track_id) + '||' + str(using_last)
                 cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
                 cv2.putText(image, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
