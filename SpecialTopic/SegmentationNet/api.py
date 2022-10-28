@@ -49,10 +49,12 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
         pipeline = Compose(pipeline_cfg)
         model.pipeline = pipeline
     if with_color_platte is not None and with_color_platte != 'none' and isinstance(with_color_platte, str):
-        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood
+        from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood, \
+            FoodWithSpoon
         support_platte = {
             'ADE20KDataset': ADE20KDataset,
-            'FoodAndNotFood': FoodAndNotFood
+            'FoodAndNotFood': FoodAndNotFood,
+            'FoodWithSpoon': FoodWithSpoon
         }
         platte = support_platte.get(with_color_platte, None)
         assert platte is not None, '目前不支援該資料集'

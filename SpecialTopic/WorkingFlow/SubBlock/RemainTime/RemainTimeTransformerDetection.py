@@ -57,6 +57,7 @@ class RemainTimeTransformerDetection:
         self.support_api = {
             'remain_time_detection': self.remain_time_detection
         }
+        self.logger = None
 
     def __call__(self, call_api, inputs=None):
         self.current_time = time.time()
@@ -67,52 +68,88 @@ class RemainTimeTransformerDetection:
         return results
 
     def remain_time_detection(self, image, track_object_info):
+        """ 根據時間的推移以及剩餘量推算還需多少時間
+        Args:
+            image: 圖像相關資料
+            track_object_info: 正在追蹤對象的資料
+        """
         for track_object in track_object_info:
             track_id = track_object.get('track_id', None)
             category_from_remain = track_object.get('category_from_remain', None)
             using_last = track_object.get('using_last', None)
             assert track_id is not None and category_from_remain is not None and using_last is not None, \
-                'Transformer Nlp模塊有缺少參數'
+                self.logger['logger'].critical('傳送到Remain time transformer detection中的追蹤對象缺少資料')
             if isinstance(category_from_remain, str):
+                # 如果傳送過來的剩餘量資料是字串型態表示上層剩餘量檢測模型正在初始化
                 self.upper_layer_init(track_id)
             elif using_last:
+                # 如果上層是使用之前的結果
                 self.get_last_detection(track_id)
             else:
+                # 上層是本次判斷的結果
                 self.update_detection(track_id, category_from_remain)
-            assert self.keep_data.get(track_id, None) is not None, '程序有問題請排查'
+            # 檢查當前track_id應該已經被放到keep_data當中
+            assert self.keep_data.get(track_id, None) is not None, self.logger['logger'].critical('程序有問題請排查')
+            # 獲取模型輸出的結果作為預測結果
             track_object['remain_time'] = self.keep_data[track_id]['status']
         return image, track_object_info
 
     def upper_layer_init(self, track_id):
+        """ 如果上層模型正在初始化會到這裡處理
+        Args:
+            track_id: 追蹤對象的ID
+        """
         if track_id in self.keep_data.keys():
-            assert self.keep_data[track_id]['status'] == 'Upper layer init ...', '程序過程有問題'
+            # 如果該追蹤ID已經有出現在keep_data當中，那麼它的狀態應該要是str型態否則表示過程有問題
+            assert isinstance(self.keep_data[track_id]['status'], str), \
+                self.logger['logger'].critical('程序過程有問題')
+            self.keep_data[track_id]['last_track_time'] = self.current_time
         else:
+            # 如果該追蹤ID是第一次出現就會需要建立保存資料的字典
+            self.logger['logger'].info(f'Track ID: {track_id}, Waiting init ...')
             new_data = dict(remain_buffer=list(), remain_time_input=list(), remain_time_output=list(), status='',
                             last_track_time=self.current_time, last_input_time=0)
+            # 將狀態設定成[Upper layer init ...]
             new_data['status'] = 'Upper layer init ...'
             self.keep_data[track_id] = new_data
 
     def get_last_detection(self, track_id):
+        """ 如果上層傳下的資料是之前的預測結果
+        Args:
+            track_id: 追蹤對象ID
+        """
         if track_id not in self.keep_data.keys():
             new_data = dict(remain_buffer=list(), remain_time_input=list(), remain_time_output=list(), status='',
                             last_track_time=self.current_time, last_input_time=0)
-            new_data['status'] = 'Waiting init ...'
+            new_data['status'] = 'Upper layer get last waiting init ...'
             self.keep_data[track_id] = new_data
         else:
-            self.keep_data['last_tack_time'] = self.current_time
+            self.keep_data[track_id]['last_track_time'] = self.current_time
 
     def update_detection(self, track_id, food_remain):
+        """ 上層是本次的預測結果
+        Args:
+            track_id: 追蹤對象ID
+            food_remain: 食物剩餘量
+        """
         if track_id not in self.keep_data.keys():
             new_data = dict(remain_buffer=list(), remain_time_input=list(), remain_time_output=list(), status='',
                             last_track_time=self.current_time, last_input_time=0)
             self.keep_data[track_id] = new_data
             self.keep_data[track_id]['status'] = 'Waiting init ...'
+            self.logger['logger'].info(f'Track ID: {track_id}, Wait init ...')
         # self.keep_data[track_id]['status'] = 'Wait init ...'
+        # 將當前檢測出的剩餘量放到remain_buffer當中
         self.keep_data[track_id]['remain_buffer'].append(food_remain)
         self.keep_data[track_id]['last_track_time'] = self.current_time
+        # 嘗試更新要放到剩餘時間檢測的輸入
         self.update_input_data(track_id)
 
     def update_input_data(self, track_id):
+        """ 嘗試更新要放到剩餘時間檢測的輸入資料
+        Args:
+            track_id: 正在追蹤的ID
+        """
         last_input_time = self.keep_data[track_id]['last_input_time']
         if self.current_time - last_input_time < self.time_gap:
             return
@@ -126,6 +163,8 @@ class RemainTimeTransformerDetection:
         self.update_output_data(track_id)
 
     def update_output_data(self, track_id):
+        """ 預測還需多少時間
+        """
         # 這裡需要保留<SOS>與<EOS>的兩位
         max_len = self.model.variables['max_len'] - 2
         food_remain = self.keep_data[track_id]['remain_time_input'][:max_len]
@@ -144,8 +183,11 @@ class RemainTimeTransformerDetection:
         self.keep_data[track_id]['status'] = reduce_result
 
     def remove_miss_object(self):
+        """ 移除過久沒有出線的追蹤對象
+        """
         remove_keys = [track_id for track_id, track_info in self.keep_data.items()
                        if (self.current_time - track_info['last_track_time']) > self.keep_time]
+        [self.logger['logger'].info(f'Track ID: {k} remove') for k in remove_keys]
         [self.keep_data.pop(k) for k in remove_keys]
 
     @staticmethod
@@ -211,6 +253,7 @@ class RemainTimeTransformerDetection:
 
 
 def test():
+    import logging
     import time
     model_cfg = {
         'phi': 'm',
@@ -227,6 +270,13 @@ def test():
         'keep_time': 60
     }
     remain_time_detection = RemainTimeTransformerDetection(**TransformerNlp_cfg)
+    logger = logging.getLogger('test')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    logger = dict(logger=logger, sub_log=None)
+    remain_time_detection.logger = logger
     sleep_time = 1
     food_remain_list = [100, 97, 93, 90, 90, 89, 86, 85, 85, 84, 82, 81, 79, 76, 76, 75, 75, 73, 73, 72, 71, 67, 61, 59,
                         58, 58, 55, 49, 49, 45, 44, 42, 34, 28, 24, 24, 20, 16, 14, 11, 7, 4, 3, 1, 0]

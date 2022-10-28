@@ -128,10 +128,12 @@ class SegformerRemainDetection:
                 if isinstance(results, (int, float)):
                     results = round(results * 100, 2)
             if with_draw:
+                self.logger['logger'].debug(f'Track ID: {track_id}, Remain: {results[0]}')
                 track_object['category_from_remain'] = results[0]
                 self.logger['logger'].debug(f'Track ID: [ {track_id} ], 剩餘量結果: [ {results[0]} ]')
                 track_object['remain_color_picture'] = results[1]
             else:
+                self.logger['logger'].debug(f'Track ID: {track_id}, Remain: {results}')
                 track_object['category_from_remain'] = results
                 self.logger['logger'].debug(f'Track ID: [ {track_id} ], 剩餘量結果: [ {results} ]')
         return image, track_object_info
@@ -176,7 +178,15 @@ class SegformerRemainDetection:
         xmax, ymax = min(image_width, xmax), min(image_height, ymax)
         picture = image['rgb_image'][ymin:ymax, xmin:xmax, :]
         if self.segformer_modules[remain_category_id] is None:
-            pred = np.full((image_height, image_width), 0, dtype=np.int)
+            self.logger['logger'].error(f'Track ID: {track_id}, Not have match remain detection model')
+            seg_height, seg_width = ymax - ymin, xmax - xmin
+            if with_draw:
+                draw_image_mix = np.full((seg_height, seg_width, 3), 0, dtype=np.int)
+                draw_image = np.full((seg_height, seg_width, 3), 0, dtype=np.int)
+                seg_pred = np.full((seg_height, seg_width), 0, dtype=np.int)
+                pred = (draw_image_mix, draw_image, seg_pred)
+            else:
+                pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
             pred = detect_single_picture(model=self.segformer_modules[remain_category_id], device=self.device,
                                          image_info=picture, with_draw=with_draw)
@@ -198,8 +208,10 @@ class SegformerRemainDetection:
         """
         assert isinstance(pred, np.ndarray), self.logger['logger'].critical('pred資料需要是ndarray類型')
         if pred.ndim == 3 and pred.shape[2]:
+            self.logger['logger'].critical('預測出來的圖像需要是單通道')
             raise ValueError('預測出來的圖像需要是單通道')
         if pred.ndim == 3:
+            self.logger['logger'].debug('預測輸出通道多了channel維度，正常是不需要的')
             pred = pred.squeeze(axis=-1)
         result = self.area_func(pred)
         if track_id not in self.keep_last.keys():
@@ -226,7 +238,7 @@ class SegformerRemainDetection:
         remove_keys = [track_id for track_id, track_info in self.keep_last.items()
                        if (self.frame - track_info['last_frame'] + self.mod_frame)
                        % self.mod_frame > self.save_last_period]
-        [self.logger['logger'].info(f'{k} delete') for k in remove_keys]
+        [self.logger['logger'].debug(f'Track ID: {k}, Delete') for k in remove_keys]
         [self.keep_last.pop(k) for k in remove_keys]
 
     def get_standard_remain(self, track_id):
@@ -287,6 +299,7 @@ class SegformerRemainDetection:
 
 
 def test():
+    import logging
     import cv2
     import torch
     import logging
