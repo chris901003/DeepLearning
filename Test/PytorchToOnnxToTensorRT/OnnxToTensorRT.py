@@ -48,7 +48,7 @@ class HostDeviceMem(object):
         return self.__str__()
 
 
-def build_engine(onnx_file_path, engine_file_path, max_batch_size=1, fp16_mode=False, save_engine=False):
+def build_engine(onnx_file_path, engine_file_path, max_batch_size=8, fp16_mode=False, save_engine=False):
     """ 構建cudaEngine
     Args:
         onnx_file_path: onnx當案資料路徑
@@ -117,7 +117,7 @@ def build_engine(onnx_file_path, engine_file_path, max_batch_size=1, fp16_mode=F
 
     # 动态输入profile优化
     # 這裡為了讓tensorRT可以動態輸入，所謂的動態輸入指的是[batch, width, height]等的大小問題
-    # 所以要給每個動態輸入綁訂一個profile，用於指定[最大值, 最小值, 常規值]
+    # 所以要給每個動態輸入綁訂一個profile，用於指定[最小值, 最大值, 常規值, 最大值]
     # 透過builder獲取profile對象
     profile = builder.create_optimization_profile()
     # 給定動態輸入的資料
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     # 是否使用fp16的精確度運算
     fp16_mode = False
     # 輸入資料的最大batch大小
-    max_batch_size = 1
+    max_batch_size = 8
     # tensorRT引擎的路徑，估計是拿來讀取或是保存使用的
     trt_engine_path = "resnet50.trt"
 
@@ -305,13 +305,14 @@ if __name__ == '__main__':
     # 構建輸出的shape，這裡會是(batch_size, num_classes)
     output_shape = (max_batch_size, 1000)
     # 構建一個假的輸入，shape(1, 3, 224, 224)，這裡的型態會是float32
-    dummy_input = np.ones([1, 3, 224, 224], dtype=np.float32)
+    dummy_input = np.ones([4, 3, 224, 224], dtype=np.float32)
     # 將輸入的host部分的資料改成dummy_input的資料，這裡要記得展平
     # 此操作就是將資料放到inputs中
     inputs[0].host = dummy_input.reshape(-1)
 
     # 如果是动态输入，需以下设置
     # 目前看到就是說如果要動態輸入就放上這行
+    # 如果有維度是動態輸入的只需要在進行推理前指定當前輸入資料的shape就可以，切記要進行指定，否則會有問題
     context.set_binding_shape(0, dummy_input.shape)
 
     t1 = time.time()
@@ -319,6 +320,9 @@ if __name__ == '__main__':
     trt_outputs = inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
     t2 = time.time()
     # 由于tensorrt输出为一维向量，需要reshape到指定尺寸
+    # 如果是可以動態調整batch的時候輸出的資料依舊會是最大batch值
+    # 也就是如果最大動態batch為8，但我們輸入的資料是(4, 3, 224, 224)那麼出來的結果依舊會是(8, 3, 224, 224)
+    # 這樣後面的4個batch的值會都是0，所以只要將結果取前4個就是我們需要的結果
     feat = postprocess_the_outputs(trt_outputs[0], output_shape)
 
     tensorRT_time = list()
