@@ -189,6 +189,7 @@ def allocate_buffers(engine):
     stream = cuda.Stream()
     # 這裡會對engine進行遍歷，結果會是我們在onnx中有說明的輸入以及輸出的名稱
     for binding in engine:
+        # 這裡透過volume計算的不會保括batch_size的大小，所以需要自行乘上可能的最大batch大小
         size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size  # 非动态输入
         # size = trt.volume(engine.get_binding_shape(binding))                       # 动态输入
         # 這裡我們將volume的程式碼攤開
