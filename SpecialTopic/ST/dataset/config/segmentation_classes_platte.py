@@ -69,5 +69,5 @@ FoodAndNotFood = {
 }
 FoodWithSpoon = {
     'CLASSES': ('Food', 'NotFood', 'Spoon', 'BackGround'),
-    'PALETTE': [[255, 0, 0], [0, 255, 0], [184, 96, 0], [0, 0, 255]]
+    'PALETTE': [[255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255]]
 }
