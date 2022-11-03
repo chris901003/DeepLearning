@@ -51,6 +51,13 @@ def main():
     color_palette = plt.cm.get_cmap('jet_r')(range(255))
     kinect = PyKinectRuntime.PyKinectRuntime(PyKinectV2.FrameSourceTypes_Depth | PyKinectV2.FrameSourceTypes_Color)
     pTime = 0
+
+    from SpecialTopic.YoloxObjectDetection.api import init_model, detect_image
+    import torch
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # model = init_model(pretrained=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth',
+    #                    num_classes=9)
+
     while True:
         if kinect.has_new_depth_frame():
             color_frame = kinect.get_last_color_frame()
@@ -62,6 +69,20 @@ def main():
             rgb_image = cv2.resize(colorImage, (1920 // 2, 1080 // 2))
             deep_image = cv2.resize(cv2.flip(img, 1), (1920 // 2, 1080 // 2))
             deep_color = deep_color_image(deep_image, color_palette)
+            #
+            # results = detect_image(model, device, rgb_image, [640, 640], num_classes=9)
+            # image_height, image_width = rgb_image.shape[:2]
+            # labels, scores, boxes = results
+            # for label, score, box in zip(labels, scores, boxes):
+            #     ymin, xmin, ymax, xmax = box
+            #     if ymin <= 0 or xmin <= 0 or ymax >= image_height or xmax >= image_width:
+            #         continue
+            #     ymin, xmin, ymax, xmax = int(ymin), int(xmin), int(ymax), int(xmax)
+            #     xmin, ymin = max(0, xmin), max(0, ymin)
+            #     xmax, ymax = min(image_width, xmax), min(image_height, ymax)
+            #     cv2.rectangle(rgb_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+            #     cv2.rectangle(deep_color, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+
             cTime = time.time()
             fps = 1 / (cTime - pTime)
             pTime = cTime

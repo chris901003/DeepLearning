@@ -1,7 +1,7 @@
 {
-  "0": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_0.pth"},
+  "0": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_0_2022_10_24.pth"},
   "1": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_1.pth"},
-  "2": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_2.pth"},
+  "2": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_2_2022_10_17.pth"},
   "3": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_3.pth"},
   "4": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_4.pth"},
   "5": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_5.pth"},

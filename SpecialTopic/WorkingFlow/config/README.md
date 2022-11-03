@@ -63,6 +63,25 @@ type = 說明要使用哪個子模塊
     - deep_image = 深度圖像資訊，這裡的高寬會與RGB圖像相同
     - deep_draw = 會依據不同深度映射到調色盤上的顏色進行著色
 
+### get_deep_picture_from_kinectv2
+獲取圖像的方式，這裡是專門給kinect v2使用的，如果使用不同深度攝影機就不適用
+#### 參數說明
+- deep_color_palette = 色彩條選擇
+- deep_color_palette_range = 色彩範圍，這裡需要根據使用的色彩條選擇範圍
+- deep_image_height = 深度圖高度
+- deep_image_width = 深度圖寬度
+- rgb_image_height = 彩色圖高度
+- rgb_image_width = 彩色圖寬度
+- deep_color_range = 深度顯示範圍
+##### api說明:
+- get_single_picture: 獲取RGB圖像以及深度圖像資料
+  - input: None
+  - output: [rgb_image, image_type, deep_image, deep_draw]
+    - rbg_image = 彩色圖像，這裡會是指定的相機獲取的RGB圖像
+    - image_type = 圖像屬性類別
+    - deep_image = 深度圖像資訊，這裡的高寬會與RGB圖像相同
+    - deep_draw = 會依據不同深度映射到調色盤上的顏色進行著色
+
 ## ObjectDetection
 
 ---
@@ -182,6 +201,46 @@ type = 說明要使用哪個子模塊
       - remain_category_id = 在剩餘量檢測時使用到的模型ID
       - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
       - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_draw才會有
+
+### remain_segformer_detection_with_deep_information
+使用帶有深度資訊以及分割網路預測剩餘量百分比
+##### 文件說明
+- remain_module_file = 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型lasses_path: 分割網路的類別檔案 
+- with_color_platte = 使用的調色盤 
+- save_last_period = 最多可以保存多少幀沒有獲取到該id的圖像 
+- strict_down = 強制剩餘量只會越來越少 
+- reduce_mode = 對於當前檢測剩餘量的平均方式，可以減少預測結果突然暴增
+  - momentum = 使用動量方式調整
+    - alpha = 動量超參數
+- area_mode = 計算當前剩餘量的方式 
+  - volume_change = 透過體積比例變化得知剩餘量
+- init_deep_mode = 初始化深度的方式，也就是定義原始底層深度的方式
+  - target_seg_idx_man = 從指定類別中獲取基底深度值
+    - target_seg_idx = 要從分割網路中選取哪些類別的值作為選取點
+    - topk_freq = 估計基礎深度時，取出出現頻率最高的k個資料
+- dynamic_init_deep_mode = 動態調整底層深度的方式，如果沒有打算動態調整就設定成None，或是初始化時不要傳入相關資料
+  - 目前暫時棄用，沒有找到一個好的動態調整方式
+- check_init_ratio_frame = 有新目標要檢測剩餘量時需要以前多少幀作為100%的比例 
+- standard_remain_error = 在確認表準比例時的最大容忍標準差，這裡會是範圍表示可容忍的值建議[0.9, 1.1]
+- with_seg_draw = 將分割的顏色標註圖回傳 
+- with_depth_draw = 將深度圖像顏色回傳
+##### api說明
+- remain_detection: 對於剩餘量進行檢測
+  - input: [image, track_object_info]
+    - image = 圖像資料，一定要是原始圖像，因為會對該圖像擷取需要的部分進行剩餘量判斷
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+  - output: [image, track_object_info]
+    - image = 圖像資料，跟傳入時的圖像相同
+    - track_object_info = 經過一系列操作後要傳到下個模塊的資料
+      - position = 位置資訊
+      - category_from_object_detection = 分類類別名稱
+      - object_score = 預測分數
+      - track_id = 追蹤的ID
+      - using_last = 是否需要進行之後層結構的判斷
+      - remain_category_id = 在剩餘量檢測時使用到的模型ID
+      - category_from_remain = 剩餘量的類別，也有可能會是字串表示當前狀態(新增)
+      - remain_color_picture = 分割網路預測結果的色圖，如果有開啟with_seg_draw才會有
+      - remain_deep_picture = 深度資料可視畫，如果有開啟with_depth_draw就會有
 
 ## ShowResults
 

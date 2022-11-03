@@ -1,0 +1,10 @@
+{
+  "type": "ReadPictureFromKinectV2",
+  "deep_color_palette": "jet_r",
+  "deep_color_palette_range": 255,
+  "deep_image_height": 540,
+  "deep_image_width": 960,
+  "rgb_image_height": 540,
+  "rgb_image_width": 960,
+  "deep_color_range": [500, 1500]
+}
