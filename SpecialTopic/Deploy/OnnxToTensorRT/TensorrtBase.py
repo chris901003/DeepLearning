@@ -1,13 +1,17 @@
 import tensorrt as trt
 import os
-import time
-import torch
-import numpy as np
 import pycuda.driver as cuda
+import math
+import pycuda.autoinit
 
 
 class HostDeviceMem:
     def __init__(self, host_mem, device_mem):
+        """ 用來存放記憶體相關資料
+        Args:
+            host_mem: 實際資料
+            device_mem: 要轉到目的地的記憶體位置
+        """
         self.host = host_mem
         self.device = device_mem
 
@@ -26,7 +30,7 @@ class TensorrtBase:
         'INTERNAL_ERROR': trt.Logger.INTERNAL_ERROR
     }
 
-    def __init__(self, onnx_file_path, fp16_mode=False, max_batch_size=1, trt_engine_path=None,
+    def __init__(self, onnx_file_path, fp16_mode=True, max_batch_size=1, trt_engine_path=None,
                  save_trt_engine_path=None, dynamic_shapes=None, dynamic_factor=1,
                  max_workspace_size=(1 << 30), trt_logger_level='VERBOSE', logger=None):
         """
@@ -46,6 +50,7 @@ class TensorrtBase:
             trt_logger_level: TensorRT的Logger階級
             logger: 紀錄過程的logger
         """
+        # import pycuda.autoinit必須要有，用來初始化cuda使用的
         self.onnx_file_path = onnx_file_path
         self.fp16_mode = fp16_mode
         self.max_batch_size = max_batch_size
@@ -66,7 +71,7 @@ class TensorrtBase:
     def build_engine(self):
         """ 構建TensorRT推理引擎
         """
-        if os.path.exists(self.trt_engine_path):
+        if self.trt_engine_path is not None and os.path.exists(self.trt_engine_path):
             # 如果給定的TensorRT序列化後引擎資料存在就直接加載
             if self.logger is None:
                 print(f'Reading engine from file: {self.trt_engine_path}')
@@ -75,7 +80,7 @@ class TensorrtBase:
             with open(self.trt_engine_path, 'rb') as f, trt.Runtime(self.trt_logger) as runtime:
                 return runtime.deserialize_cuda_engine(f.read())
         # 初始化一些構建ICudaEngine需要的對象
-        EXPLICIT_BATCH = 1 << int(trt.NetworkDefinitionFlag.EXPLICIT_BATCH)
+        EXPLICIT_BATCH = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
         builder = trt.Builder(self.trt_logger)
         network = builder.create_network(EXPLICIT_BATCH)
         config = builder.create_builder_config()
@@ -105,11 +110,11 @@ class TensorrtBase:
         # 將動態資料進行設定
         builder.max_batch_size = self.max_batch_size
         if self.dynamic_shapes is not None:
-            for binding_name, dynamic_shape in self.dynamic_shapes.itmes():
+            trt_profile = builder.create_optimization_profile()
+            for binding_name, dynamic_shape in self.dynamic_shapes.items():
                 min_shape, opt_shape, max_shape = dynamic_shape
-                trt_profile = builder.create_optimizer_profile()
                 trt_profile.set_shape(binding_name, min_shape, opt_shape, max_shape)
-                config.add_optimization_profile(trt_profile)
+            config.add_optimization_profile(trt_profile)
 
         # 如果要保存的位置上有其他資料就先刪除
         if self.save_trt_engine_path is not None:
@@ -121,7 +126,7 @@ class TensorrtBase:
         if engine:
             if self.save_trt_engine_path is not None:
                 # 保存經過序列化後的引擎
-                with open(self.save_trt_engine_path, 'rb') as f:
+                with open(self.save_trt_engine_path, 'wb') as f:
                     f.write(engine.serialize())
         else:
             if self.logger is None:
@@ -136,8 +141,17 @@ class TensorrtBase:
         inputs, outputs, bindings = list(), list(), list()
         stream = cuda.Stream()
         for binding in self.engine:
-            data_size = trt.volume(self.engine.get_binding_shape(binding)) * self.engine.max_batch_size * \
-                        self.dynamic_factor
+            max_binding_shape = self.dynamic_shapes.get(binding, None)
+            if max_binding_shape is not None:
+                # 直接使用最大的資料作為空間大小
+                max_binding_shape = max_binding_shape[2]
+                data_size = math.prod(max_binding_shape)
+            else:
+                binding_shape = self.engine.get_binding_shape(binding)[1:]
+                if -1 in binding_shape:
+                    print('有動態資料，需要提供動態消息，否則無法產生正確的記憶體空間，會報錯')
+                data_size = trt.volume(self.engine.get_binding_shape(binding)) * self.engine.max_batch_size * \
+                            self.dynamic_factor
             data_size = abs(data_size)
             data_type = trt.nptype(self.engine.get_binding_dtype(binding))
             host_mem = cuda.pagelocked_empty(data_size, data_type)
@@ -180,21 +194,225 @@ class TensorrtBase:
             binding_idx = self.engine[binding_name]
             if dynamic_shape:
                 self.context.set_binding_shape(binding_idx, binding_data.shape)
-            # TODO 這一步不確定是否可以對上，需要檢測看看
-            inputs[binding_idx] = binding_data.reshape(-1)
+            # 這裡的index概念與上面相同
+            inputs[binding_idx].host = binding_data
         [cuda.memcpy_htod_async(inp.device, inp.host, stream) for inp in inputs]
         self.context.execute_async_v2(bindings=bindings, stream_handle=stream.handle)
         [cuda.memcpy_dtoh_async(out.host, out.device, stream) for out in outputs]
-        stream.synchromize()
+        stream.synchronize()
         trt_outputs = [out.host for out in outputs]
         trt_outputs = self.postprocess_outputs(trt_outputs, output_shapes)
         return trt_outputs
 
 
-def test():
-    pass
+def one_dynamic_var():
+    import time
+    import torch
+    from torchvision import models, transforms
+    import onnx
+    from PIL import Image
+    import onnxruntime
+    import numpy as np
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model = models.resnet18(pretrained=True)
+    model.eval()
+    model = model.to(device)
+    input_names = ['images']
+    output_names = ['preds']
+    images = torch.randn(1, 3, 224, 224)
+    images = images.to(device)
+    onnx_file = 'test.onnx'
+    # 實現多種個不固定維度，接下來嘗試多個不固定shape的輸入資料以及輸出資料
+    dynamic_axes = {'images': {0: 'batch_size', 2: 'image_height', 3: 'image_width'}, 'preds': {0: 'batch_size'}}
+    with torch.no_grad():
+        # model_script = torch.jit.script(model)
+        # torch.onnx.export(model_script, images, onnx_file, input_names=input_names, output_names=output_names,
+        #                   dynamic_axes=dynamic_axes)
+        torch.onnx.export(model, images, onnx_file, verbose=False, input_names=input_names, output_names=output_names,
+                          opset_version=11, dynamic_axes=dynamic_axes)
+
+    net = onnx.load(onnx_file)
+    onnx.checker.check_model(net)
+    transform_data = transforms.Compose([
+        # transforms.Resize((224, 224)),
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    image = Image.open('test.jpg')
+    image = transform_data(image)
+    batch_size = 2
+    images = torch.stack([image for _ in range(batch_size)])
+
+    # 使用torch推理
+    with torch.no_grad():
+        images = images.to(device)
+        sTime = time.time()
+        torch_preds = model(images)
+        eTime = time.time()
+    torch_preds = torch_preds.argmax(dim=1)
+    del model
+    torch.cuda.empty_cache()
+    print(f'Torch prediction: {torch_preds.tolist()}, Time: {eTime - sTime}')
+
+    # 使用onnxruntime推理
+    session = onnxruntime.InferenceSession('test.onnx', providers=['CUDAExecutionProvider'])
+    session.get_modelmeta()
+    onnx_outputs = ['preds']
+    onnx_inputs = {'images': images.cpu().numpy()}
+    sTime = time.time()
+    onnx_preds = session.run(onnx_outputs, onnx_inputs)
+    eTime = time.time()
+    onnx_preds = onnx_preds[0]
+    onnx_preds = onnx_preds.argmax(axis=1)
+    print(f'Onnx prediction: {onnx_preds}, Time: {eTime - sTime}')
+
+    # 使用tensorRT推理
+    save_trt_engine_path = './test.trt'
+    trt_engine_path = './test.trt'
+    # trt_engine_path = None
+    dynamic_shapes = {'images': ((1, 3, 224, 224), (2, 3, 224, 224), (3, 3, 400, 400))}
+    tensor_engine = TensorrtBase(onnx_file_path=onnx_file, fp16_mode=True, max_batch_size=3,
+                                 dynamic_shapes=dynamic_shapes, save_trt_engine_path=save_trt_engine_path,
+                                 trt_engine_path=trt_engine_path, trt_logger_level='INTERNAL_ERROR')
+    input_datas = {'images': images.cpu().numpy().astype(np.float32)}
+    output_shapes = [(3, 1000)]
+    dynamic_shape = True
+    sTime = time.time()
+    tensorrt_preds = tensor_engine.inference(input_datas=input_datas, output_shapes=output_shapes,
+                                             dynamic_shape=dynamic_shape)
+    eTime = time.time()
+    tensorrt_preds = tensorrt_preds[0]
+    tensorrt_preds = tensorrt_preds.argmax(axis=1)
+    print(f'TensorRT prediction: {tensorrt_preds[:batch_size]}, Time: {eTime - sTime}')
+
+
+def two_dynamic_var():
+    import torch
+    from torch import nn
+    import time
+    import numpy as np
+    import random
+    import onnxruntime
+
+    # 多個不固定shape的輸入資料以及輸出資料
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.more_layer = nn.Sequential(
+                nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1),
+                nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+                nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
+                nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
+                nn.Conv2d(in_channels=512, out_channels=3, kernel_size=3, padding=1)
+            )
+            self.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1)
+            self.conv2 = nn.Conv2d(in_channels=3, out_channels=128, kernel_size=3, padding=1)
+            self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+            self.fc1 = nn.Linear(in_features=64, out_features=10)
+            self.fc2 = nn.Linear(in_features=128, out_features=10)
+
+        def forward(self, x, y):
+            x, y = self.more_layer(x), self.more_layer(y)
+            out1 = self.avg_pool(self.conv1(x))
+            out2 = self.avg_pool(self.conv2(y))
+            out1 = out1.reshape(out1.size(0), -1)
+            out2 = out2.reshape(out2.size(0), -1)
+            out1 = self.fc1(out1)
+            out2 = self.fc2(out2)
+            return out1, out2
+
+    def setup_seed(seed):
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.backends.cudnn.deterministic = True
+
+    setup_seed(0)
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model = Net()
+    model.eval()
+    model = model.to(device)
+    input_names = ['image1', 'image2']
+    output_names = ['pred1', 'pred2']
+    image1 = torch.randn(1, 3, 112, 112).to(device)
+    image2 = torch.randn(1, 3, 224, 224).to(device)
+    onnx_file = 'test.onnx'
+    dynamic_axes = {'image1': {0: 'batch_size'}, 'image2': {0: 'batch_size'},
+                    'pred1': {0: 'batch_size'}, 'pred2': {0: 'batch_size'}}
+    with torch.no_grad():
+        torch.onnx.export(model, (image1, image2), onnx_file, verbose=False, input_names=input_names,
+                          output_names=output_names, opset_version=11, dynamic_axes=dynamic_axes)
+
+    batch_size = 2
+    image1 = torch.randn(batch_size, 3, 112, 112).to(device)
+    image2 = torch.randn(batch_size, 3, 224, 224).to(device)
+
+    # torch推理
+    with torch.no_grad():
+        sTime = time.time()
+        torch_preds = model(image1, image2)
+        eTime = time.time()
+    torch_preds_x = torch_preds[0].argmax(dim=1).detach().cpu().numpy()
+    torch_preds_y = torch_preds[1].argmax(dim=1).detach().cpu().numpy()
+    print(f'Torch prediction x: {torch_preds_x}, Torch prediction y: {torch_preds_y}, Time: {eTime - sTime}')
+
+    test_round = 100
+    torch_time_record = list()
+    for _ in range(test_round):
+        sTime = time.time()
+        _ = model(image1, image2)
+        eTime = time.time()
+        torch_time_record.append(eTime - sTime)
+    torch_avg_time = sum(torch_time_record) / len(torch_time_record)
+    print(f'Torch average time: {torch_avg_time}')
+
+    # onnx推理
+    session = onnxruntime.InferenceSession('test.onnx', providers=['CUDAExecutionProvider'])
+    session.get_modelmeta()
+    onnx_inputs = {'image1': image1.cpu().numpy(), 'image2': image2.cpu().numpy()}
+    onnx_outputs = ['pred1', 'pred2']
+    sTime = time.time()
+    onnx_preds = session.run(onnx_outputs, onnx_inputs)
+    eTime = time.time()
+    onnx_preds_x, onnx_preds_y = onnx_preds[0], onnx_preds[1]
+    onnx_preds_x, onnx_preds_y = onnx_preds_x.argmax(axis=1), onnx_preds_y.argmax(axis=1)
+    print(f'Onnx prediction x: {onnx_preds_x}, Onnx prediction y: {onnx_preds_y}, Time: {eTime - sTime}')
+
+    save_trt_engine_path = './test.trt'
+    trt_engine_path = './test.trt'
+    # trt_engine_path = None
+    dynamic_shapes = {'image1': ((1, 3, 112, 112), (2, 3, 112, 112), (3, 3, 112, 112)),
+                      'image2': ((1, 3, 224, 224), (2, 3, 224, 224), (3, 3, 224, 224))}
+    tensor_engine = TensorrtBase(onnx_file_path=onnx_file, fp16_mode=True, max_batch_size=3,
+                                 dynamic_shapes=dynamic_shapes, save_trt_engine_path=save_trt_engine_path,
+                                 trt_engine_path=trt_engine_path, trt_logger_level='INTERNAL_ERROR')
+    input_datas = {'image1': image1.cpu().numpy(), 'image2': image2.cpu().numpy()}
+    output_shapes = [(3, 10), (3, 10)]
+    dynamic_shape = True
+    sTime = time.time()
+    tensorrt_preds = tensor_engine.inference(input_datas=input_datas, output_shapes=output_shapes,
+                                             dynamic_shape=dynamic_shape)
+    eTime = time.time()
+    tensorrt_preds_x, tensorrt_preds_y = tensorrt_preds[0][:batch_size], tensorrt_preds[1][:batch_size]
+    tensorrt_preds_x, tensorrt_preds_y = tensorrt_preds_x.argmax(axis=1), tensorrt_preds_y.argmax(axis=1)
+    print(f'TensorRT prediction x: {tensorrt_preds_x}, TensorRT prediction y: {tensorrt_preds_y}, '
+          f'Time: {eTime - sTime}')
+
+    tensorrt_time_record = list()
+    for _ in range(test_round):
+        sTime = time.time()
+        _ = tensor_engine.inference(input_datas=input_datas, output_shapes=output_shapes,
+                                    dynamic_shape=dynamic_shape)
+        eTime = time.time()
+        tensorrt_time_record.append(eTime - sTime)
+    tensorrt_avg_time = sum(tensorrt_time_record) / len(tensorrt_time_record)
+    print(f'TensorRT average time: {tensorrt_avg_time}')
 
 
 if __name__ == '__main__':
     print('Testing TensorrtBase class')
-    test()
+    two_dynamic_var()
