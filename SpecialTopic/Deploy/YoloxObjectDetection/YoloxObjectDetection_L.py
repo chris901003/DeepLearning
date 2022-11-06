@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import os
 import numpy as np
-import onnxruntime
 import argparse
 
 
@@ -228,13 +227,19 @@ def load_pretrained(model, pretrained_path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # 分類類別數
     parser.add_argument('--num-classes', type=int, default=9)
+    # 訓練權重資料位置，這裡一定要加載進去
     parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/900_yolox_850.25.pth')
     args = parser.parse_args()
     return args
 
 
 def main():
+    """
+    主要是生成Yolox Object Detection模型大小為L的onnx模型檔案
+    如果生成設備上有gpu就會產生出可以支持gpu版本的onnx檔案
+    """
     args = parse_args()
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = YoloxObjectDetection(num_classes=args.num_classes)
