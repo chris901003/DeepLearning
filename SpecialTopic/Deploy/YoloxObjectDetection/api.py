@@ -1,3 +1,4 @@
+import tensorrt
 import torch
 from PIL import Image
 import numpy as np
@@ -41,20 +42,26 @@ def create_onnx_file(model_phi='l', num_classes=9, pretrained='/Users/huanghongy
     input_names = [input_name]
     output_names = [output_name]
     with torch.no_grad():
-        model_script = torch.jit.script(model)
-        torch.onnx.export(model_script, images, save_path, input_names=input_names,
+        # model_script = torch.jit.script(model)
+        torch.onnx.export(model, images, save_path, input_names=input_names,
                           output_names=output_names, opset_version=11, dynamic_axes=dynamic_axes)
 
 
-def create_onnx_session(onnx_file='YoloxObjectDetectionL.onnx'):
+def create_onnx_session(onnx_file='YoloxObjectDetectionL.onnx', gpu='auto'):
     """ 創建一個onnxruntime對象
     Args:
         onnx_file: onnx檔案路徑
+        gpu: 使用的onnxruntime是否為gpu版本，如果是使用auto就會自動查看
     Return:
         實例化的onnxruntime對象，可以執行的onnx
     """
     assert os.path.exists(onnx_file), '給定的onnx檔案路徑不存在'
-    session = onnxruntime.InferenceSession(onnx_file)
+    if gpu == 'auto':
+        gpu = True if onnxruntime.get_device() == 'GPU' else False
+    if not gpu:
+        session = onnxruntime.InferenceSession(onnx_file)
+    else:
+        session = onnxruntime.InferenceSession(onnx_file, providers=['CUDAExecutionProvider'])
     return session
 
 
@@ -155,7 +162,7 @@ def tensorrt_engine_detect_image(tensorrt_engine, image, input_shape='Default', 
     if input_shape == 'Default':
         input_shape = [640, 640]
     if output_shapes == 'Default':
-        output_shapes = [(1, num_classes)]
+        output_shapes = [(1, 14, 80, 80), (1, 14, 40, 40), (1, 14, 20, 20)]
     if isinstance(image, str):
         image = Image.open(image)
     elif type(image) is np.ndarray:
@@ -168,10 +175,9 @@ def tensorrt_engine_detect_image(tensorrt_engine, image, input_shape='Default', 
     image = cvtColor(image)
     image_data = resize_image(image, input_shape, keep_ratio=keep_ratio)
     image_data = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
-    tensorrt_inputs = {input_name: image_data}
+    tensorrt_inputs = {input_name: np.ascontiguousarray(image_data)}
     tensorrt_preds = tensorrt_engine.inference(input_datas=tensorrt_inputs, output_shapes=output_shapes,
                                                dynamic_shape=using_dynamic_shape)
-    tensorrt_preds = tensorrt_preds[0]
     outputs = [torch.from_numpy(pred) for pred in tensorrt_preds]
     outputs = decode_outputs(outputs, input_shape)
     results = non_max_suppression(outputs, num_classes, input_shape, image_shape, keep_ratio, conf_thres=confidence,
@@ -184,32 +190,52 @@ def tensorrt_engine_detect_image(tensorrt_engine, image, input_shape='Default', 
 
 if __name__ == '__main__':
     print('Testing Deploy Yolox object detection')
-    model = create_onnx_session()
-    image = cv2.imread('/Users/huanghongyan/Downloads/food_data_flag/imgs/57.jpeg')
-    results = onnxruntime_detect_image(model, image)
-    labels, scores, boxes = results
-    for score, box in zip(scores, boxes):
-        ymin, xmin, ymax, xmax = box
-        xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
-        cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
-        cv2.putText(image, str(score), (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (89, 214, 210), 2, cv2.LINE_AA)
-    img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    img.show()
+    create_onnx_file(pretrained=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth')
+    image_path = r'C:\Dataset\FoodDetectionDataset\img\2.jpg'
 
-    from SpecialTopic.YoloxObjectDetection.api import init_model, detect_image
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    torch_model = init_model(pretrained='/Users/huanghongyan/Downloads/900_yolox_850.25.pth',
-                             num_classes=9)
-    torch_model.eval()
-    torch_image = cv2.imread('/Users/huanghongyan/Downloads/food_data_flag/imgs/57.jpeg')
-    results = detect_image(torch_model, device, torch_image, input_shape=[640, 640], num_classes=9)
+    # 如果需要重新構建TensorRT引擎，需要將最後輸出的list去除，不過這樣會造成與onnxruntime衝突，會導致onnxruntime發生錯誤
+    # TODO: 處理TensorRT對Onnx的SequenceConstruct的相容性
+    tensorrt_engine = create_tensorrt_engine(onnx_file_path='YoloxObjectDetectionL.onnx', fp16_mode=True,
+                                             trt_logger_level='INTERNAL_ERROR',
+                                             save_trt_engine_path='YoloxObjectDetectionL.trt')
+    trt_image = cv2.imread(image_path)
+    results = tensorrt_engine_detect_image(tensorrt_engine=tensorrt_engine, image=trt_image)
     labels, scores, boxes = results
     for score, box in zip(scores, boxes):
         ymin, xmin, ymax, xmax = box
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
-        cv2.rectangle(torch_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
-        cv2.putText(torch_image, str(score), (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.rectangle(trt_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+        cv2.putText(trt_image, str(score), (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
                     1, (89, 214, 210), 2, cv2.LINE_AA)
-    torch_image = Image.fromarray(cv2.cvtColor(torch_image, cv2.COLOR_BGR2RGB))
-    torch_image.show()
+    trt_image = Image.fromarray(cv2.cvtColor(trt_image, cv2.COLOR_BGR2RGB))
+    trt_image.show()
+
+    # model = create_onnx_session()
+    # image = cv2.imread(image_path)
+    # results = onnxruntime_detect_image(model, image)
+    # labels, scores, boxes = results
+    # for score, box in zip(scores, boxes):
+    #     ymin, xmin, ymax, xmax = box
+    #     xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+    #     cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+    #     cv2.putText(image, str(score), (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
+    #                 1, (89, 214, 210), 2, cv2.LINE_AA)
+    # img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    # img.show()
+
+    # from SpecialTopic.YoloxObjectDetection.api import init_model, detect_image
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # torch_model = init_model(pretrained=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth',
+    #                          num_classes=9)
+    # torch_model.eval()
+    # torch_image = cv2.imread(image_path)
+    # results = detect_image(torch_model, device, torch_image, input_shape=[640, 640], num_classes=9)
+    # labels, scores, boxes = results
+    # for score, box in zip(scores, boxes):
+    #     ymin, xmin, ymax, xmax = box
+    #     xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+    #     cv2.rectangle(torch_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+    #     cv2.putText(torch_image, str(score), (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
+    #                 1, (89, 214, 210), 2, cv2.LINE_AA)
+    # torch_image = Image.fromarray(cv2.cvtColor(torch_image, cv2.COLOR_BGR2RGB))
+    # torch_image.show()

@@ -141,7 +141,10 @@ class TensorrtBase:
         inputs, outputs, bindings = list(), list(), list()
         stream = cuda.Stream()
         for binding in self.engine:
-            max_binding_shape = self.dynamic_shapes.get(binding, None)
+            if self.dynamic_shapes is not None:
+                max_binding_shape = self.dynamic_shapes.get(binding, None)
+            else:
+                max_binding_shape = None
             if max_binding_shape is not None:
                 # 直接使用最大的資料作為空間大小
                 max_binding_shape = max_binding_shape[2]
