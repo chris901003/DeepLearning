@@ -80,7 +80,15 @@ class SPPBottleneck(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = torch.cat([x] + [m(x) for m in self.m], dim=1)
+        x1 = self.m[0](x)
+        x2 = self.m[1](x)
+        x3 = self.m[2](x)
+        x = torch.cat([x, x1, x2, x3], dim=1)
+        # spp_list = list([x])
+        # for m in self.m:
+        #     spp_list.append(m(x))
+        # x = torch.cat(spp_list, dim=1)
+        # x = torch.cat([x] + [m(x) for m in self.m], dim=1)
         return self.conv2(x)
 
 
@@ -184,9 +192,10 @@ class YoloxObjectDetection(nn.Module):
         P4_downsample = torch.cat([P4_downsample, P5], 1)
         P5_out = self.C3_n4(P4_downsample)
 
-        outputs = list()
+        # outputs = list()
         idx = 0
         fpn_inputs = [P3_out, P4_out, P5_out]
+        output1, output2, output3 = fpn_inputs
         for stem, cls_conv, cls_pred, reg_conv, reg_pred, obj_pred in zip(
                 self.stems, self.cls_convs, self.cls_preds, self.reg_convs, self.reg_preds, self.obj_preds):
             x = stem(fpn_inputs[idx])
@@ -196,9 +205,16 @@ class YoloxObjectDetection(nn.Module):
             reg_output = reg_pred(reg_feat)
             obj_output = obj_pred(reg_feat)
             output = torch.cat([reg_output, obj_output, cls_output], 1)
-            outputs.append(output)
+            # outputs.append(output)
+            if idx == 0:
+                output1 = output
+            elif idx == 1:
+                output2 = output
+            else:
+                output3 = output
             idx += 1
-        return outputs
+        # return outputs
+        return output1, output2, output3
 
 
 def load_pretrained(model, pretrained_path):
@@ -230,7 +246,7 @@ def parse_args():
     # 分類類別數
     parser.add_argument('--num-classes', type=int, default=9)
     # 訓練權重資料位置，這裡一定要加載進去
-    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/900_yolox_850.25.pth')
+    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth')
     args = parser.parse_args()
     return args
 
@@ -247,6 +263,7 @@ def main():
     model.eval()
     model = model.to(device)
     images = torch.randn(1, 3, 640, 640).to(device)
+    # preds = model(images)
     input_names = ['images']
     output_names = ['outputs']
     with torch.no_grad():
