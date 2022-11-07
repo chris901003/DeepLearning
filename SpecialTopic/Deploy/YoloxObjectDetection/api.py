@@ -6,8 +6,9 @@ import cv2
 import PIL
 import onnxruntime
 import os
-from utils import load_pretrained
-from YoloxObjectDetection_L import YoloxObjectDetection as YoloxObjectDetectionL
+from SpecialTopic.Deploy.YoloxObjectDetection.utils import load_pretrained
+from SpecialTopic.Deploy.YoloxObjectDetection.YoloxObjectDetection_L import \
+    YoloxObjectDetection as YoloxObjectDetectionL
 from SpecialTopic.Deploy.OnnxToTensorRT.TensorrtBase import TensorrtBase
 from SpecialTopic.YoloxObjectDetection.utils import resize_image, cvtColor, preprocess_input, decode_outputs, \
     non_max_suppression

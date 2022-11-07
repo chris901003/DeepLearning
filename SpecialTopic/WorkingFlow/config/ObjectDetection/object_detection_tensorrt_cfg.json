@@ -1,0 +1,18 @@
+{
+  "type": "YoloxObjectDetectionTensorRT",
+  "onnx_or_trt_file": "./checkpoint/object_detection/tensorrt/2022_11_7.trt",
+  "classes_path": "./prepare/object_detection_classes.txt",
+  "confidence": 0.7,
+  "nms": 0.3,
+  "filter_edge": false,
+  "cfg": "auto",
+  "average_time_check": 30,
+  "track_percentage": 0.5,
+  "tracking_keep_period": 120,
+  "last_track_send": 5,
+  "average_time_output": 1,
+  "intersection_area_threshold": 0.2,
+  "new_track_box": 10,
+  "new_track_box_max_interval": 3,
+  "device": "auto"
+}

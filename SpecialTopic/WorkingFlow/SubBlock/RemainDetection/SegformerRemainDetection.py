@@ -75,6 +75,8 @@ class SegformerRemainDetection:
         self.logger = None
 
     def build_modules(self):
+        """ 構建分割網路模型，如果該模型沒有提供權重就會用None取代
+        """
         modules_dict = dict()
         with open(self.remain_module_file, 'r') as f:
             module_config = json.load(f)
@@ -215,6 +217,7 @@ class SegformerRemainDetection:
             pred = pred.squeeze(axis=-1)
         result = self.area_func(pred)
         if track_id not in self.keep_last.keys():
+            self.logger['logger'].info(f'Track ID: {track_id}, add in to segformer remain detection.')
             data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list())
             self.keep_last[track_id] = data
         if self.keep_last[track_id]['standard_remain'] == -1:
