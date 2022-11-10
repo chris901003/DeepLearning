@@ -12,8 +12,11 @@ class ObjectDetection:
              logger: 保存運行過程中狀態的log實例化對象
         """
         from SpecialTopic.WorkingFlow.SubBlock.ObjectDetection.YoloxObjectDetection import YoloxObjectDetection
+        from SpecialTopic.WorkingFlow.SubBlock.ObjectDetection.YoloxObjectDetectionTensorRT import \
+            YoloxObjectDetectionTensorRT
         support_module = {
-            'YoloxObjectDetection': YoloxObjectDetection
+            'YoloxObjectDetection': YoloxObjectDetection,
+            'YoloxObjectDetectionTensorRT': YoloxObjectDetectionTensorRT
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)

@@ -37,7 +37,7 @@ class TensorrtBase:
         Args:
              onnx_file_path: onnx檔案路徑位置
              fp16_mode: 是否使用fp16模式，預設會是fp32，使用fp16可以提升速度但同時會降低準確度
-             max_batch_size: 最大batch，這裡主要是對固定batch的引擎做設定，如果batch部分是做成動態的就設定動態中的最大batch
+             max_batch_size: 最大batch，不論是否為固定batch或是動態batch都需要填寫，否則會直接使用默認的1
              trt_engine_path: 如果有想要直接加載已經序列化好的TensorRT引擎就傳入資料位置
              save_trt_engine_path: 如果有想要保存TensorRT推理引擎就給一個保存位置
              dynamic_shapes: 保存要設定成動態的維度資料，以下是傳入的格式
@@ -184,14 +184,24 @@ class TensorrtBase:
                 dict = {'input_binding_name': data}
             output_shapes: 輸出結果的shape，這裡需要按照輸出的順序排列
                 list = [shape]
+                這裡也可以在list當中填上輸出資料的名稱，須按照順序填寫，會自動推理出輸出的shape，
+                不過使用此功能時會默認第零個維度的資料會是batch
             dynamic_shape: 是否有使用動態shape，如果有使用就需要開啟才會調用set_binding_shape來指定當前的shape
         """
         assert isinstance(input_datas, dict), '輸入資料需要是dict型態'
-        assert isinstance(output_shapes, list), '輸出資料需要是list型態'
+        assert isinstance(output_shapes, list), '輸出資料需要是list型態或是使用auto'
+        assert len(output_shapes) > 0, '至少需要有一種輸出'
         inputs, outputs, bindings, stream = self.buffer
         if dynamic_shape:
             # 官方說明，如果使用動態
             self.context.active_optimization_profile = 0
+        auto_output_shape = True if isinstance(output_shapes[0], str) else False
+        # 用來記錄推理的輸出shape，如果是手動輸入就不會需要用到
+        inference_output_shape = dict()
+        # 記錄下在tensorrt中綁定的index對應到輸出名稱
+        binding_idx_to_output_name = dict()
+        # 將輸出名稱對應到輸出index的字典
+        output_name_to_output_idx = dict()
         for binding_name, binding_data in input_datas.items():
             # 獲取輸入資料綁定名稱對應上的ID
             binding_idx = self.engine[binding_name]
@@ -199,12 +209,27 @@ class TensorrtBase:
                 self.context.set_binding_shape(binding_idx, binding_data.shape)
             # 這裡的index概念與上面相同
             inputs[binding_idx].host = binding_data
+        if auto_output_shape:
+            for output_name in output_shapes:
+                binding_idx = self.engine[output_name]
+                output_shape = self.context.get_binding_shape(binding_idx)
+                inference_output_shape[binding_idx] = (tuple([self.max_batch_size] + list(output_shape[1:])))
+                binding_idx_to_output_name[binding_idx] = output_name
+            inference_output_shape = sorted(inference_output_shape.items())
+            binding_idx_to_output_name = sorted(binding_idx_to_output_name.items())
+            output_name_to_output_idx = {v: idx for idx, (_, v) in enumerate(binding_idx_to_output_name)}
+            output_names = output_shapes
+            output_shapes = [v for _, v in inference_output_shape]
+
         [cuda.memcpy_htod_async(inp.device, inp.host, stream) for inp in inputs]
         self.context.execute_async_v2(bindings=bindings, stream_handle=stream.handle)
         [cuda.memcpy_dtoh_async(out.host, out.device, stream) for out in outputs]
         stream.synchronize()
         trt_outputs = [out.host for out in outputs]
         trt_outputs = self.postprocess_outputs(trt_outputs, output_shapes)
+        if auto_output_shape:
+            results = [trt_outputs[output_name_to_output_idx[output_name]] for output_name in output_names]
+            return results
         return trt_outputs
 
 
@@ -300,6 +325,9 @@ def two_dynamic_var():
     import onnxruntime
 
     # 多個不固定shape的輸入資料以及輸出資料
+    # 輸出資料的順序與最後return的順序無關，基本上是最後不再更動的順序
+    # 所以如果輸出結果有多個的時候要特別注意順序問題，不一定是理想狀態
+    # 如果使用的輸出shape是auto就會處理掉這個問題，如果是自訂輸出的shape就須自行解決
     class Net(nn.Module):
         def __init__(self):
             super(Net, self).__init__()
@@ -324,7 +352,7 @@ def two_dynamic_var():
             out2 = out2.reshape(out2.size(0), -1)
             out1 = self.fc1(out1)
             out2 = self.fc2(out2)
-            return out1, out2
+            return out1, out2, y
 
     def setup_seed(seed):
         torch.manual_seed(seed)
@@ -340,12 +368,13 @@ def two_dynamic_var():
     model.eval()
     model = model.to(device)
     input_names = ['image1', 'image2']
-    output_names = ['pred1', 'pred2']
+    output_names = ['pred1', 'pred2', 'pred3']
     image1 = torch.randn(1, 3, 112, 112).to(device)
     image2 = torch.randn(1, 3, 224, 224).to(device)
     onnx_file = 'test.onnx'
-    dynamic_axes = {'image1': {0: 'batch_size'}, 'image2': {0: 'batch_size'},
-                    'pred1': {0: 'batch_size'}, 'pred2': {0: 'batch_size'}}
+    dynamic_axes = {'image1': {0: 'batch_size'}, 'image2': {0: 'batch_size', 2: 'img_height', 3: 'img_width'},
+                    'pred1': {0: 'batch_size'}, 'pred2': {0: 'batch_size'},
+                    'pred3': {0: 'batch_size', 2: 'img_height', 3: 'img_width'}}
     with torch.no_grad():
         torch.onnx.export(model, (image1, image2), onnx_file, verbose=False, input_names=input_names,
                           output_names=output_names, opset_version=11, dynamic_axes=dynamic_axes)
@@ -374,16 +403,16 @@ def two_dynamic_var():
     print(f'Torch average time: {torch_avg_time}')
 
     # onnx推理
-    session = onnxruntime.InferenceSession('test.onnx', providers=['CUDAExecutionProvider'])
-    session.get_modelmeta()
-    onnx_inputs = {'image1': image1.cpu().numpy(), 'image2': image2.cpu().numpy()}
-    onnx_outputs = ['pred1', 'pred2']
-    sTime = time.time()
-    onnx_preds = session.run(onnx_outputs, onnx_inputs)
-    eTime = time.time()
-    onnx_preds_x, onnx_preds_y = onnx_preds[0], onnx_preds[1]
-    onnx_preds_x, onnx_preds_y = onnx_preds_x.argmax(axis=1), onnx_preds_y.argmax(axis=1)
-    print(f'Onnx prediction x: {onnx_preds_x}, Onnx prediction y: {onnx_preds_y}, Time: {eTime - sTime}')
+    # session = onnxruntime.InferenceSession('test.onnx', providers=['CUDAExecutionProvider'])
+    # session.get_modelmeta()
+    # onnx_inputs = {'image1': image1.cpu().numpy(), 'image2': image2.cpu().numpy()}
+    # onnx_outputs = ['pred1', 'pred2']
+    # sTime = time.time()
+    # onnx_preds = session.run(onnx_outputs, onnx_inputs)
+    # eTime = time.time()
+    # onnx_preds_x, onnx_preds_y = onnx_preds[0], onnx_preds[1]
+    # onnx_preds_x, onnx_preds_y = onnx_preds_x.argmax(axis=1), onnx_preds_y.argmax(axis=1)
+    # print(f'Onnx prediction x: {onnx_preds_x}, Onnx prediction y: {onnx_preds_y}, Time: {eTime - sTime}')
 
     save_trt_engine_path = './test.trt'
     trt_engine_path = './test.trt'
@@ -394,7 +423,8 @@ def two_dynamic_var():
                                  dynamic_shapes=dynamic_shapes, save_trt_engine_path=save_trt_engine_path,
                                  trt_engine_path=trt_engine_path, trt_logger_level='INTERNAL_ERROR')
     input_datas = {'image1': image1.cpu().numpy(), 'image2': image2.cpu().numpy()}
-    output_shapes = [(3, 10), (3, 10)]
+    # output_shapes = [(3, 10), (3, 10)]
+    output_shapes = ['pred1', 'pred2', 'pred3']
     dynamic_shape = True
     sTime = time.time()
     tensorrt_preds = tensor_engine.inference(input_datas=input_datas, output_shapes=output_shapes,
@@ -402,6 +432,8 @@ def two_dynamic_var():
     eTime = time.time()
     tensorrt_preds_x, tensorrt_preds_y = tensorrt_preds[0][:batch_size], tensorrt_preds[1][:batch_size]
     tensorrt_preds_x, tensorrt_preds_y = tensorrt_preds_x.argmax(axis=1), tensorrt_preds_y.argmax(axis=1)
+    tensorrt_preds_z = tensorrt_preds[2]
+    print(tensorrt_preds_z.shape)
     print(f'TensorRT prediction x: {tensorrt_preds_x}, TensorRT prediction y: {tensorrt_preds_y}, '
           f'Time: {eTime - sTime}')
 

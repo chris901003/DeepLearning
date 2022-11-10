@@ -113,6 +113,10 @@ type = 說明要使用哪個子模塊
 ，被放到這裡的目標不會給予ID
 這裡匹配目標的方式是透過計算交並比獲取，所以只需調整比例就可以寬鬆的認定為同一個目標
 
+### object_detection_tensorrt_cfg
+基本上與上方的object_detection_cfg相同，唯一不同的是將模型執行的底層從pytorch改成tensorrt\
+經過測試後帧率大約提升20%，主要是記憶體消耗有明顯下降
+
 ## ObjectClassifyToRemainClassify
 
 ---

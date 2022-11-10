@@ -14,12 +14,12 @@ def parse_args():
     # 選擇使用的模型主幹，目前支援[ResNet, VIT, MobileVit]
     parser.add_argument('--model-type', type=str, default='VIT')
     # 使用的模型大小，這裡支援的尺寸會與使用的模型主幹有關
-    parser.add_argument('--phi', type=str, default='m')
+    parser.add_argument('--phi', type=str, default='l')
     # batch size，盡量調整到超過4，這樣BN層才不會出問題
-    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--batch-size', type=int, default=8)
     parser.add_argument('--Freeze-batch-size', type=int, default=512)
     # 加載預訓練權重，這裡指的是在ImageNet上預訓練權重
-    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\VIT\vit_m.pth')
+    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\VIT\vit_l.pth')
 
     parser.add_argument('--num-classes', type=int, default=100)
     parser.add_argument('--auto-fp16', action='store_false')
@@ -27,9 +27,9 @@ def parse_args():
     # 起始Epoch數
     parser.add_argument('--Init-Epoch', type=int, default=0)
     # 在多少個Epoch前會將骨幹凍結，這邊建議訓練VIT時可以進行凍結
-    parser.add_argument('--Freeze-Epoch', type=int, default=3)
+    parser.add_argument('--Freeze-Epoch', type=int, default=0)
     # 總共要訓練多少個Epoch
-    parser.add_argument('--Total-Epoch', type=int, default=10)
+    parser.add_argument('--Total-Epoch', type=int, default=100)
     # 最大學習率
     parser.add_argument('--Init-lr', type=float, default=1e-3)
     # 指定使用優化器類別
@@ -158,11 +158,13 @@ def main():
 
     Init_lr = args.Init_lr
     Min_lr = Init_lr * 0.01
-    nbs = 64
+    nbs = 1024
     lr_limit_max = 1e-3 if args.optimizer_type == 'adam' else 5e-2
     lr_limit_min = 3e-4 if args.optimizer_type == 'adam' else 5e-4
     Init_lr_fit = min(max(batch_size / nbs * Init_lr, lr_limit_min), lr_limit_max)
     Min_lr_fit = min(max(batch_size / nbs * Min_lr, lr_limit_min * 1e-2), lr_limit_max * 1e-2)
+    Init_lr_fit = Init_lr
+    Min_lr_fit = Min_lr
     pg0, pg1, pg2 = [], [], []
     for k, v in model.named_modules():
         if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):

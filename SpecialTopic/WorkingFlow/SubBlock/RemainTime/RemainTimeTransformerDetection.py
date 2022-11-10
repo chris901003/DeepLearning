@@ -102,7 +102,8 @@ class RemainTimeTransformerDetection:
         if track_id in self.keep_data.keys():
             # 如果該追蹤ID已經有出現在keep_data當中，那麼它的狀態應該要是str型態否則表示過程有問題
             assert isinstance(self.keep_data[track_id]['status'], str), \
-                self.logger['logger'].critical('程序過程有問題')
+                self.logger['logger'].critical(f'Track ID: {track_id}, Status: {self.keep_data[track_id]["status"]},'
+                                               f'程序過程有問題')
             self.keep_data[track_id]['last_track_time'] = self.current_time
         else:
             # 如果該追蹤ID是第一次出現就會需要建立保存資料的字典

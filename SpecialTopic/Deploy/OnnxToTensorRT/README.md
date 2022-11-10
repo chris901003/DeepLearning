@@ -1,5 +1,8 @@
 # Deploy: Onnx to TensorRT
 
+### Test
+主要是在測試轉換的一些語法是否可行，是否需要更改模型結構避開
+
 ### TensorrtBase
 給一個最基礎的TensorRT的基底，可以直接透過該基底創建出一個TensorRT引擎，將引擎構建包裝起來
 #### 初始化參數資料
@@ -19,3 +22,6 @@ dict = {'綁定到哪個輸入名稱': (最小輸入, 最常輸入, 最大輸入
 - max_workspace_size = 最大工作空間大小，如果遇到記憶體不足可到這裡改大
 - trt_logger_level = TensorRT的Logger階級
 - logger = 紀錄過程的logger
+#### 更新紀錄
+目前輸出shape可以設定成auto會透過決定輸入shape後自動推算出輸出的shape
+- 同時會解決輸出的順序與理想會有差異的問題，如果不使用auto會導致輸出的順序與return的順序會有出入，需自行解決

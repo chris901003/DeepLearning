@@ -8,7 +8,7 @@
   },
   "step2": {
     "type": "ObjectDetection",
-    "config_file": "./config/ObjectDetection/object_detection_cfg.json",
+    "config_file": "./config/ObjectDetection/object_detection_tensorrt_cfg.json",
     "call_api": ["detect_single_picture"],
     "inputs": [["image", "image_type"]],
     "outputs": [["image", "track_object_info"]]

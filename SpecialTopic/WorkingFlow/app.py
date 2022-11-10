@@ -1,3 +1,4 @@
+import tensorrt
 import argparse
 import os
 import time
