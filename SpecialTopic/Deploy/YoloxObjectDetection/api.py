@@ -6,8 +6,10 @@ import cv2
 import PIL
 import os
 from SpecialTopic.Deploy.YoloxObjectDetection.utils import load_pretrained
-from SpecialTopic.Deploy.YoloxObjectDetection.YoloxObjectDetection_L import \
-    YoloxObjectDetection as YoloxObjectDetectionL
+from SpecialTopic.Deploy.YoloxObjectDetection.Models.YoloxObjectDetection_L \
+    import YoloxObjectDetection as YoloxObjectDetectionL
+from SpecialTopic.Deploy.YoloxObjectDetection.Models.YoloxObjectDetection_Nano import YoloxObjectDetectionNano
+from SpecialTopic.Deploy.YoloxObjectDetection.Models.YoloxObjectDetection_Tiny import YoloxObjectDetectionTiny
 from SpecialTopic.Deploy.OnnxToTensorRT.TensorrtBase import TensorrtBase
 from SpecialTopic.YoloxObjectDetection.utils import resize_image, cvtColor, preprocess_input, decode_outputs, \
     non_max_suppression
@@ -29,7 +31,8 @@ def create_onnx_file(model_phi='l', num_classes=9, pretrained='/Users/huanghongy
         None，會直接將onnx檔案保存到指定位置
     """
     support_model_phi = {
-        'l': {'model_cls': YoloxObjectDetectionL, 'input_shape': (1, 3, 640, 640)}
+        'l': {'model_cls': YoloxObjectDetectionL, 'input_shape': (1, 3, 640, 640)},
+        'Nano': {'model_cls': YoloxObjectDetectionNano, 'input_shape': (1, 3, 640, 640)}
     }
     create_model_cfg = support_model_phi.get(model_phi, None)
     assert create_model_cfg is not None, '尚未支援該模型大小'
