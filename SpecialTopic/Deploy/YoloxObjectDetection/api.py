@@ -32,7 +32,8 @@ def create_onnx_file(model_phi='l', num_classes=9, pretrained='/Users/huanghongy
     """
     support_model_phi = {
         'l': {'model_cls': YoloxObjectDetectionL, 'input_shape': (1, 3, 640, 640)},
-        'Nano': {'model_cls': YoloxObjectDetectionNano, 'input_shape': (1, 3, 640, 640)}
+        'Nano': {'model_cls': YoloxObjectDetectionNano, 'input_shape': (1, 3, 640, 640)},
+        'Tiny': {'model_cls': YoloxObjectDetectionTiny, 'input_shape': (1, 3, 640, 640)}
     }
     create_model_cfg = support_model_phi.get(model_phi, None)
     assert create_model_cfg is not None, '尚未支援該模型大小'

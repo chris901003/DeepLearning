@@ -6,3 +6,6 @@
 
 ### YoloxObjectDetection
 專門將Yolox目標檢測模型，轉成Onnx的格式，這裡會盡可能追求效率的寫法，會將許多東西固定下來
+
+### SegmentationNet
+專門將Segformer分割網路模型，轉成Onnx的格式
