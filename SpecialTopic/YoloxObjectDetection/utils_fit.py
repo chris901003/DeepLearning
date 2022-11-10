@@ -113,7 +113,7 @@ def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, e
                 torch.save(model.state_dict(), os.path.join(save_dir, f'yolox_best_val_loss.pth'))
 
     if local_rank == 0:
-        pbar.clear()
+        pbar.close()
         print('Finish Validation')
         print('Epoch:' + str(epoch + 1) + '/' + str(Epoch))
         print('Total Loss: %.3f || Val Loss: %.3f ' % (loss / epoch_step, val_loss / epoch_step_val))
