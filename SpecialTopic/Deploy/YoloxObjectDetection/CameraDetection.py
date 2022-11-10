@@ -9,6 +9,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # 使用的相機ID
     parser.add_argument('--camera-id', type=int, default=0)
+    # FPS值
+    parser.add_argument('-fps', type=int, default=30)
     # 分類類別文件
     parser.add_argument('--classes-file', type=str, default=r'C:\Dataset\FoodDetectionDataset\classes.txt')
     # Onnx檔案位置
@@ -30,6 +32,7 @@ def main():
                                              save_trt_engine_path=args.save_trt_engine_path)
     classes_name, num_classes = get_classes(args.classes_file)
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FPS, args.fps)
     while True:
         ret, img = cap.read()
         if ret:

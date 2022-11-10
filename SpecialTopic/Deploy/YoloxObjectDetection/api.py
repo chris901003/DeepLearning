@@ -4,7 +4,6 @@ from PIL import Image
 import numpy as np
 import cv2
 import PIL
-import onnxruntime
 import os
 from SpecialTopic.Deploy.YoloxObjectDetection.utils import load_pretrained
 from SpecialTopic.Deploy.YoloxObjectDetection.YoloxObjectDetection_L import \
@@ -56,6 +55,10 @@ def create_onnx_session(onnx_file='YoloxObjectDetectionL.onnx', gpu='auto'):
     Return:
         實例化的onnxruntime對象，可以執行的onnx
     """
+    try:
+        import onnxruntime
+    except ImportError:
+        raise ImportError('如果需要使用onnxruntime進行推理需安裝onnxruntime')
     assert os.path.exists(onnx_file), '給定的onnx檔案路徑不存在'
     if gpu == 'auto':
         gpu = True if onnxruntime.get_device() == 'GPU' else False
