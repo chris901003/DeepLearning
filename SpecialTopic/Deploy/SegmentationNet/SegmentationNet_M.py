@@ -28,9 +28,15 @@ class Segformer(nn.Module):
         act_type = GELU
         norm_type = LN, eps=1e-6
         """
-        self.layers = nn.ModuleList()
+        num_layers = (3, 4, 6, 3)
+        num_heads = (1, 2, 4, 8)
         # TODO: 如果轉成TensorRT過程中發生錯誤請先將這裡進行調整
         dpr = [x.item() for x in torch.linspace(0, 0.1, 16)]
+        self.layers = nn.ModuleList()
+        cur = 0
+        for i, num_layer in enumerate(num_layers):
+            embed_dims_i = 64 * num_heads[i]
+            patch_embed = PatchEmbedNormal()
 
     def forward(self):
         pass

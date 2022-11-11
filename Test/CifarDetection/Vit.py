@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 from SpecialTopic.ST.net.lr_scheduler import get_lr_scheduler_yolox, set_optimizer_lr_yolox
 from SpecialTopic.ST.build import build_detector
 from DatasetSource import cifar100_dataset_from_official
+from dataset import Cifar100Dataset
+import os
 from torchvision import transforms
 
 
@@ -118,6 +120,52 @@ def val(model, device, epoch, val_dataloader, Total_Epoch):
     pbar.close()
 
 
+def predict_answer():
+    from PIL import Image
+    args = parse_args()
+    folder_path = './Training_data/1'
+    pretrained = './resnet50.pth'
+    answer_file = './410985048.txt'
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    support_image_format = ['.png']
+    images_name = [image_name for image_name in os.listdir(folder_path)
+                   if os.path.splitext(image_name)[1] in support_image_format]
+    images_info = {int(os.path.splitext(image_name)[0]): image_name for image_name in images_name}
+    images_info = sorted(images_info.items())
+    transforms_data = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    model_cfg = {
+        'type': args.model_type,
+        'phi': args.phi,
+        'num_classes': args.num_classes,
+        'pretrained': args.pretrained
+    }
+    model = build_detector(model_cfg)
+    model.load_state_dict(torch.load(pretrained, map_location='cpu'))
+    model.eval()
+    model = model.to(device)
+    results = list()
+    for _, image_name in tqdm(images_info):
+        image = Image.open(os.path.join(folder_path, image_name))
+        image = transforms_data(image)
+        image = image.unsqueeze(dim=0)
+        with torch.no_grad():
+            image = image.to(device)
+            preds = model(image)
+        preds = preds.squeeze(dim=0)
+        preds = preds.argmax().item()
+        info = os.path.splitext(image_name)[0] + ' ' + str(preds)
+        results.append(info)
+    with open(answer_file, 'w') as f:
+        for result in results:
+            f.write(result)
+            f.write('\n')
+    print(f'Total {len(results)} pictures')
+
+
 def main():
     args = parse_args()
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -142,19 +190,25 @@ def main():
         for param in model.backbone.parameters():
             param.requires_grad = False
         batch_size = freeze_batch_size
-    transform_data = transforms.Compose([
-        transforms.Resize(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-    train_dataset = cifar100_dataset_from_official(root='cifar100', train=True, download=True,
-                                                   transform_data=transform_data)
-    eval_dataset = cifar100_dataset_from_official(root='cifar100', train=False, download=True,
-                                                  transform_data=transform_data)
+    # transform_data = transforms.Compose([
+    #     transforms.Resize(224),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    # ])
+    # train_dataset = cifar100_dataset_from_official(root='cifar100', train=True, download=True,
+    #                                                transform_data=transform_data)
+    # eval_dataset = cifar100_dataset_from_official(root='cifar100', train=False, download=True,
+    #                                               transform_data=transform_data)
+    # train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, pin_memory=True, shuffle=True,
+    #                               num_workers=args.num_workers)
+    # eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=batch_size, pin_memory=True, shuffle=False,
+    #                              num_workers=args.num_workers)
+    train_dataset = Cifar100Dataset(annotation_path='./train_annotation.txt')
+    eval_dataset = Cifar100Dataset(annotation_path='./train_annotation.txt')
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, pin_memory=True, shuffle=True,
-                                  num_workers=args.num_workers)
+                                  num_workers=args.num_workers, collate_fn=train_dataset.collate_fn)
     eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=batch_size, pin_memory=True, shuffle=False,
-                                 num_workers=args.num_workers)
+                                 num_workers=args.num_workers, collate_fn=train_dataset.collate_fn)
 
     Init_lr = args.Init_lr
     Min_lr = Init_lr * 0.01
@@ -192,6 +246,7 @@ def main():
         set_optimizer_lr_yolox(optimizer, lr_scheduler_func, epoch)
         train(model, device, optimizer, epoch, train_dataloader, args.Total_Epoch, scaler)
         val(model, device, epoch, eval_dataloader, args.Total_Epoch)
+        torch.save(model.state_dict(), './vit.pth')
 
 
 if __name__ == '__main__':

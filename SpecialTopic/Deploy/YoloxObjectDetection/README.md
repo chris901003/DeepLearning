@@ -1,7 +1,15 @@
 # Deploy YoloxObjectDetection
 
-### YoloxObjectDetection_L
+### Models
+各種尺寸的模型轉onnx碼\
+目前提供[Nano, Tiny, L]版本
+
+#### YoloxObjectDetection_L
 產生模型尺寸為L的onnx檔案，全部模型層結構都在檔案當中，這裡盡可能以提高效率為主的撰寫
+#### YoloxObjectDetection_Nano
+產生模型尺寸為Nano的onnx檔案，全部模型層結構都在檔案當中，這裡盡可能以提高效率為主的撰寫
+#### YoloxObjectDetection_Tiny
+產生模型尺寸為Tiny的onnx檔案，全部模型層結構都在檔案當中，這裡盡可能以提高效率為主的撰寫
 
 ### utils
 提供該資料夾下的功能函數
