@@ -4,6 +4,32 @@ import torch
 from torch import nn
 
 
+class PatchEmbedNormal(nn.Module):
+    def __init__(self, in_channels=3, embed_dims=768, kernel_size=16, stride=None, padding=0,
+                 norm_cfg=None, bias=True):
+        super(PatchEmbedNormal, self).__init__()
+        self.embed_dims = embed_dims
+        if stride is None:
+            stride = kernel_size
+        kernel_size = (kernel_size, kernel_size)
+        stride = (stride, stride)
+        padding = (padding, padding)
+        self.projection = nn.Conv2d(in_channels=in_channels, out_channels=embed_dims, kernel_size=kernel_size,
+                                    stride=stride, padding=padding, bias=bias)
+        if norm_cfg == 'LN':
+            self.norm = nn.LayerNorm(embed_dims, eps=1e-6)
+        else:
+            self.norm = None
+            raise NotImplementedError('尚未提供除了LN以外的歸一化層')
+
+    def forward(self, x):
+        x = self.projection(x)
+        out_size = (x.shape[2], x.shape[2])
+        x = x.flatten(2).transpose(1, 2)
+        x = self.norm(x)
+        return x, out_size
+        
+
 class Segformer(nn.Module):
     def __init__(self, num_classes):
         super(Segformer, self).__init__()
@@ -28,15 +54,33 @@ class Segformer(nn.Module):
         act_type = GELU
         norm_type = LN, eps=1e-6
         """
+        in_channels = 3
         num_layers = (3, 4, 6, 3)
         num_heads = (1, 2, 4, 8)
+        patch_sizes = (7, 3, 3, 3)
+        strides = (4, 2, 2, 2)
+        sr_ratios = (8, 4, 2, 1)
+        mlp_ratio = 4
         # TODO: 如果轉成TensorRT過程中發生錯誤請先將這裡進行調整
         dpr = [x.item() for x in torch.linspace(0, 0.1, 16)]
         self.layers = nn.ModuleList()
         cur = 0
         for i, num_layer in enumerate(num_layers):
             embed_dims_i = 64 * num_heads[i]
-            patch_embed = PatchEmbedNormal()
+            patch_embed = PatchEmbedNormal(in_channels=in_channels, embed_dims=embed_dims_i, kernel_size=patch_sizes[i],
+                                           stride=strides[i], padding=patch_sizes[i] // 2, norm_cfg='LN')
+            layer = nn.ModuleList([
+                TransformerEncoderLayer(embed_dims=embed_dims_i, num_heads=num_heads[i],
+                                        feedforward_channels=mlp_ratio * embed_dims_i, drop_rate=0.,
+                                        attn_drop_rate=0., drop_path_rate=dpr[cur + idx], qkv_bias=False,
+                                        act_cfg='GELU', norm_cfg='LN', sr_ratio=sr_ratios[i])
+                for idx in range(num_layer)
+            ])
+            in_channels = embed_dims_i
+            norm = nn.LayerNorm(normalized_shape=embed_dims_i, eps=1e-6)
+            block = nn.ModuleList([patch_embed, layer, norm])
+            self.layers.append(block)
+            cur += num_layer
 
     def forward(self):
         pass
