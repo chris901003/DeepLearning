@@ -252,14 +252,14 @@ def parse_args():
     # 分類類別數
     parser.add_argument('--num-classes', type=int, default=9)
     # 訓練權重資料位置，這裡一定要加載進去
-    parser.add_argument('--pretrained', type=str, default='none')
+    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\Yolox\yolox_tiny.pth')
     args = parser.parse_args()
     return args
 
 
 def main():
     """
-    主要是生成Yolox Object Detection模型大小為Nano的onnx模型檔案
+    主要是生成Yolox Object Detection模型大小為Tiny的onnx模型檔案
     如果生成設備上有gpu就會產生出可以支持gpu版本的onnx檔案
     """
     args = parse_args()
