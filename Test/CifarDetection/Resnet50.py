@@ -115,6 +115,15 @@ def predict_answer():
     print(f'Total {len(results)} pictures')
 
 
+def _set_module(model, submodule_key, module):
+    tokens = submodule_key.split('.')
+    sub_tokens = tokens[:-1]
+    cur_mod = model
+    for s in sub_tokens:
+        cur_mod = getattr(cur_mod, s)
+    setattr(cur_mod, tokens[-1], module)
+
+
 def main():
     args = parse_args()
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -139,6 +148,10 @@ def main():
     eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=batch_size, pin_memory=True, shuffle=False,
                                  num_workers=args.num_workers, collate_fn=train_dataset.collate_fn)
     model = models.resnet50(pretrained=True)
+    # for layer_idx, layer_model in model.named_modules():
+    #     if isinstance(layer_model, nn.ReLU):
+    #         _set_module(model, layer_idx, nn.LeakyReLU())
+    # model = model.double()
     fc_inputs = model.fc.in_features
     model.fc = nn.Sequential(
         nn.Linear(in_features=fc_inputs, out_features=512),
@@ -159,5 +172,5 @@ def main():
 
 
 if __name__ == '__main__':
-    predict_answer()
+    main()
     print('Finish')
