@@ -80,7 +80,7 @@ class TransformerEncoderLayer(nn.Module):
         if act_cfg == 'Default':
             act_cfg = dict(type='GELU')
         if norm_cfg == 'Default':
-            norm_cfg = dict(type='LN')
+            norm_cfg = dict(type='LN', eps=1e-6)
         self.norm1 = build_norm(norm_cfg, embed_dims)[1]
         self.attn = EfficientMultiheadAttention(
             embed_dims=embed_dims, num_heads=num_heads, attn_drop=attn_drop_rate, proj_drop=drop_rate,
@@ -98,7 +98,7 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class MixVisionTransformer(nn.Module):
-    def __init__(self, in_channels=3, embed_dims=64, num_stages=4, num_layers=(3, 4, 6, 3), num_heads=(1, 2, 4, 8),
+    def __init__(self, in_channels=3, embed_dims=64, num_stages=4, num_layers=(3, 4, 6, 3), num_heads=(1, 2, 5, 8),
                  patch_sizes=(7, 3, 3, 3), strides=(4, 2, 2, 2), sr_ratios=(8, 4, 2, 1),
                  out_indices=(0, 1, 2, 3), mlp_ratio=4, qkv_bias=True, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., act_cfg='Default', norm_cfg='Default'):
