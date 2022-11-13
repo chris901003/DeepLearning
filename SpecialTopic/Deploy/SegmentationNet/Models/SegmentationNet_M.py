@@ -225,13 +225,14 @@ class SegformerHead(BaseDecodeHead):
                               align_corners=self.align_corners)
             )
         out = self.fusion_conv(torch.cat(outs, dim=1))
-        out = self.cls_seg(out)
-        return out
+        seg_pred = self.cls_seg(out)
+        # seg_pred = F.interpolate(input=out, size=self.image_size, mode='bilinear', align_corners=False)
+        return seg_pred
         
 
-class Segformer(nn.Module):
+class SegmentationNetM(nn.Module):
     def __init__(self, num_classes):
-        super(Segformer, self).__init__()
+        super(SegmentationNetM, self).__init__()
         # 此部分的參數都是模型大小為m的資料
         self.num_classes = num_classes
 
@@ -290,6 +291,8 @@ class Segformer(nn.Module):
         self.decode_head = SegformerHead(**decode_head_cfg)
 
     def forward(self, x):
+        # image_height, image_width = x.shape[2:]
+        # self.decode_head.image_size = image_height, image_width
         outs = list()
         for i, layer in enumerate(self.layers):
             x, hw_shape = layer[0](x)
@@ -347,18 +350,19 @@ def main():
     """
     args = parse_args()
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Segformer(num_classes=args.num_classes)
+    model = SegmentationNetM(num_classes=args.num_classes)
     model = load_pretrained(model, args.pretrained)
     model.eval()
     model = model.to(device)
     images = torch.randn(1, 3, 512, 512).to(device)
     preds = model(images)
     print(preds.shape)
+    dynamic_axes = {'images_seg': {2: 'image_height', 3: 'image_width'}}
     input_names = ['images_seg']
     output_names = ['outputs_seg']
     with torch.no_grad():
         torch.onnx.export(model, images, 'SegmentationNetM.onnx', input_names=input_names,
-                          output_names=output_names, opset_version=11)
+                          output_names=output_names, opset_version=11, dynamic_axes=dynamic_axes)
 
 
 def test_onnx_file():
@@ -397,7 +401,11 @@ def test_tensorrt():
     trt_logger_level = 'VERBOSE'
     fp16_mode = True
     max_batch_size = 1
-    dynamic_shapes = None
+    # 這裡即使我們將輸出的shape設定成固定shape但是onnx資料還是會自動將輸出資料變成動態shape
+    # 由於我們可以肯定輸出的大小，所以在這裡先將輸出的記憶體空間大小固定下來，才比較容易進行控制
+    # 否則一方面是記憶體不好管控，另一方面是最後reshape輸出時會有困難
+    dynamic_shapes = {'images_seg': ((1, 3, 512, 512), (1, 3, 512, 512), (1, 3, 800, 800)),
+                      'outputs_seg': ((1, 3, 128, 128), (1, 3, 128, 128), (1, 3, 128, 128))}
     tensorrt_engine = TensorrtBase(onnx_file_path=onnx_file_path, fp16_mode=fp16_mode, max_batch_size=max_batch_size,
                                    dynamic_shapes=dynamic_shapes, save_trt_engine_path=save_trt_engine_path,
                                    trt_engine_path=trt_engine_path, trt_logger_level=trt_logger_level)
@@ -423,10 +431,11 @@ def test_tensorrt():
     trt_input = {'images_seg': np.ascontiguousarray(image).astype(np.float32)}
     trt_output = ['outputs_seg']
     output = tensorrt_engine.inference(input_datas=trt_input, output_shapes=trt_output,
-                                       dynamic_shape=False)[0]
+                                       dynamic_shape=True)[0]
     output = torch.from_numpy(output)
-    seg_pred = F.interpolate(input=output, size=image.shape[2:], mode='bilinear', align_corners=False)
-    seg_pred = F.interpolate(input=seg_pred, size=origin_image.shape[:2], mode='bilinear', align_corners=False)
+    # 最後還需要將插值部分移出模型當中，後處理再進行，因為這樣會使的輸出大小不確定導致不好處理記憶體空間申請，以及調整
+    output = F.interpolate(input=output, size=image.shape[2:], mode='bilinear', align_corners=False)
+    seg_pred = F.interpolate(input=output, size=origin_image.shape[:2], mode='bilinear', align_corners=False)
     seg_pred = F.softmax(seg_pred, dim=1)
     mask = (seg_pred > 0.8).squeeze(dim=0).cpu().numpy()
     seg_pred = seg_pred.argmax(dim=1)
