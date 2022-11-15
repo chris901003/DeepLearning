@@ -1,0 +1,16 @@
+{
+  "type": "SegformerRemainDetection",
+  "remain_module_file": "./prepare/remain_detection/remain_segformer_trt_module_cfg.json",
+  "fp16": true,
+  "with_color_platte": "FoodAndNotFood",
+  "save_last_period": 120,
+  "strict_down": false,
+  "reduce_mode": {
+    "type": "momentum", "alpha": 0.9
+  },
+  "area_mode": {
+    "type": "bbox_mode", "main_classes_idx": 0
+  },
+  "check_init_ratio_frame": 5,
+  "with_draw": true
+}

@@ -1,4 +1,7 @@
-import tensorrt
+try:
+    import tensorrt
+except ImportError:
+    raise ImportError('需要有TensorRT才可使用該模塊')
 import os
 import torch
 import numpy as np
