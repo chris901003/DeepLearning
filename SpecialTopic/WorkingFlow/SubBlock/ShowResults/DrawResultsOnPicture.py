@@ -85,7 +85,8 @@ class DrawResultsOnPicture:
                 xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
                 xmin, ymin = max(0, xmin), max(0, ymin)
                 xmax, ymax = min(image_width, xmax), min(image_height, ymax)
-                picture = cv2.resize(picture, (xmax - xmin, ymax - ymin))
+                print(xmax, xmin, ymax, ymin, picture.shape)
+                picture = cv2.resize(picture.astype(np.uint8), (xmax - xmin, ymax - ymin))
                 result_image[ymin:ymax, xmin:xmax] = result_image[ymin:ymax, xmin:xmax] * \
                                                      (1 - opacity) + picture * opacity
         return result_image
