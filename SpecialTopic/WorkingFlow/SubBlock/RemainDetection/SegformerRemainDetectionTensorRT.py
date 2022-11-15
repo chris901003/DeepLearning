@@ -1,3 +1,7 @@
+try:
+    import tensorrt
+except ImportError:
+    raise ImportError('無法使用TensorRT模組，須完成安裝TensorRT才可使用')
 import json
 import os
 import torch
@@ -5,16 +9,15 @@ import numpy as np
 from typing import Union
 import math
 from functools import partial
-from SpecialTopic.ST.utils import get_classes, get_cls_from_dict
-from SpecialTopic.SegmentationNet.api import init_module, detect_single_picture
-from SpecialTopic.Deploy.SegmentationNet.api import create_tensorrt_engine
+from SpecialTopic.ST.utils import get_cls_from_dict
+from SpecialTopic.Deploy.SegmentationNet.api import create_tensorrt_engine, tensorrt_engine_detect_image
 
 
-class SegformerRemainDetection:
+class SegformerRemainDetectionTensorRT:
     def __init__(self, remain_module_file, fp16=True, save_last_period=60, strict_down=False,
                  reduce_mode: Union[str, dict] = 'Default', area_mode: Union[str, dict] = 'Default',
                  with_color_platte: Union[str, dict] = 'FoodAndNotFood', check_init_ratio_frame=10, std_error=0.5,
-                 with_draw=False):
+                 with_draw=False, max_batch_size=1, dynamic_shapes=None):
         """
         Args:
             remain_module_file: 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型
@@ -30,6 +33,8 @@ class SegformerRemainDetection:
             check_init_ratio_frame: 有新目標要檢測剩餘量時需要以前多少幀作為100%的比例
             std_error: 在確認表準比例時的最大容忍標準差
             with_draw: 將分割的顏色標註圖回傳
+            max_batch_size: 最大的推理batch
+            dynamic_shapes: 動態shape的設定，如果沒有使用動態shape就使用默認的None即可
         """
         if reduce_mode == 'Default':
             reduce_mode = dict(type='momentum', alpha=0.9)
@@ -60,6 +65,8 @@ class SegformerRemainDetection:
         self.check_init_ratio_frame = check_init_ratio_frame
         self.std_error = std_error
         self.with_draw = with_draw
+        self.max_batch_size = max_batch_size
+        self.dynamic_shapes = dynamic_shapes
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.segformer_modules = self.build_modules()
         # keep_last = {'track_id': track_info}
@@ -81,23 +88,24 @@ class SegformerRemainDetection:
     def build_modules(self):
         """ 構建分割網路模型，如果該模型沒有提供權重就會用None取代
         """
-        models_list = list()
+        models_list = dict()
         with open(self.remain_module_file, 'r') as f:
             module_config = json.load(f)
         for module_name, module_info in module_config.items():
             onnx_file_path = module_info.get('onnx_file_path', None)
             trt_file_path = module_info.get('trt_file_path', None)
             save_trt_file_path = module_info.get('save_trt_file_path', None)
-            if trt_file_path is None or not os.path.exists(trt_file_path):
-                if onnx_file_path is None or not os.path.exists(onnx_file_path):
-                    tensorrt_engine = None
-                    print(f'')
-            tensorrt_engine = create_tensorrt_engine(onnx_file_path=onnx_file_path, fp16_mode=self.fp16,
-                                                     max_batch_size=self.max_batch_size,
-                                                     save_trt_engine_path=save_trt_file_path,
-                                                     trt_engine_path=trt_file_path,
-                                                     dynamic_shapes=self.dynamic_shapes)
-            models_list.append(tensorrt_engine)
+            if (trt_file_path is None or not os.path.exists(trt_file_path)) and \
+                    (onnx_file_path is None or not os.path.exists(onnx_file_path)):
+                tensorrt_engine = None
+                print(f'Segformer: {module_name}未提供對應的TensorRT引擎，會無法進行分割')
+            else:
+                tensorrt_engine = create_tensorrt_engine(onnx_file_path=onnx_file_path, fp16_mode=self.fp16,
+                                                         max_batch_size=self.max_batch_size,
+                                                         save_trt_engine_path=save_trt_file_path,
+                                                         trt_engine_path=trt_file_path,
+                                                         dynamic_shapes=self.dynamic_shapes)
+            models_list[module_name] = tensorrt_engine
         return models_list
 
     def __call__(self, call_api, inputs):
@@ -198,8 +206,10 @@ class SegformerRemainDetection:
             else:
                 pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
-            pred = detect_single_picture(model=self.segformer_modules[remain_category_id], device=self.device,
-                                         image_info=picture, with_draw=with_draw)
+            pred = tensorrt_engine_detect_image(tensorrt_engine=self.segformer_modules[remain_category_id],
+                                                image_info=picture, category_info=self.with_color_platte)
+            # pred = detect_single_picture(model=self.segformer_modules[remain_category_id], device=self.device,
+            #                              image_info=picture, with_draw=with_draw)
         if with_draw:
             # 將結果保存下來
             result = self.save_to_keep_last(track_id, pred[2])
@@ -310,19 +320,19 @@ class SegformerRemainDetection:
 
 
 def test():
-    import logging
     import cv2
     import torch
     import logging
+    import time
     from SpecialTopic.YoloxObjectDetection.api import init_model as init_object_detection
     from SpecialTopic.YoloxObjectDetection.api import detect_image as detect_object_detection_image
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    object_detection_model = init_object_detection(pretrained='/Users/huanghongyan/Downloads/900_yolox_850.25.pth',
+    object_detection_model = init_object_detection(pretrained=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth',
                                                    num_classes=9)
-    module = SegformerRemainDetection(remain_module_file='./prepare/remain_segformer_module_cfg.json',
-                                      classes_path='./prepare/remain_segformer_detection_classes.txt',
-                                      with_color_platte='FoodAndNotFood', reduce_mode=dict(type='momentum', alpha=0),
-                                      check_init_ratio_frame=5, with_draw=True)
+    module = SegformerRemainDetectionTensorRT(
+        remain_module_file='./prepare/remain_detection/remain_segformer_trt_module_cfg.json',
+        with_color_platte='FoodAndNotFood', reduce_mode=dict(type='momentum', alpha=0),
+        check_init_ratio_frame=5, with_draw=True)
     logger = logging.getLogger('test')
     logger.setLevel(logging.DEBUG)
     handler = logging.StreamHandler()
@@ -349,7 +359,9 @@ def test():
                 data.append(info)
             image = dict(rgb_image=image)
             inputs = dict(image=image, track_object_info=data)
+            sTime = time.time()
             image, results = module(call_api='remain_detection', inputs=inputs)
+            eTime = time.time()
             image = image['rgb_image']
             for result in results:
                 position = result['position']
@@ -365,6 +377,8 @@ def test():
                 cv2.putText(image, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 255), 2, cv2.LINE_AA)
                 image[ymin:ymax, xmin:xmax] = image[ymin:ymax, xmin:xmax] * (1 - 0.5) + remain_color_picture * 0.5
+            fps = 1 / (eTime - sTime + 1e-8)
+            cv2.putText(image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
             cv2.imshow('img', image)
         if cv2.waitKey(1) == ord('q'):
             break

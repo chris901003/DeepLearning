@@ -13,9 +13,9 @@ def parse_args():
     # onnx檔案保存路徑
     parser.add_argument('--onnx-file', type=str, default=None)
     # tensorrt引擎保存路徑
-    parser.add_argument('--trt-engine-path', type=str, default='SegmentationNetM.trt')
+    parser.add_argument('--trt-engine-path', type=str, default='SegmentationNetNano.trt')
     # 保存tensorrt引擎序列化後的資料
-    parser.add_argument('--save-engine-path', type=str, default='SegmentationNetM.trt')
+    parser.add_argument('--save-engine-path', type=str, default='SegmentationNetNano.trt')
     # 是否要啟用fp16模式進行推理
     parser.add_argument('--fp16', action='store_false')
     args = parser.parse_args()
@@ -33,7 +33,7 @@ def main():
         ret, img = cap.read()
         if ret:
             sTime = time.time()
-            draw_image_mix, draw_image = tensorrt_engine_detect_image(tensorrt_engine, image_info=img)
+            draw_image_mix, draw_image, seg_pred = tensorrt_engine_detect_image(tensorrt_engine, image_info=img)
             eTime = time.time()
             fps = 1 / (eTime - sTime)
             cv2.putText(draw_image_mix, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
