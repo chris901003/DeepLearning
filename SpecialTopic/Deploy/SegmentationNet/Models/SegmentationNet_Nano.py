@@ -233,9 +233,9 @@ class SegformerHead(BaseDecodeHead):
         return seg_pred
         
 
-class SegmentationNetM(nn.Module):
+class SegmentationNetNano(nn.Module):
     def __init__(self, num_classes):
-        super(SegmentationNetM, self).__init__()
+        super(SegmentationNetNano, self).__init__()
         # 此部分的參數都是模型大小為m的資料
         self.num_classes = num_classes
 

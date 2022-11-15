@@ -1,5 +1,5 @@
 {
-  "type": "SegformerRemainDetection",
+  "type": "SegformerRemainDetectionTensorRT",
   "remain_module_file": "./prepare/remain_detection/remain_segformer_trt_module_cfg.json",
   "fp16": true,
   "with_color_platte": "FoodAndNotFood",

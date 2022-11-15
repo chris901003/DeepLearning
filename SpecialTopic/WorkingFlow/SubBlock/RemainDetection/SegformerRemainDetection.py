@@ -306,10 +306,11 @@ def test():
     import cv2
     import torch
     import logging
+    import time
     from SpecialTopic.YoloxObjectDetection.api import init_model as init_object_detection
     from SpecialTopic.YoloxObjectDetection.api import detect_image as detect_object_detection_image
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    object_detection_model = init_object_detection(pretrained='/Users/huanghongyan/Downloads/900_yolox_850.25.pth',
+    object_detection_model = init_object_detection(pretrained=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth',
                                                    num_classes=9)
     module = SegformerRemainDetection(remain_module_file='./prepare/remain_segformer_module_cfg.json',
                                       classes_path='./prepare/remain_segformer_detection_classes.txt',
@@ -341,7 +342,9 @@ def test():
                 data.append(info)
             image = dict(rgb_image=image)
             inputs = dict(image=image, track_object_info=data)
+            sTime = time.time()
             image, results = module(call_api='remain_detection', inputs=inputs)
+            eTime = time.time()
             image = image['rgb_image']
             for result in results:
                 position = result['position']
@@ -357,6 +360,8 @@ def test():
                 cv2.putText(image, info, (xmin + 30, ymin + 30), cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 255), 2, cv2.LINE_AA)
                 image[ymin:ymax, xmin:xmax] = image[ymin:ymax, xmin:xmax] * (1 - 0.5) + remain_color_picture * 0.5
+            fps = 1 / (eTime - sTime + 1e-8)
+            cv2.putText(image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
             cv2.imshow('img', image)
         if cv2.waitKey(1) == ord('q'):
             break

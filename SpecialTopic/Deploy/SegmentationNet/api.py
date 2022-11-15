@@ -7,7 +7,7 @@ import torch
 import cv2
 import numpy as np
 from typing import Union
-import torch.nn.functional as F
+import time
 from onnxsim import simplify
 import onnx
 from SpecialTopic.Deploy.OnnxToTensorRT.TensorrtBase import TensorrtBase
@@ -16,6 +16,7 @@ from SpecialTopic.ST.dataset.config.segmentation_classes_platte import FoodAndNo
 from SpecialTopic.SegmentationNet.api import image_draw
 from SpecialTopic.Deploy.SegmentationNet.utils import load_pretrained
 from SpecialTopic.Deploy.SegmentationNet.Models.SegmentationNet_M import SegmentationNetM
+from SpecialTopic.Deploy.SegmentationNet.Models.SegmentationNet_Nano import SegmentationNetNano
 
 
 def simplify_onnx(onnx_path='SegmentationNetM.onnx', output_path='SegmentationNetM_Simplify.onnx'):
@@ -41,6 +42,7 @@ def create_onnx_file(model_phi='m', num_classes=3, pretrained='pretrained.pth', 
         None，會將onnx檔案直接保存到指定位置
     """
     support_model_phi = {
+        'nano': {'model_cls': SegmentationNetNano, 'input_shape': (1, 3, 512, 512)},
         'm': {'model_cls': SegmentationNetM, 'input_shape': (1, 3, 512, 512)}
     }
     create_model_cfg = support_model_phi.get(model_phi, None)
@@ -236,21 +238,23 @@ def tensorrt_engine_detect_image(tensorrt_engine, image_info, threshold=0.7, opa
         return seg_pred
     draw_image_mix, draw_image = image_draw(origin_image, seg_pred, palette=PALETTE, classes=CLASSES, opacity=opacity,
                                             with_class=with_class, mask=mask)
-    return draw_image_mix, draw_image
+    return draw_image_mix, draw_image, seg_pred
 
 
 def test():
-    # create_onnx_file(pretrained=r'C:\Checkpoint\SegformerFoodAndNotFoodDetection\1024_eval_0.pth')
-    # simplify_onnx()
-    session = create_onnx_session(onnx_file='SegmentationNetM_Simplify.onnx')
+    create_onnx_file(model_phi='nano',
+                     pretrained=r'C:\DeepLearning\SpecialTopic\SegmentationNet\checkpoint\1115_0_mit_b0_eval.pth',
+                     save_path='SegmentationNetNano.onnx')
+    simplify_onnx(onnx_path='SegmentationNetNano.onnx', output_path='SegmentationNetNano_Simplify.onnx')
+    session = create_onnx_session(onnx_file='SegmentationNetNano_Simplify.onnx')
     image_path = r'C:\Dataset\SegmentationFoodRemain\Donburi\images\training\1.jpg'
     draw_image_mix, draw_image = onnxruntime_detect_image(onnx_model=session, image_info=image_path)
     from PIL import Image
     image = Image.fromarray(cv2.cvtColor(draw_image_mix, cv2.COLOR_BGR2RGB))
     image.show()
-    tensorrt_engine = create_tensorrt_engine(onnx_file_path='SegmentationNetM_Simplify.onnx', fp16_mode=True,
-                                             save_trt_engine_path='SegmentationNetM.trt',
-                                             trt_engine_path='SegmentationNetM.trt')
+    tensorrt_engine = create_tensorrt_engine(onnx_file_path='SegmentationNetNano_Simplify.onnx', fp16_mode=True,
+                                             save_trt_engine_path='SegmentationNetNano.trt',
+                                             trt_engine_path='SegmentationNetNano.trt')
     draw_image_mix, draw_image = tensorrt_engine_detect_image(tensorrt_engine, image_path)
     image = Image.fromarray(cv2.cvtColor(draw_image_mix, cv2.COLOR_BGR2RGB))
     image.show()
