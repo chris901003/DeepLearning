@@ -423,8 +423,8 @@ def test_tensorrt():
     ]
     pipeline = Compose(pipeline_cfg)
     image = cv2.imread(image_path)
-    image = cv2.resize(image, (512, 512))
     origin_image = image.copy()
+    image = cv2.resize(image, (512, 512))
     data = dict(img=image)
     data = pipeline(data)
     image = data['img'][0].unsqueeze(dim=0).numpy()
