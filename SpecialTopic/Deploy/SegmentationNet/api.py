@@ -1,4 +1,7 @@
-import tensorrt
+try:
+    import tensorrt
+except ImportError:
+    print('You will not able use TensorRT to speed up model')
 import os
 import torch
 import cv2
