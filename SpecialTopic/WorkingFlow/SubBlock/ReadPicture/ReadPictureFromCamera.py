@@ -2,10 +2,16 @@ import cv2
 
 
 class ReadPictureFromCamera:
-    def __init__(self, camera_id=0):
+    def __init__(self, camera_id=0, fps=30):
+        """ 透過相機獲取圖像資料
+        Args:
+            camera_id: 指定相機ID，如果是使用tx2是要從1開始使用，0是板載的相機
+            fps: 設定獲取圖像資料的fps值，在tx2上必須設定
+        """
         assert isinstance(camera_id, int), '指定攝影機需要是正整數型態'
         self.camera_id = camera_id
         self.cap = cv2.VideoCapture(camera_id)
+        self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.support_api = {'get_single_picture': self.get_single_picture}
         self.logger = None
 
