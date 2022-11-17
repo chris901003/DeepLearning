@@ -15,12 +15,11 @@ def parse_args():
     # 模型的大小
     parser.add_argument('--phi', type=str, default='m')
     # 類別文件
-    parser.add_argument('--classes-path', type=str, default='./classes.txt')
+    parser.add_argument('--classes-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\classes.txt')
     # 訓練權重路徑
-    parser.add_argument('--pretrained', type=str, default='/Users/huanghongyan/Downloads/segformer_mit-b2_512x512_16'
-                                                          '0k_ade20k_20220620_114047-64e4feca.pth')
+    parser.add_argument('--pretrained', type=str, default=r'C:\DeepLearning\SpecialTopic\SegmentationNet\checkpoint\1117_seg9_m.pth')
     # 要使用哪個調色盤
-    parser.add_argument('--with-color-platte', type=str, default='ADE20KDataset')
+    parser.add_argument('--with-color-platte', type=str, default='Seg9AndNotFood')
     args = parser.parse_args()
     return args
 

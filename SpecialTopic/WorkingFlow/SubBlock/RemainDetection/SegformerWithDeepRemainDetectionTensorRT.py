@@ -1,3 +1,7 @@
+try:
+    import tensorrt
+except ImportError:
+    raise ImportError('無法使用TensorRT模組，需先安裝完TensorRT才可以使用該模塊')
 import torch
 import json
 import os
@@ -5,20 +9,20 @@ import numpy as np
 import math
 from functools import partial
 from typing import Union
-from SpecialTopic.SegmentationNet.api import init_module as init_segmentation_module
-from SpecialTopic.SegmentationNet.api import detect_single_picture as segmentation_detect_single_picture
-from SpecialTopic.ST.utils import get_cls_from_dict, get_classes
+from SpecialTopic.Deploy.SegmentationNet.api import create_tensorrt_engine, tensorrt_engine_detect_image
+from SpecialTopic.ST.utils import get_cls_from_dict
 
 
-class SegformerWithDeepRemainDetection:
-    def __init__(self, remain_module_file, classes_path, with_color_platte='FoodAndNotFood', save_last_period=60,
+class SegformerWithDeepRemainDetectionTensorRT:
+    def __init__(self, remain_module_file, fp16=True, with_color_platte='FoodAndNotFood', save_last_period=60,
                  strict_down=False, reduce_mode: Union[dict, str] = 'Default', area_mode: Union[dict, str] = 'Default',
                  init_deep_mode: Union[dict, str] = 'Default', dynamic_init_deep_mode: Union[dict] = None,
-                 check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False):
+                 check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False,
+                 max_batch_size=1, dynamic_shapes=None):
         """
         Args:
             remain_module_file: 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型
-            classes_path: 分割網路的類別檔案
+            fp16: 是否要採用fp16進行推理
             with_color_platte: 使用的調色盤
             save_last_period: 最多可以保存多少幀沒有獲取到該id的圖像
             strict_down: 強制剩餘量只會越來越少
@@ -79,7 +83,9 @@ class SegformerWithDeepRemainDetection:
         self.init_deep_func = init_deep_func
         self.dynamic_init_deep_func = dynamic_init_deep_func
         self.remain_module_file = remain_module_file
-        self.classes_path = classes_path
+        self.fp16 = fp16
+        self.max_batch_size = max_batch_size
+        self.dynamic_shapes = dynamic_shapes
         self.save_last_period = save_last_period
         self.strict_downs = strict_down
         self.with_color_platte = with_color_platte
@@ -88,7 +94,6 @@ class SegformerWithDeepRemainDetection:
         self.with_seg_draw = with_seg_draw
         self.with_depth_draw = with_depth_draw
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.classes, self.num_classes = get_classes(classes_path)
         self.segformer_modules = self.build_modules()
         # keep_data = {'track_id': track_info}
         # track_id = 由目標檢測追蹤出的對象ID
@@ -116,21 +121,25 @@ class SegformerWithDeepRemainDetection:
     def build_modules(self):
         """ 構建同時初始化分割網路模型
         """
-        modules_dict = dict()
+        models_list = dict()
         with open(self.remain_module_file, 'r') as f:
             module_config = json.load(f)
         for module_name, module_info in module_config.items():
-            phi = module_info.get('phi', None)
-            assert phi is not None, f'Segformer with deep remain detection {module_name}需要提供phi來指定模型大小'
-            pretrained = module_info.get('pretrained', 'none')
-            if not os.path.exists(pretrained):
-                model = None
-                print(f'Segformer with deep remain detection中{module_name}未加載預訓練權重')
+            onnx_file_path = module_info.get('onnx_file_path', None)
+            trt_file_path = module_info.get('trt_file_path', None)
+            save_trt_file_path = module_info.get('save_trt_file_path', None)
+            if (trt_file_path is None or not os.path.exists(trt_file_path)) and \
+                    (onnx_file_path is None or not os.path.exists(onnx_file_path)):
+                tensorrt_engine = None
+                print(f'Segformer: {module_name}未提供對應的TensorRT引擎，會無法進行分割')
             else:
-                model = init_segmentation_module(model_type='Segformer', phi=phi, pretrained=pretrained,
-                                                 num_classes=self.num_classes, with_color_platte=self.with_color_platte)
-            modules_dict[module_name] = model
-        return modules_dict
+                tensorrt_engine = create_tensorrt_engine(onnx_file_path=onnx_file_path, fp16_mode=self.fp16,
+                                                         max_batch_size=self.max_batch_size,
+                                                         save_trt_engine_path=save_trt_file_path,
+                                                         trt_engine_path=trt_file_path,
+                                                         dynamic_shapes=self.dynamic_shapes)
+            models_list[module_name] = tensorrt_engine
+        return models_list
 
     def __call__(self, call_api, inputs=None):
         func = self.support_api.get(call_api, None)
@@ -237,9 +246,9 @@ class SegformerWithDeepRemainDetection:
                 pred = np.full((seg_height, seg_width), 0, dtype=np.int)
         else:
             # pred = [draw_image_mix, draw_image, seg_pred] or [seg_pred]
-            pred = segmentation_detect_single_picture(model=self.segformer_modules[remain_category_id],
-                                                      device=self.device, image_info=rgb_picture,
-                                                      with_draw=with_seg_draw)
+            pred = tensorrt_engine_detect_image(tensorrt_engine=self.segformer_modules[remain_category_id],
+                                                image_info=rgb_picture, category_info=self.with_color_platte,
+                                                with_draw=self.with_seg_draw)
         depth_data = depth_image[ymin:ymax, xmin:xmax]
         if with_depth_draw:
             depth_color_picture = depth_color[ymin:ymax, xmin:xmax]
@@ -524,8 +533,7 @@ def test():
     # object_detection_model = YoloxObjectDetection(**object_detection_config)
     # object_detection_model.logger = logger
     module_config = {
-        'remain_module_file': './prepare/remain_segformer_module_cfg.json',
-        'classes_path': './prepare/remain_segformer_detection_classes.txt',
+        'remain_module_file': './prepare/remain_detection/remain_segformer_trt_module_cfg.json',
         'with_color_platte': 'FoodAndNotFood',
         'save_last_period': 60,
         'strict_down': False,
@@ -547,7 +555,7 @@ def test():
         'with_seg_draw': True,
         'with_depth_draw': True
     }
-    remain_module = SegformerWithDeepRemainDetection(**module_config)
+    remain_module = SegformerWithDeepRemainDetectionTensorRT(**module_config)
     remain_module.logger = logger
     pTime = 0
     while True:

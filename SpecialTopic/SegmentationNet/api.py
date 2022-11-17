@@ -50,10 +50,12 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
         model.pipeline = pipeline
     if with_color_platte is not None and with_color_platte != 'none' and isinstance(with_color_platte, str):
         from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood, \
-            FoodWithSpoon
+            DonburiRiceAndNotFood, Seg9AndNotFood, FoodWithSpoon
         support_platte = {
             'ADE20KDataset': ADE20KDataset,
             'FoodAndNotFood': FoodAndNotFood,
+            'DonburiRiceAndNotFood':DonburiRiceAndNotFood,
+            'Seg9AndNotFood': Seg9AndNotFood,
             'FoodWithSpoon': FoodWithSpoon
         }
         platte = support_platte.get(with_color_platte, None)

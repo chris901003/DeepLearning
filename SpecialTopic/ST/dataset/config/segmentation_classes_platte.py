@@ -67,6 +67,16 @@ FoodAndNotFood = {
     'CLASSES': ('Food', 'NotFood', 'BackGround'),
     'PALETTE': [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
 }
+DonburiRiceAndNotFood = {
+    'CLASSES': ('Donburi', 'Rice', 'NotFood', 'BackGround'),
+    'PALETTE': [[255, 0, 0], [255, 255, 0], [0, 255, 0], [0, 0, 255]]
+}
+Seg9AndNotFood = {
+    'CLASSES': ('Donburi', 'SoupRice', 'Rice', 'Countable', 'SoupNoodle',
+                'Noodle', 'SideDish', 'SolidSoup', 'Soup', 'NotFood', 'BackGround'),
+    'PALETTE': [[255, 0, 0], [255, 128, 0], [255, 255, 0], [128, 255, 0], [153, 51, 255],
+                [255, 0, 255], [149, 113, 51], [62, 161, 108], [212, 163, 233], [0, 255, 0], [0, 0, 255]]
+}
 FoodWithSpoon = {
     'CLASSES': ('Food', 'NotFood', 'Spoon', 'BackGround'),
     'PALETTE': [[255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255]]

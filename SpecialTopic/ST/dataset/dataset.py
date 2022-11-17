@@ -216,10 +216,12 @@ class SegformerDataset(Dataset):
 
     def get_classes_and_palette(self):
         from SpecialTopic.ST.dataset.config.segmentation_classes_platte import ADE20KDataset, FoodAndNotFood, \
-            FoodWithSpoon
+            DonburiRiceAndNotFood, Seg9AndNotFood, FoodWithSpoon
         support_dataset = {
             'ADE20KDataset': ADE20KDataset,
             'FoodAndNotFood': FoodAndNotFood,
+            'DonburiRiceAndNotFood': DonburiRiceAndNotFood,
+            'Seg9AndNotFood': Seg9AndNotFood,
             'FoodWithSpoon': FoodWithSpoon
         }
         info = support_dataset.get(self.data_name, None)

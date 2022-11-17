@@ -1,0 +1,21 @@
+{
+  "type": "SegformerWithDeepRemainDetectionTensorRT",
+  "remain_module_file": "./prepare/remain_detection/remain_segformer_trt_module_cfg.json",
+  "with_color_platte": "FoodAndNotFood",
+  "save_last_period": 150,
+  "strict_down": false,
+  "reduce_mode": {
+    "type": "momentum", "alpha": 0.5
+  },
+  "area_mode": {
+    "type": "volume_change", "main_classes_idx": 0
+  },
+  "init_deep_mode": {
+    "type": "target_seg_idx_mean", "target_seg_idx": [2], "topk_freq": 3
+  },
+  "dynamic_init_deep_mode": null,
+  "check_init_ratio_frame": 5,
+  "standard_remain_error": [0.8, 1.2],
+  "with_seg_draw": true,
+  "with_depth_draw": true
+}
