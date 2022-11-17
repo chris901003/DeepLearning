@@ -29,7 +29,7 @@
   },
   "step5": {
     "type": "RemainTimeDetection",
-    "config_file": "./config/RemainTimeDetection/remain_time_transformer_detection.json",
+    "config_file": "./config/RemainTimeDetection/remain_time_transformer_detection_trt.json",
     "call_api": ["remain_time_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]

@@ -1,0 +1,19 @@
+{
+  "type": "RemainTimeTransformerDetectionTensorRT",
+  "model_cfg": {
+    "create_encoder_onnx_cfg": null,
+    "create_decoder_onnx_cfg": null,
+    "encoder_onnx_file": null,
+    "decoder_onnx_file": null,
+    "encoder_trt_path": "./checkpoint/remain_time/trt/RemainEatingTimeEncoder.trt",
+    "decoder_trt_path": "./checkpoint/remain_time/trt/RemainEatingTimeDecoder.trt",
+    "save_encoder_trt_path": null,
+    "save_decoder_trt_path": null,
+    "setting_file_path": "./prepare/remain_time/remain_time_transformer_detection.pickle"
+  },
+  "time_gap": 5,
+  "min_remain_detection": 10,
+  "reduce_mode_buffer": {"type": "mean"},
+  "reduce_mode_output": {"type": "momentum", "alpha": 0.7},
+  "keep_time": 200
+}

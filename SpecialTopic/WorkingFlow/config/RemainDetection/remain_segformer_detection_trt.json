@@ -3,7 +3,7 @@
   "remain_module_file": "./prepare/remain_detection/remain_segformer_trt_module_cfg.json",
   "fp16": true,
   "with_color_platte": "FoodAndNotFood",
-  "save_last_period": 120,
+  "save_last_period": 150,
   "strict_down": false,
   "reduce_mode": {
     "type": "momentum", "alpha": 0.9

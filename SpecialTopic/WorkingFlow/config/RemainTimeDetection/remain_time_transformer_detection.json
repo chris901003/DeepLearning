@@ -9,5 +9,5 @@
   "min_remain_detection": 10,
   "reduce_mode_buffer": {"type": "mean"},
   "reduce_mode_output": {"type": "momentum", "alpha": 0.7},
-  "keep_time": 60
+  "keep_time": 200
 }
