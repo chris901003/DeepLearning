@@ -7,6 +7,7 @@ import pickle
 import torch
 import onnx
 import numpy as np
+from SpecialTopic.Deploy.OnnxToTensorRT.TensorrtBase import TensorrtBase
 from SpecialTopic.Deploy.RemainEatingTime.RemainEatingTime_M import RemainEatingTimeM
 from SpecialTopic.Deploy.RemainEatingTime.utils import load_pretrained, parser_setting, load_encoder_pretrained, \
     load_decoder_pretrained, RemainEatingTimeEncoder, RemainEatingTimeDecoder
@@ -154,27 +155,20 @@ def create_onnx_session(onnx_file='RemainEatingTimeM_Simplify.onnx', gpu='auto')
     return session
 
 
-def onnxruntime_detect(onnx_model, food_remain, input_names=('remain_food', 'remain_time'),
-                       output_names='predict_time'):
-    if isinstance(output_names, str):
-        onnx_outputs = [output_names]
-    elif isinstance(output_names, (list, tuple)):
-        onnx_outputs = output_names
-    else:
-        raise ValueError('output_names格式錯誤')
+def create_tensorrt(onnx_file_path=None, fp16_mode=True, max_batch_size=1, trt_engine_path=None,
+                            save_trt_engine_path=None, dynamic_shapes=None, trt_logger_level='VERBOSE'):
+    tensorrt_engine = TensorrtBase(onnx_file_path=onnx_file_path, fp16_mode=fp16_mode, max_batch_size=max_batch_size,
+                                   trt_engine_path=trt_engine_path, save_trt_engine_path=save_trt_engine_path,
+                                   dynamic_shapes=dynamic_shapes, trt_logger_level=trt_logger_level)
+    return tensorrt_engine
 
 
 if __name__ == '__main__':
-    create_decoder_onnx(setting_file='/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/RemainEating'
-                                     'Time/train_annotation.pickle',
-                        pretrained_path='/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/Remain'
-                                        'EatingTime/save/auto_eval.pth')
-    # create_onnx_file(setting_file_path='/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/RemainEating'
-    #                                     'Time/train_annotation.pickle',
-    #                  pretrained='/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/Remain'
-    #                             'EatingTime/save/auto_eval.pth')
-    # food_remain = [100, 97, 93, 90, 90, 89, 86, 85, 85, 84, 82, 81, 79, 76, 76, 75, 75, 73, 73, 72, 71, 67, 61, 59, 58,
-    #                58, 55, 49, 49, 45, 44, 42, 34, 28, 24, 24, 20, 16, 14, 11, 7, 4, 3, 1, 0]
-    #
-    # session = create_onnx_session()
-
+    create_encoder_onnx(setting_file=r'C:\DeepLearning\SpecialTopic\RemainEatingTime\train_annotation.pickle',
+                        pretrained_path=r'C:\DeepLearning\SpecialTopic\RemainEatingTime\save\auto_eval.pth')
+    create_decoder_onnx(setting_file=r'C:\DeepLearning\SpecialTopic\RemainEatingTime\train_annotation.pickle',
+                        pretrained_path=r'C:\DeepLearning\SpecialTopic\RemainEatingTime\save\auto_eval.pth')
+    trt_encode_engine = create_tensorrt(onnx_file_path='RemainEatingTimeEncoder_Simplify.onnx',
+                                        save_trt_engine_path='RemainEatingTimeEncoder.trt')
+    trt_decode_engine = create_tensorrt(onnx_file_path='RemainEatingTimeDecoder_Simplify.onnx',
+                                        save_trt_engine_path='RemainEatingTimeDecoder.trt')

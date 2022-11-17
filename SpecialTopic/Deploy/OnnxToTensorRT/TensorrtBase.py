@@ -189,7 +189,7 @@ class TensorrtBase:
             dynamic_shape: 是否有使用動態shape，如果有使用就需要開啟才會調用set_binding_shape來指定當前的shape
         """
         assert isinstance(input_datas, dict), '輸入資料需要是dict型態'
-        assert isinstance(output_shapes, list), '輸出資料需要是list型態或是使用auto'
+        assert isinstance(output_shapes, (tuple, list)), '輸出資料需要是list型態或是使用auto'
         assert len(output_shapes) > 0, '至少需要有一種輸出'
         inputs, outputs, bindings, stream = self.buffer
         if dynamic_shape:
