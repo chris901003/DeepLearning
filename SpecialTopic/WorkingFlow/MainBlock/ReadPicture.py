@@ -13,10 +13,12 @@ class ReadPicture:
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromVideo import ReadPictureFromVideo
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromCamera import ReadPictureFromCamera
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromPi import ReadPictureFromPi
+        from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromKinectV2 import ReadPictureFromKinectV2
         support_module = {
             'ReadPictureFromVideo': ReadPictureFromVideo,
             'ReadPictureFromCamera': ReadPictureFromCamera,
-            'ReadPictureFromPi': ReadPictureFromPi
+            'ReadPictureFromPi': ReadPictureFromPi,
+            'ReadPictureFromKinectV2': ReadPictureFromKinectV2
         }
         cfg = parser_cfg(cfg_path)
         self.cfg = cfg

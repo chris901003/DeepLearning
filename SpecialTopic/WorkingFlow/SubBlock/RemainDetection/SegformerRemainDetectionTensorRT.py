@@ -207,7 +207,8 @@ class SegformerRemainDetectionTensorRT:
                 pred = np.full((image_height, image_width), 0, dtype=np.int)
         else:
             pred = tensorrt_engine_detect_image(tensorrt_engine=self.segformer_modules[remain_category_id],
-                                                image_info=picture, category_info=self.with_color_platte)
+                                                image_info=picture, category_info=self.with_color_platte,
+                                                with_draw=self.with_draw)
             # pred = detect_single_picture(model=self.segformer_modules[remain_category_id], device=self.device,
             #                              image_info=picture, with_draw=with_draw)
         if with_draw:

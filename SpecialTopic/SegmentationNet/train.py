@@ -16,15 +16,15 @@ def parse_args():
     # 模型大小，根據不同模型會有不同可以使用的大小
     parser.add_argument('--phi', type=str, default='m')
     # 一個batch的大小，如果顯存不夠就將這裡條小
-    parser.add_argument('--batch-size', type=int, default=2)
+    parser.add_argument('--batch-size', type=int, default=4)
     # 多少個batch會進行權重更新，可以透過這種方式模擬大batch size的情況，通常可以增加正確率
     parser.add_argument('--optimizer-step-period', type=int, default=1)
     # 預訓練權重，這裡給的會是主幹的預訓練權重
-    parser.add_argument('--pretrained', type=str, default='none')
+    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\Segformer\segformer_m.pth')
     # 如果要從上次訓練斷掉的地方繼續訓練就將權重文件放到這裡
     parser.add_argument('--load-from', type=str, default='none')
     # 分類類別文件
-    parser.add_argument('--classes-path', type=str, default='./classes.txt')
+    parser.add_argument('--classes-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\classes.txt')
     # 訓練圖像資料的前綴路徑，為了可以將標註文件內容寫成相對路徑所使用
     parser.add_argument('--data-prefix', type=str, default='')
     # 訓練使用的標註文件
@@ -32,7 +32,7 @@ def parse_args():
     # 驗證使用的標註文件，如果沒有找到該標註文件就會使用訓練文件當作驗證文件
     parser.add_argument('--eval-annotation-path', type=str, default='./eval_annotation.txt')
     # 要使用哪個CLASSES與PLATTE
-    parser.add_argument('--data-name', type=str, default='ADE20KDataset')
+    parser.add_argument('--data-name', type=str, default='DonburiRiceAndNotFood')
     # 自動使用fp16，如果沒有關閉就會在使用gpu訓練時自動開啟，開啟後可以節省一半的顯存
     parser.add_argument('--auto-fp16', action='store_false')
     # 自動使用cudnn，當檢測到使用gpu訓練時會自動開啟cudnn，如果模型當中沒有使用到卷積層就不會有效果
@@ -64,7 +64,7 @@ def parse_args():
     # 檔案保存路徑
     parser.add_argument('--save-path', type=str, default='./checkpoint')
     # 給保存的權重命名，比較好分類
-    parser.add_argument('--weight-name', type=str, default='auto')
+    parser.add_argument('--weight-name', type=str, default='221117_seg2_m')
 
     # DataLoader中要使用的cpu核心數
     parser.add_argument('--num-workers', type=int, default=8)
