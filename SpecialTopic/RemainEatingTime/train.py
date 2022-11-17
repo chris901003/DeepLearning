@@ -146,8 +146,8 @@ def main():
     model = model.to(device)
     # 確認模型可以運作
     # import numpy as np
-    # remain = np.random.randint(low=0, high=101, size=120)
-    # remain_time = np.random.randint(low=0, high=61, size=120)
+    # remain = np.random.randint(low=0, high=101, size=118)
+    # remain_time = np.random.randint(low=0, high=61, size=118)
     # remain = np.concatenate(([101], remain, [102]))
     # remain_time = np.concatenate(([61], remain_time, [62], [63]))
     # remain = torch.from_numpy(remain).unsqueeze(dim=0)

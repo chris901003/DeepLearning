@@ -8,7 +8,7 @@ from torch import nn
 class PositionEmbedding(nn.Module):
     def __init__(self, max_len, embed_dim, num_classes):
         super(PositionEmbedding, self).__init__()
-        pe = torch.asarray([[self.get_pe(i, j, embed_dim) for j in range(embed_dim)] for i in range(max_len)])
+        pe = torch.tensor([[self.get_pe(i, j, embed_dim) for j in range(embed_dim)] for i in range(max_len)])
         pe = pe.unsqueeze(dim=0)
         self.register_buffer('pe', pe)
         self.embed_weight = nn.Embedding(num_classes, embed_dim)
@@ -54,6 +54,33 @@ class EncoderLayer(nn.Module):
         return out
 
 
+class Decoder(nn.Module):
+    def __init__(self, embed_dim, heads, decoder_layers, attention_norm, mlp_ratio, dropout_ratio):
+        super(Decoder, self).__init__()
+        self.layers = nn.ModuleList()
+        for _ in range(decoder_layers):
+            self.layers.append(DecoderLayer(embed_dim, heads, attention_norm, mlp_ratio, dropout_ratio))
+
+    def forward(self, x, y, mask_pad_x, mask_tril_y):
+        for layer in self.layers:
+            y = layer(x, y, mask_pad_x, mask_tril_y)
+        return y
+
+
+class DecoderLayer(nn.Module):
+    def __init__(self, embed_dim, heads, attention_norm, mlp_ratio, dropout_ratio):
+        super(DecoderLayer, self).__init__()
+        self.self_multi_head = MultiHead(embed_dim, heads, attention_norm, dropout_ratio)
+        self.cross_multi_head = MultiHead(embed_dim, heads, attention_norm, dropout_ratio)
+        self.fpn = FPN(embed_dim, mlp_ratio, dropout_ratio)
+
+    def forward(self, x, y, mask_pad_x, mask_tril_y):
+        y = self.self_multi_head(y, y, y, mask_tril_y)
+        y = self.cross_multi_head(y, x, x, mask_pad_x)
+        y = self.fpn(y)
+        return y
+
+
 class MultiHead(nn.Module):
     def __init__(self, embed_dim, heads, attention_norm=None, dropout_ratio=0.):
         super(MultiHead, self).__init__()
@@ -69,6 +96,9 @@ class MultiHead(nn.Module):
 
     def forward(self, q, k, v, mask):
         clone_q = q.clone()
+        q = self.norm(q)
+        k = self.norm(k)
+        v = self.norm(v)
         q = self.fc_q(q)
         k = self.fc_k(k)
         v = self.fc_v(v)
@@ -119,9 +149,9 @@ class RemainEatingTimeM(nn.Module):
         setting = self.parser_cfg()
         num_remain_classes = setting['num_remain_classes']
         num_time_classes = setting['num_time_classes']
-        max_len = setting['max_len']
-        remain_pad_val = setting['remain_pad_val']
-        time_pad_val = setting['time_pad_val']
+        self.max_len = setting['max_len']
+        self.remain_pad_val = setting['remain_pad_val']
+        self.time_pad_val = setting['time_pad_val']
         embed_dim = 32
         heads = 4
         encoder_layers = 3
@@ -129,13 +159,38 @@ class RemainEatingTimeM(nn.Module):
         mlp_ratio = 2
         dropout_ratio = 0.1
         attention_norm = 8
-        self.embed_remain = PositionEmbedding(max_len, embed_dim, num_remain_classes)
-        self.embed_time = PositionEmbedding(max_len, embed_dim, num_time_classes)
+        self.embed_remain = PositionEmbedding(self.max_len, embed_dim, num_remain_classes)
+        self.embed_time = PositionEmbedding(self.max_len, embed_dim, num_time_classes)
         self.encoder = Encoder(embed_dim, heads, encoder_layers, attention_norm, mlp_ratio, dropout_ratio)
         self.decoder = Decoder(embed_dim, heads, decoder_layers, attention_norm, mlp_ratio, dropout_ratio)
+        self.cls_fc = nn.Linear(embed_dim, num_time_classes)
 
-    def forward(self):
-        pass
+    @staticmethod
+    def mask_pad(data, pad, len):
+        mask = data == pad
+        mask = mask.reshape(-1, 1, 1, len)
+        mask = mask.expand(-1, 1, len, len)
+        return mask
+
+    @staticmethod
+    def mask_tril(data, pad, len):
+        tril = 1 - torch.tril(torch.ones(1, len, len, dtype=torch.long))
+        tril = tril.to(data.device)
+        mask = data == pad
+        mask = mask.unsqueeze(1).long()
+        mask = mask + tril
+        mask = mask > 0
+        mask = (mask == 1).unsqueeze(dim=1)
+        return mask
+
+    def forward(self, remain, remain_time):
+        mask_pad_remain = self.mask_pad(remain, self.remain_pad_val, self.max_len)
+        mask_tril_time = self.mask_tril(remain_time, self.time_pad_val, self.max_len)
+        remain, remain_time = self.embed_remain(remain), self.embed_time(remain_time)
+        remain_output = self.encoder(remain, mask_pad_remain)
+        time_output = self.decoder(remain_output, remain_time, mask_pad_remain, mask_tril_time)
+        out = self.cls_fc(time_output)
+        return out
 
     @torch.jit.ignore
     def parser_cfg(self):
@@ -150,4 +205,5 @@ class RemainEatingTimeM(nn.Module):
 
 if __name__ == '__main__':
     print('Testing Remain Eating Time transfer to onnx model')
-    RemainEatingTimeM(setting_file_path=None)
+    RemainEatingTimeM(setting_file_path='/Users/huanghongyan/Documents/DeepLearning/SpecialTopic/RemainEating'
+                                        'Time/train_annotation.pickle')
