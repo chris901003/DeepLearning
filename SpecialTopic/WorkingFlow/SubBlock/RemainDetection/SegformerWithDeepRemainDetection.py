@@ -15,7 +15,7 @@ class SegformerWithDeepRemainDetection:
                  strict_down=False, reduce_mode: Union[dict, str] = 'Default', area_mode: Union[dict, str] = 'Default',
                  init_deep_mode: Union[dict, str] = 'Default', dynamic_init_deep_mode: Union[dict] = None,
                  check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False,
-                 remain_filter_std=5, remain_filter_stable_check_period=30, remain_filter_max_len=60):
+                 remain_filter_std=2, remain_filter_stable_check_period=30, remain_filter_max_len=40):
         """
         Args:
             remain_module_file: 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型
@@ -438,12 +438,12 @@ class SegformerWithDeepRemainDetection:
             data = np.array(self.keep_data[track_id]['confuse_remain_keep'])
             avg = np.sum(data) / data_len
             data = np.sum(np.abs(data - avg) > self.remain_filter_std)
+            print(data, avg, current_remain, last_remain)
             if data == 0:
                 self.keep_data[track_id]['confuse_remain_keep'] = list()
                 return current_remain
-        else:
-            self.keep_data[track_id]['confuse_remain_keep'] = \
-                self.keep_data[track_id]['confuse_remain_keep'][-self.remain_filter_max_len:]
+        self.keep_data[track_id]['confuse_remain_keep'] = \
+            self.keep_data[track_id]['confuse_remain_keep'][-self.remain_filter_max_len:]
         return last_remain
 
     def remove_miss_object(self):
