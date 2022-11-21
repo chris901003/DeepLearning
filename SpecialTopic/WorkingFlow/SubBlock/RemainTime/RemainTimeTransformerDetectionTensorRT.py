@@ -172,6 +172,7 @@ class RemainTimeTransformerDetectionTensorRT:
             return
         if len(self.keep_data[track_id]['remain_buffer']) < self.min_remain_detection:
             return
+        self.logger['logger'].info(f'Track id: {track_id}, update left time')
         remain_buffer = self.keep_data[track_id]['remain_buffer']
         self.keep_data[track_id]['remain_buffer'] = list()
         remain_buffer_reduce = self.reduce_buffer_func(remain_buffer)

@@ -9,29 +9,28 @@ from tqdm import tqdm
 def args_parse():
     parser = argparse.ArgumentParser()
     # 圖像資料夾位置
-    parser.add_argument('--image-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\images\training')
+    parser.add_argument('--image-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\seg_\images\training')
     # 標註文件資料夾位置
-    parser.add_argument('--annotation-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\jsons\training')
+    parser.add_argument('--annotation-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\seg_\jsons\training')
     # 圖像保存位置
-    parser.add_argument('--save-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\annotations\training')
+    parser.add_argument('--save-folder-path', type=str, default=r'C:\Dataset\SegmentationFoodRemain\seg_\annotations\training')
     # 總共有哪些類別，這裡的順序會與到時圖像的時候相同，所以如果要避免被覆蓋就需要調整順序
-    parser.add_argument('--labels', type=str, default=['NotFood', 'Donburi', 'Rice'],
+    parser.add_argument('--labels', type=str, default=['NotFood', 'Food'],
                         nargs='+')
     # 是否需要嚴格規定每張圖像當中都需要有labels的標註，當strict_check_label為False時就不會嚴格檢查
     parser.add_argument('--strict-check-label', action='store_true')
     # 要標註的idx，這裡的長度需要與labels相同
-    parser.add_argument('--labels-idx', type=int, default=[2, 3, 1], nargs='+')
+    parser.add_argument('--labels-idx', type=int, default=[2, 1], nargs='+')
     # 背景值
-    parser.add_argument('--background-val', type=int, default=4)
+    parser.add_argument('--background-val', type=int, default=3)
     args = parser.parse_args()
     return args
 
 
 def check_picture():
     from PIL import Image
-    image_path = r'C:\Dataset\SegmentationFoodRemain\Classes\seg_9\annotations\training\0.png'
-    idx_to_rgb = [[0, 0, 0], [255, 0, 0], [255, 0, 0], [255, 0, 0], [255, 0, 0], [255, 0, 0], [255, 0, 0],
-                  [255, 0, 0], [255, 0, 0], [255, 0, 0], [0, 255, 0], [0, 0, 255]]
+    image_path = r'C:\Dataset\SegmentationFoodRemain\seg_\annotations\training\199.png'
+    idx_to_rgb = [[0, 0, 0], [255, 0, 0], [0, 255, 0], [0, 0, 255]]
     png_image = cv2.imread(image_path)[..., 0]
     image_height, image_width = png_image.shape[:2]
     # image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
@@ -100,4 +99,4 @@ def main():
 
 if __name__ == '__main__':
     print('Create annotation png picture')
-    main()
+    check_picture()

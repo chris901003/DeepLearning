@@ -5,7 +5,7 @@
   "3": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_3.pth"},
   "4": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_4.pth"},
   "5": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_5.pth"},
-  "6": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_6.pth"},
+  "6": {"phi": "m", "pretrained":  "./checkpoint/remain/221119_6_fake_rice_FoodAndNotFood.pth"},
   "7": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_7.pth"},
   "8": {"phi": "m", "pretrained":  "./checkpoint/remain/segformer_8.pth"}
 }

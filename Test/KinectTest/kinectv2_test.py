@@ -37,8 +37,8 @@ def depth_2_color_space(kinect, depth_space_point, depth_frame_data, show=False,
 
 
 def deep_color_image(deep_info, color_palette):
-    min_value = 500
-    max_value = 3000
+    min_value = 600
+    max_value = 800
     dpt_clip = np.clip(deep_info, min_value, max_value)
     dpt_clip = (dpt_clip - min_value) / (max_value - min_value) * 253
     dpt_clip = dpt_clip.astype(int)

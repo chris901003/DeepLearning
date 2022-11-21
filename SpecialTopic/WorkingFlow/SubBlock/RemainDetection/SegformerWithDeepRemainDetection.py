@@ -14,7 +14,8 @@ class SegformerWithDeepRemainDetection:
     def __init__(self, remain_module_file, classes_path, with_color_platte='FoodAndNotFood', save_last_period=60,
                  strict_down=False, reduce_mode: Union[dict, str] = 'Default', area_mode: Union[dict, str] = 'Default',
                  init_deep_mode: Union[dict, str] = 'Default', dynamic_init_deep_mode: Union[dict] = None,
-                 check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False):
+                 check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False,
+                 remain_filter_std=5, remain_filter_stable_check_period=30, remain_filter_max_len=60):
         """
         Args:
             remain_module_file: 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型
@@ -30,6 +31,9 @@ class SegformerWithDeepRemainDetection:
             standard_remain_error: 在確認表準比例時的最大容忍標準差，這裡會是範圍表示可容忍的值建議[0.9, 1.1]
             with_seg_draw: 將分割的顏色標註圖回傳
             with_depth_draw: 將深度圖像顏色回傳
+            remain_filter_std: 過濾突減剩餘量部分
+            remain_filter_stable_check_period: 保存多少長度後的突發值後確認是真實的
+            remain_filter_max_len: 最多保存最後多少幀的資料，避免取均值資料過於久遠
         """
         if reduce_mode == 'Default':
             reduce_mode = dict(type='momentum', alpha=0.7)
@@ -87,6 +91,9 @@ class SegformerWithDeepRemainDetection:
         self.standard_remain_error = standard_remain_error
         self.with_seg_draw = with_seg_draw
         self.with_depth_draw = with_depth_draw
+        self.remain_filter_std = remain_filter_std
+        self.remain_filter_stable_check_period = remain_filter_stable_check_period
+        self.remain_filter_max_len = remain_filter_max_len
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.classes, self.num_classes = get_classes(classes_path)
         self.segformer_modules = self.build_modules()
@@ -94,6 +101,7 @@ class SegformerWithDeepRemainDetection:
         # track_id = 由目標檢測追蹤出的對象ID
         # track_info = {
         #   'remain': 原先會是上次的輸出，經過本次更新後就會是本次的輸出
+        #   'confuse_remain_keep': 當遇到突然剩餘量下降時，會進行保留，如果確認是沒有誤判或是環境問題後才會放到正式剩餘量上
         #   'last_frame': 最後一次追蹤到的幀數，超過save_last_period沒有追蹤到就會拋棄
         #   'standard_remain': 剩餘量標準，認定為100%時的食物體積
         #   'standard_remain_record': 剩餘量標準的參數保存，如果有使用動態基底深度調整就一定需要該資料
@@ -173,15 +181,15 @@ class SegformerWithDeepRemainDetection:
                 # 對當前情況進行預測
                 results = self.update_detection(image, position, track_id, remain_category_id,
                                                 with_seg_draw=with_seg_draw, with_depth_draw=with_depth_draw)
-            if isinstance(results['remain'], (int, float)):
-                self.keep_data[track_id]['remain'] = results['remain']
             self.logger['logger'].info(f'Track ID: {track_id}, category from remain: {results["remain"]}')
             self.keep_data[track_id]['remain_seg_picture'] = results['rgb_draw']
             self.keep_data[track_id]['remain_depth_picture'] = results['depth_draw']
             self.keep_data[track_id]['last_frame'] = self.frame
-            track_object['category_from_remain'] = results['remain']
+            track_object['category_from_remain'] = self.remain_filter(track_id, results['remain'])
             track_object['remain_color_picture'] = results['rgb_draw']
             track_object['remain_deep_picture'] = results['depth_draw']
+            if isinstance(track_object['category_from_remain'], (int, float)):
+                self.keep_data[track_id]['remain'] = track_object['category_from_remain']
         return image, track_object_info
 
     def get_last_detection(self, track_id):
@@ -415,6 +423,29 @@ class SegformerWithDeepRemainDetection:
             # 透過新的基底深度計算的體積差距過大時就會不更新基底深度
             return -1
 
+    def remain_filter(self, track_id, current_remain):
+        last_remain = self.keep_data[track_id]['remain']
+        if isinstance(current_remain, str) or isinstance(last_remain, str):
+            return current_remain
+        print(abs(current_remain - last_remain))
+        if abs(current_remain - last_remain) > self.remain_filter_std and last_remain != -1:
+            self.keep_data[track_id]['confuse_remain_keep'].append(current_remain)
+        else:
+            self.keep_data[track_id]['confuse_remain_keep'] = list()
+            return current_remain
+        data_len = len(self.keep_data[track_id]['confuse_remain_keep'])
+        if data_len >= self.remain_filter_stable_check_period:
+            data = np.array(self.keep_data[track_id]['confuse_remain_keep'])
+            avg = np.sum(data) / data_len
+            data = np.sum(np.abs(data - avg) > self.remain_filter_std)
+            if data == 0:
+                self.keep_data[track_id]['confuse_remain_keep'] = list()
+                return current_remain
+        else:
+            self.keep_data[track_id]['confuse_remain_keep'] = \
+                self.keep_data[track_id]['confuse_remain_keep'][-self.remain_filter_max_len:]
+        return last_remain
+
     def remove_miss_object(self):
         remove_keys = [track_id for track_id, track_info in self.keep_data.items()
                        if ((self.frame - track_info['last_frame'] + self.mod_frame)
@@ -489,7 +520,7 @@ class SegformerWithDeepRemainDetection:
 
     def get_empty_data(self):
         data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list(),
-                    remain_seg_picture=None, remain_depth_picture=None, basic_deep=-1)
+                    remain_seg_picture=None, remain_depth_picture=None, basic_deep=-1, confuse_remain_keep=list())
         return data
 
 

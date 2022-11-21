@@ -1,6 +1,7 @@
 import torch
 from PIL import Image
 from torch.utils.data.dataset import Dataset
+import numpy as np
 from torchvision import transforms
 
 
@@ -11,7 +12,9 @@ class Cifar100Dataset(Dataset):
         if std == 'Default':
             std = [0.229, 0.224, 0.225]
         self.transform_data = transforms.Compose([
-            transforms.Resize(224),
+            # transforms.Resize(224),
+            # transforms.RandomRotation(90),
+            # transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
@@ -22,6 +25,8 @@ class Cifar100Dataset(Dataset):
         result = self.data_info[idx]
         image_path = result.get('image_path')
         image = Image.open(image_path)
+        if np.random.rand() < 0.5:
+            image = image.rotate(90)
         image = self.transform_data(image)
         label = result.get('label')
         image_name = result.get('image_name')
