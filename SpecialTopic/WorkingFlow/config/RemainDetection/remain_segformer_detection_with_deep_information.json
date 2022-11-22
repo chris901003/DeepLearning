@@ -9,7 +9,7 @@
     "type": "momentum", "alpha": 0.5
   },
   "area_mode": {
-    "type": "volume_change", "main_classes_idx": 0
+    "type": "volume_change", "main_classes_idx": 0, "bow_deep": 100
   },
   "init_deep_mode": {
     "type": "target_seg_idx_mean", "target_seg_idx": [2], "topk_freq": 3
