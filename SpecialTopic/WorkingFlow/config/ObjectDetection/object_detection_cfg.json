@@ -1,7 +1,7 @@
 {
   "type": "YoloxObjectDetection",
   "phi": "l",
-  "pretrained": "./checkpoint/object_detection/yolox_l_2022_10_27.pth",
+  "pretrained": "./checkpoint/object_detection/yolox_l_fake_rice.pth",
   "classes_path": "./prepare/object_detection_classes.txt",
   "confidence": 0.7,
   "nms": 0.3,
@@ -10,7 +10,7 @@
   "average_time_check": 30,
   "track_percentage": 0.5,
   "tracking_keep_period": 120,
-  "last_track_send": 5,
+  "last_track_send": 1,
   "average_time_output": 1,
   "intersection_area_threshold": 0.2,
   "new_track_box": 10,

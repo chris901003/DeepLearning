@@ -1,16 +1,16 @@
 {
   "step1": {
     "type": "ReadPicture",
-    "config_file": "./config/ReadPicture/get_picture_from_camera_cfg.json",
+    "config_file": "./config/ReadPicture/get_deep_picture_from_kinectv2.json",
     "call_api": ["get_single_picture"],
     "inputs": [[]],
-    "outputs": [["image", "image_type"]]
+    "outputs": [["image", "image_type", "deep_image", "deep_draw"]]
   },
   "step2": {
     "type": "ObjectDetection",
-    "config_file": "./config/ObjectDetection/object_detection_tensorrt_cfg.json",
+    "config_file": "./config/ObjectDetection/object_detection_cfg.json",
     "call_api": ["detect_single_picture"],
-    "inputs": [["image", "image_type"]],
+    "inputs": [["image", "image_type", "deep_image", "deep_draw"]],
     "outputs": [["image", "track_object_info"]]
   },
   "step3": {
@@ -22,7 +22,7 @@
   },
   "step4": {
     "type": "RemainDetection",
-    "config_file": "./config/RemainDetection/remain_segformer_detection_trt.json",
+    "config_file": "./config/RemainDetection/remain_segformer_detection_with_deep_information.json",
     "call_api": ["remain_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]

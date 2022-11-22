@@ -14,7 +14,8 @@ class SegformerWithDeepRemainDetection:
     def __init__(self, remain_module_file, classes_path, with_color_platte='FoodAndNotFood', save_last_period=60,
                  strict_down=False, reduce_mode: Union[dict, str] = 'Default', area_mode: Union[dict, str] = 'Default',
                  init_deep_mode: Union[dict, str] = 'Default', dynamic_init_deep_mode: Union[dict] = None,
-                 check_init_ratio_frame=5, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False):
+                 check_init_ratio_frame=30, standard_remain_error='Default', with_seg_draw=False, with_depth_draw=False,
+                 remain_filter_std=100, remain_filter_stable_check_period=30, remain_filter_max_len=40):
         """
         Args:
             remain_module_file: 配置剩餘量模型的config資料，目前是根據不同類別會啟用不同的分割權重模型
@@ -30,15 +31,18 @@ class SegformerWithDeepRemainDetection:
             standard_remain_error: 在確認表準比例時的最大容忍標準差，這裡會是範圍表示可容忍的值建議[0.9, 1.1]
             with_seg_draw: 將分割的顏色標註圖回傳
             with_depth_draw: 將深度圖像顏色回傳
+            remain_filter_std: 過濾突減剩餘量部分
+            remain_filter_stable_check_period: 保存多少長度後的突發值後確認是真實的
+            remain_filter_max_len: 最多保存最後多少幀的資料，避免取均值資料過於久遠
         """
         if reduce_mode == 'Default':
             reduce_mode = dict(type='momentum', alpha=0.7)
         if area_mode == 'Default':
-            area_mode = dict(type='volume_change', main_classes_idx=0)
+            area_mode = dict(type='volume_change', main_classes_idx=0, bow_deep=100)
         if init_deep_mode == 'Default':
             init_deep_mode = dict(type='target_seg_idx_mean', target_seg_idx=[1, 2])
         if standard_remain_error == 'Default':
-            standard_remain_error = [0.9, 1.1]
+            standard_remain_error = [0.95, 1.05]
         assert isinstance(reduce_mode, dict), 'reduce mode 需要提供字典格式才有辦法初始化'
         assert isinstance(area_mode, dict) and isinstance(init_deep_mode, dict), '需要是字典格式才可以初始化'
         assert isinstance(dynamic_init_deep_mode, dict) or dynamic_init_deep_mode is None, 'dynamic_init_deep_mode需要是' \
@@ -87,6 +91,9 @@ class SegformerWithDeepRemainDetection:
         self.standard_remain_error = standard_remain_error
         self.with_seg_draw = with_seg_draw
         self.with_depth_draw = with_depth_draw
+        self.remain_filter_std = remain_filter_std
+        self.remain_filter_stable_check_period = remain_filter_stable_check_period
+        self.remain_filter_max_len = remain_filter_max_len
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.classes, self.num_classes = get_classes(classes_path)
         self.segformer_modules = self.build_modules()
@@ -94,6 +101,7 @@ class SegformerWithDeepRemainDetection:
         # track_id = 由目標檢測追蹤出的對象ID
         # track_info = {
         #   'remain': 原先會是上次的輸出，經過本次更新後就會是本次的輸出
+        #   'confuse_remain_keep': 當遇到突然剩餘量下降時，會進行保留，如果確認是沒有誤判或是環境問題後才會放到正式剩餘量上
         #   'last_frame': 最後一次追蹤到的幀數，超過save_last_period沒有追蹤到就會拋棄
         #   'standard_remain': 剩餘量標準，認定為100%時的食物體積
         #   'standard_remain_record': 剩餘量標準的參數保存，如果有使用動態基底深度調整就一定需要該資料
@@ -148,6 +156,9 @@ class SegformerWithDeepRemainDetection:
         """
         with_seg_draw = self.with_seg_draw
         with_depth_draw = self.with_depth_draw
+        import cv2
+        deep_draw = image['deep_draw']
+        cv2.imshow('deep', deep_draw)
         assert 'rgb_image' in image.keys(), self.logger['logger'].critical('缺少rgb_image資料')
         assert 'deep_image' in image.keys(), self.logger['logger'].critical('缺少深度deep_image資料')
         if with_depth_draw:
@@ -173,15 +184,15 @@ class SegformerWithDeepRemainDetection:
                 # 對當前情況進行預測
                 results = self.update_detection(image, position, track_id, remain_category_id,
                                                 with_seg_draw=with_seg_draw, with_depth_draw=with_depth_draw)
-            if isinstance(results['remain'], (int, float)):
-                self.keep_data[track_id]['remain'] = results['remain']
             self.logger['logger'].info(f'Track ID: {track_id}, category from remain: {results["remain"]}')
             self.keep_data[track_id]['remain_seg_picture'] = results['rgb_draw']
             self.keep_data[track_id]['remain_depth_picture'] = results['depth_draw']
             self.keep_data[track_id]['last_frame'] = self.frame
-            track_object['category_from_remain'] = results['remain']
+            track_object['category_from_remain'] = self.remain_filter(track_id, results['remain'])
             track_object['remain_color_picture'] = results['rgb_draw']
             track_object['remain_deep_picture'] = results['depth_draw']
+            if isinstance(track_object['category_from_remain'], (int, float)):
+                self.keep_data[track_id]['remain'] = track_object['category_from_remain']
         return image, track_object_info
 
     def get_last_detection(self, track_id):
@@ -239,7 +250,7 @@ class SegformerWithDeepRemainDetection:
             # pred = [draw_image_mix, draw_image, seg_pred] or [seg_pred]
             pred = segmentation_detect_single_picture(model=self.segformer_modules[remain_category_id],
                                                       device=self.device, image_info=rgb_picture,
-                                                      with_draw=with_seg_draw)
+                                                      with_draw=with_seg_draw, threshold=0.7)
         depth_data = depth_image[ymin:ymax, xmin:xmax]
         if with_depth_draw:
             depth_color_picture = depth_color[ymin:ymax, xmin:xmax]
@@ -306,6 +317,10 @@ class SegformerWithDeepRemainDetection:
         for init_info in self.keep_data[track_id]['standard_remain_record']:
             average_basic_depth += init_info['basic_deep']
         average_basic_depth /= self.check_init_ratio_frame
+        # for init_info in self.keep_data[track_id]['standard_remain_record']:
+        #     if abs(init_info['basic_deep'] - average_basic_depth) > 5:
+        #         self.keep_data[track_id]['standard_reman_record'] = list()
+        #         return f'Standard basic deep reinit'
         target_volume = list()
         for init_info in self.keep_data[track_id]['standard_remain_record']:
             depth_info = average_basic_depth - init_info['target_depth_info']
@@ -314,7 +329,9 @@ class SegformerWithDeepRemainDetection:
         target_volume = np.array(target_volume)
         avg = target_volume.mean()
         std = target_volume / avg
-        if self.standard_remain_error[0] <= std.any() <= self.standard_remain_error[1]:
+        left_side = self.standard_remain_error[0] <= std
+        right_side = std <= self.standard_remain_error[1]
+        if np.sum(np.logical_and(left_side, right_side)) == self.check_init_ratio_frame:
             self.keep_data[track_id]['basic_deep'] = average_basic_depth
             self.keep_data[track_id]['standard_remain'] = avg
             return f'Standard remain volume {avg}'
@@ -334,6 +351,11 @@ class SegformerWithDeepRemainDetection:
         """
         depth_info = self.area_func(seg_pred, depth_data)
         basic_deep = self.keep_data[track_id]['basic_deep']
+        deeper_then_basic_deep = depth_info > basic_deep
+        total_invalid_pixel = np.sum(deeper_then_basic_deep)
+        if total_invalid_pixel / (depth_info[0] * depth_info[1]) > 0.1:
+            self.logger['logger'].warning(f'Track id: {track_id}, Invalid pixel is too many')
+        depth_info = depth_info[~deeper_then_basic_deep]
         depth_info = basic_deep - depth_info
         total_volume = depth_info.sum()
         return total_volume
@@ -415,6 +437,29 @@ class SegformerWithDeepRemainDetection:
             # 透過新的基底深度計算的體積差距過大時就會不更新基底深度
             return -1
 
+    def remain_filter(self, track_id, current_remain):
+        last_remain = self.keep_data[track_id]['remain']
+        if isinstance(current_remain, str) or isinstance(last_remain, str):
+            return current_remain
+        print(abs(current_remain - last_remain))
+        if abs(current_remain - last_remain) > self.remain_filter_std and last_remain != -1:
+            self.keep_data[track_id]['confuse_remain_keep'].append(current_remain)
+        else:
+            self.keep_data[track_id]['confuse_remain_keep'] = list()
+            return current_remain
+        data_len = len(self.keep_data[track_id]['confuse_remain_keep'])
+        if data_len >= self.remain_filter_stable_check_period:
+            data = np.array(self.keep_data[track_id]['confuse_remain_keep'])
+            avg = np.sum(data) / data_len
+            data = np.sum(np.abs(data - avg) > self.remain_filter_std)
+            print(data, avg, current_remain, last_remain)
+            if data == 0:
+                self.keep_data[track_id]['confuse_remain_keep'] = list()
+                return current_remain
+        self.keep_data[track_id]['confuse_remain_keep'] = \
+            self.keep_data[track_id]['confuse_remain_keep'][-self.remain_filter_max_len:]
+        return last_remain
+
     def remove_miss_object(self):
         remove_keys = [track_id for track_id, track_info in self.keep_data.items()
                        if ((self.frame - track_info['last_frame'] + self.mod_frame)
@@ -425,17 +470,21 @@ class SegformerWithDeepRemainDetection:
         [self.keep_data.pop(k) for k in remove_keys]
 
     @staticmethod
-    def volume_change(seg_pred, depth_data, main_classes_idx):
+    def volume_change(seg_pred, depth_data, main_classes_idx, bow_deep):
         """ 將被分類成感興趣類別的資料提取出來
         Args:
             seg_pred: 分割圖像資訊
             depth_data: 深度資料
             main_classes_idx: 感興趣類別ID
+            bow_deep: 碗的深度(mm)
         Returns:
             depth_data: 分割類別為感興趣類別的深度資料，這裡會被壓縮成一維資料
         """
         main_target_mask = seg_pred == main_classes_idx
         depth_data = depth_data[main_target_mask]
+        avg = np.mean(depth_data)
+        diff_mask = np.abs(depth_data - avg) <= bow_deep
+        depth_data = depth_data[diff_mask]
         return depth_data
 
     @staticmethod
@@ -489,7 +538,7 @@ class SegformerWithDeepRemainDetection:
 
     def get_empty_data(self):
         data = dict(remain=-1, last_frame=self.frame, standard_remain=-1, standard_remain_record=list(),
-                    remain_seg_picture=None, remain_depth_picture=None, basic_deep=-1)
+                    remain_seg_picture=None, remain_depth_picture=None, basic_deep=-1, confuse_remain_keep=list())
         return data
 
 

@@ -21,9 +21,9 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=8)
     parser.add_argument('--Freeze-batch-size', type=int, default=512)
     # 加載預訓練權重，這裡指的是在ImageNet上預訓練權重
-    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\VIT\vit_l.pth')
+    parser.add_argument('--pretrained', type=str, default='none')
 
-    parser.add_argument('--num-classes', type=int, default=100)
+    parser.add_argument('--num-classes', type=int, default=30)
     parser.add_argument('--auto-fp16', action='store_false')
 
     # 起始Epoch數
@@ -56,8 +56,7 @@ def train(model, device, optimizer, epoch, train_dataloader, Total_Epoch, scaler
     print('Start train')
     pbar = tqdm(total=len(train_dataloader), desc=f'Epoch {epoch}/{Total_Epoch}', postfix=dict, miniters=0.3)
     model = model.train()
-    for iteration, batch in enumerate(train_dataloader):
-        images, labels = batch
+    for iteration, (images, labels, images_name) in enumerate(train_dataloader):
         with torch.no_grad():
             images = images.to(device)
             labels = labels.to(device)
@@ -99,8 +98,7 @@ def val(model, device, epoch, val_dataloader, Total_Epoch):
     eval_topk_acc = 0
     pbar = tqdm(total=len(val_dataloader), desc=f'Epoch {epoch}/{Total_Epoch}', postfix=dict, miniters=0.3)
     model = model.eval()
-    for iteration, batch in enumerate(val_dataloader):
-        images, labels = batch
+    for iteration, (images, labels, images_name) in enumerate(val_dataloader):
         with torch.no_grad():
             images = images.to(device)
             labels = labels.to(device)
@@ -123,9 +121,9 @@ def val(model, device, epoch, val_dataloader, Total_Epoch):
 def predict_answer():
     from PIL import Image
     args = parse_args()
-    folder_path = './Training_data/1'
-    pretrained = './resnet50.pth'
-    answer_file = './410985048.txt'
+    folder_path = './410985015'
+    pretrained = './vit.pth'
+    answer_file = './410985015.txt'
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     support_image_format = ['.png']
     images_name = [image_name for image_name in os.listdir(folder_path)
@@ -154,7 +152,7 @@ def predict_answer():
         image = image.unsqueeze(dim=0)
         with torch.no_grad():
             image = image.to(device)
-            preds = model(image)
+            preds = model(image, with_loss=False)
         preds = preds.squeeze(dim=0)
         preds = preds.argmax().item()
         info = os.path.splitext(image_name)[0] + ' ' + str(preds)
@@ -250,6 +248,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    predict_answer()
     print('Finish')
 

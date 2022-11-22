@@ -6,5 +6,5 @@
   "deep_image_width": 960,
   "rgb_image_height": 540,
   "rgb_image_width": 960,
-  "deep_color_range": [500, 1500]
+  "deep_color_range": [600, 800]
 }
