@@ -15,6 +15,9 @@ class DrawResultsOnPicture:
         self.support_api = {
             'show_results': self.show_results
         }
+        self.support_text_transform = {
+            'sec2hms': self.text_transform_sec2hms
+        }
 
     def __call__(self, call_api, inputs):
         func = self.support_api.get(call_api, None)
@@ -57,11 +60,17 @@ class DrawResultsOnPicture:
             color = text_info.get('color', (0, 0, 255))
             text_size = text_info.get('text_size', 1)
             thick = text_info.get('thick', 2)
+            transform = text_info.get('transform', None)
+            if transform is not None:
+                transform = self.support_text_transform.get(transform, None)
+                assert transform is not None, f'尚未提供 {text_info.get("transform")} 字串轉換方式'
             for track_info in track_object_info:
                 info = prefix
                 for val_name in vals_name:
                     val = track_info.get(val_name, None)
                     assert val is not None, f'無法獲取{val_name}資料'
+                    if transform is not None:
+                        val = transform(val)
                     info += self.get_string_type(val) + sep
                 info += suffix
                 draw_position = track_info['draw_position']
@@ -85,7 +94,7 @@ class DrawResultsOnPicture:
                 xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
                 xmin, ymin = max(0, xmin), max(0, ymin)
                 xmax, ymax = min(image_width, xmax), min(image_height, ymax)
-                print(xmax, xmin, ymax, ymin, picture.shape)
+                # print(xmax, xmin, ymax, ymin, picture.shape)
                 picture = cv2.resize(picture.astype(np.uint8), (xmax - xmin, ymax - ymin))
                 result_image[ymin:ymax, xmin:xmax] = result_image[ymin:ymax, xmin:xmax] * \
                                                      (1 - opacity) + picture * opacity
@@ -136,6 +145,24 @@ class DrawResultsOnPicture:
         xmin, ymin = max(0, xmin), max(0, ymin)
         xmax, ymax = min(width, xmax), min(height, ymax)
         return xmin, ymin, xmax, ymax
+
+    @ staticmethod
+    def text_transform_sec2hms(sec):
+        if not isinstance(sec, (int, float)):
+            return sec
+        h = sec // 3600
+        sec %= 3600
+        m = sec // 60
+        sec %= 60
+        h, m, sec = str(int(h)), str(int(m)), str(int(sec))
+        if len(h) == 1:
+            h = '0' + h
+        if len(m) == 1:
+            m = '0' + m
+        if len(sec) == 1:
+            sec = '0' + sec
+        res = f'{h}:{m}:{sec}'
+        return res
 
 
 def test():
