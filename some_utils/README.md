@@ -50,3 +50,6 @@ _background_
 
 ### rename_labelme
 將labelme的圖像以及標注文件進行重命名
+
+### RecordDepthAndRgbWithKinectV2
+使用kinectV2同時記錄下彩色圖像以及深度資料，主要是為了測試時可以直接讀取影片資料進行判斷

@@ -331,7 +331,7 @@ class SegformerWithDeepRemainDetection:
         std = target_volume / avg
         left_side = self.standard_remain_error[0] <= std
         right_side = std <= self.standard_remain_error[1]
-        if np.sum(np.logical_and(left_side, right_side)) == self.check_init_ratio_frame:
+        if np.sum(np.logical_and(left_side, right_side)) >= self.check_init_ratio_frame * 0.8:
             self.keep_data[track_id]['basic_deep'] = average_basic_depth
             self.keep_data[track_id]['standard_remain'] = avg
             return f'Standard remain volume {avg}'
@@ -351,9 +351,12 @@ class SegformerWithDeepRemainDetection:
         """
         depth_info = self.area_func(seg_pred, depth_data)
         basic_deep = self.keep_data[track_id]['basic_deep']
+        if depth_info.ndim != 1:
+            self.logger['logger'].critical(f'Track id: {track_id}, Depth data is None')
+            raise RuntimeError(f'Track id: {track_id}, 深度資料丟失，請查出問題，曾經發生過但是疑似為概率發生')
         deeper_then_basic_deep = depth_info > basic_deep
         total_invalid_pixel = np.sum(deeper_then_basic_deep)
-        if total_invalid_pixel / (depth_info[0] * depth_info[1]) > 0.1:
+        if total_invalid_pixel / len(depth_info) > 0.1:
             self.logger['logger'].warning(f'Track id: {track_id}, Invalid pixel is too many')
         depth_info = depth_info[~deeper_then_basic_deep]
         depth_info = basic_deep - depth_info
@@ -441,7 +444,7 @@ class SegformerWithDeepRemainDetection:
         last_remain = self.keep_data[track_id]['remain']
         if isinstance(current_remain, str) or isinstance(last_remain, str):
             return current_remain
-        print(abs(current_remain - last_remain))
+        # print(abs(current_remain - last_remain))
         if abs(current_remain - last_remain) > self.remain_filter_std and last_remain != -1:
             self.keep_data[track_id]['confuse_remain_keep'].append(current_remain)
         else:
@@ -452,7 +455,7 @@ class SegformerWithDeepRemainDetection:
             data = np.array(self.keep_data[track_id]['confuse_remain_keep'])
             avg = np.sum(data) / data_len
             data = np.sum(np.abs(data - avg) > self.remain_filter_std)
-            print(data, avg, current_remain, last_remain)
+            # print(data, avg, current_remain, last_remain)
             if data == 0:
                 self.keep_data[track_id]['confuse_remain_keep'] = list()
                 return current_remain

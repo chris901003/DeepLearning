@@ -14,9 +14,11 @@ class RemainTimeDetection:
             import RemainTimeTransformerDetection
         from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeTransformerDetectionTensorRT \
             import RemainTimeTransformerDetectionTensorRT
+        from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeCalculate import RemainTimeCalculate
         support_module = {
             'RemainTimeTransformerDetection': RemainTimeTransformerDetection,
-            'RemainTimeTransformerDetectionTensorRT': RemainTimeTransformerDetectionTensorRT
+            'RemainTimeTransformerDetectionTensorRT': RemainTimeTransformerDetectionTensorRT,
+            'RemainTimeCalculate': RemainTimeCalculate
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)

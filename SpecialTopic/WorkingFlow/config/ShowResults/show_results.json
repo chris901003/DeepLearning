@@ -6,7 +6,7 @@
   "texts": [
     {"prefix": "Object: ", "val_name": ["object_score", "category_from_object_detection"], "suffix": "", "sep": "|"},
     {"prefix": "Remain Food: ", "val_name": ["track_id", "category_from_remain"], "suffix": "", "sep": "|"},
-    {"prefix": "Remain Time: ", "val_name": ["remain_time"], "suffix": " mins"},
+    {"prefix": "Remain Time: ", "val_name": ["remain_time"], "suffix": "", "transform": "sec2hms"},
     {"prefix": "Other: ", "val_name": ["using_last"], "suffix": "", "sep": ""}
   ],
   "pictures": [
