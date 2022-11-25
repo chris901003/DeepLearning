@@ -1,0 +1,6 @@
+{
+  "type": "ReadPictureFromVideoWithDepth",
+  "rgb_video_path": "./prepare/video/rgb/rgb.mp4",
+  "depth_video_path": "./prepare/video/depth/depth.mp4",
+  "depth_view_video_path": "./prepare/video/depth_view/depth_view.mp4"
+}

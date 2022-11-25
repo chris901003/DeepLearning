@@ -82,6 +82,23 @@ type = 說明要使用哪個子模塊
     - deep_image = 深度圖像資訊，這裡的高寬會與RGB圖像相同
     - deep_draw = 會依據不同深度映射到調色盤上的顏色進行著色
 
+### get_deep_picture_from_video
+透過讀取彩色影片與深度影片獲取圖像資料，方便進行實驗，不過因為是直接保存深度資料，所以使用時請確保深度資料都是正確的
+否則結果會有問題
+#### 參數說明
+- rgb_video_path = 彩色圖像檔案位置
+- depth_video_path = 深度圖像檔案位置
+- depth_view_video_path = 可視化深度圖像檔案位置
+#### api說明
+- get_single_picture: 獲取RGB圖像以及深度圖像資料
+  - input: None
+  - output: [rgb_image, image_type, deep_image, deep_draw]
+    - rbg_image = 彩色圖像，這裡會是指定的相機獲取的RGB圖像
+    - image_type = 圖像屬性類別
+    - deep_image = 深度圖像資訊，這裡的高寬會與RGB圖像相同
+    - deep_draw = 會依據不同深度映射到調色盤上的顏色進行著色
+  - 注意事項: 這裡輸出的資料與不帶有深度的有所不同，所以在全流程的config中需要更改下層輸入的資料
+
 ## ObjectDetection
 
 ---
