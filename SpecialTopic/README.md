@@ -70,3 +70,7 @@
 
 #### SegmentationNet
 分割模型，主要也是解決剩餘量資料，對於固體的食物可以使用
+
+### RemainEatingTime
+預測剩餘時間，這裡外部的檔案是使用transformer架構預測剩餘時間\
+還有一個RegressionModel是使用傳統預測回歸的方式預測剩餘量
