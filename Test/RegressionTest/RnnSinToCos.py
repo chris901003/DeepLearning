@@ -29,7 +29,6 @@ class RNN(nn.Module):
         # x (batch, time_step, input_size)
         # h_state (n_layers, batch, hidden_size)
         # r_out (batch, time_step, hidden_size)
-        x = x.squeeze(dim=-1)
         x = self.remain_embed(x)
         r_out, (h_state, c_state) = self.rnn(x)
         outs = list()  # 保存所有的預測值
@@ -78,8 +77,8 @@ def train():
         # x_np = np.sin(steps)
         # y_np = np.cos(steps)
         for x_np, y_np, length in train_data:
-            x = torch.from_numpy(x_np[np.newaxis, :, np.newaxis]).to(DEVICE)
-            y = torch.from_numpy(y_np[np.newaxis, :, np.newaxis]).squeeze(dim=-1).to(torch.long).to(DEVICE)
+            x = torch.from_numpy(x_np[np.newaxis, :]).to(DEVICE)
+            y = torch.from_numpy(y_np[np.newaxis, :]).to(torch.long).to(DEVICE)
             prediction, h_state, c_state = rnn(x)  # rnn output
             prediction = prediction.permute((0, 2, 1))
             # 這一步非常重要
@@ -144,4 +143,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    train()
