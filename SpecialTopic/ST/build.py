@@ -11,6 +11,7 @@ def build_detector(detector_cfg):
     from .net.MobileVit import MobileVit
     from .net.Segformer import Segformer
     from .net.RemainEatingTime import RemainEatingTime
+    from .net.Regression import RemainTimeRegression
     support_detector = {
         'YoloBody': YoloBody,
         'Recognizer3D': Recognizer3D,
@@ -18,7 +19,8 @@ def build_detector(detector_cfg):
         'VIT': VIT,
         'MobileVit': MobileVit,
         'Segformer': Segformer,
-        'RemainEatingTime': RemainEatingTime
+        'RemainEatingTime': RemainEatingTime,
+        'RemainTimeRegression': RemainTimeRegression
     }
     detector_cls = get_cls_from_dict(support_detector, detector_cfg)
     detector = detector_cls(**detector_cfg)
