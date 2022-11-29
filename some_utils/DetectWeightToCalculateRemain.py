@@ -1,4 +1,5 @@
 import argparse
+import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data.dataset import Dataset
@@ -18,7 +19,7 @@ def args_parse():
     # 影片路徑
     parser.add_argument('--video-path', type=str, default='SystemNumberSet/rgb.mp4')
     # 保存文字檔位置
-    parser.add_argument('--save-path', type=str, default='remain.txt')
+    parser.add_argument('--save-path', type=str, default='remain.xlsx')
     # 將框框位置填入，這裡請由左至右並且格式為[[xmin, ymin, xmax, ymax]]
     parser.add_argument('--boxes-place', type=int, default=[[10, 20, 100, 120], [120, 20, 220, 120]], nargs='+')
     # 如果要看框選位置就改成True，此時就只會看一下框選位置
@@ -159,6 +160,28 @@ def preprocess_picture(pictures):
     return images
 
 
+def reduce_weight(weight_info, scope=(0.3, 0.7)):
+    weight_len = len(weight_info)
+    weight_info = sorted(weight_info)
+    left_idx, right_idx = int(weight_len * scope[0]), int(weight_len * scope[1])
+    left_idx = max(0, min(left_idx, weight_len - 1))
+    right_idx = min(weight_len, max(left_idx + 1, right_idx))
+    weight_info = weight_info[left_idx: right_idx]
+    avg_weight = sum(weight_info) / len(weight_info)
+    return avg_weight
+
+
+def write_to_excel(weights, remains, save_path):
+    weight_dict = dict()
+    remain_dict = dict()
+    for idx, weight in enumerate(weights):
+        weight_dict[str(idx)] = weight
+    for idx, remain in enumerate(remains):
+        remain_dict[str(idx)] = remain
+    data = pd.DataFrame({'weights': weight_dict, 'remains': remain_dict})
+    data.to_excel(save_path)
+
+
 def create_remain_with_weight(video_path, save_path, boxes_place):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Net()
@@ -166,7 +189,7 @@ def create_remain_with_weight(video_path, save_path, boxes_place):
     model = model.to(device)
     model.eval()
     cap = cv2.VideoCapture(video_path)
-    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    video_fps = int(cap.get(cv2.CAP_PROP_FPS))
     weight_record = list()
     while True:
         ret, image = cap.read()
@@ -184,14 +207,40 @@ def create_remain_with_weight(video_path, save_path, boxes_place):
             with torch.no_grad():
                 number_pictures = number_pictures.to(device)
                 predicts = model(number_pictures)
-            predicts = predicts.argmax(dim=-1)
-            print('f')
-
+            predicts = predicts.argmax(dim=-1).tolist()
+            current_weight = 0
+            for predict in predicts:
+                current_weight *= 10
+                current_weight += int(predict)
+            weight_record.append(current_weight)
+            cv2.putText(image, f"Detect weight : {current_weight}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                        (255, 0, 0), 3)
             cv2.imshow('img', image)
         else:
             break
         if cv2.waitKey(1) == ord('q'):
             break
+    avg_weight_per_sec = list()
+    for idx in range(0, len(weight_record), video_fps):
+        weight_info = weight_record[idx: idx + video_fps]
+        weight = reduce_weight(weight_info)
+        avg_weight_per_sec.append(weight)
+    # 這裡會默認將最一開始的重量設定成最大重量，以及最後的重量設定成最小重量
+    max_weight = avg_weight_per_sec[0]
+    min_weight = avg_weight_per_sec[-1]
+    total_weight = max_weight - min_weight
+    if total_weight == 0:
+        total_weight = 1e-9
+    remain = list()
+    for weight in avg_weight_per_sec:
+        current = weight - min_weight
+        current_remain = current / total_weight
+        remain.append(current_remain)
+    # 最終剩餘重量會是放在avg_weight_per_sec
+    # 最終判斷出的剩餘量會在remain
+    # 這裡會保存成excel檔案方便重新定義剩餘量公式以及調整重量資料
+    write_to_excel(avg_weight_per_sec, remain, save_path)
+    print('Finish detect weight')
 
 
 def main():
