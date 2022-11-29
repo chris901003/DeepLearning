@@ -16,6 +16,8 @@ def args_parse():
     # 需要提供系統字體，這裡需要每個數字的樣子才可以進行辨識
     # 資料格式，圖像中的數字與檔名相同，並且需要是[.jpg, .JPG, .jpeg, .JPEG]其中一種
     parser.add_argument('--system-number-set', type=str, default='SystemNumberSet')
+    # 重量數值範圍
+    parser.add_argument('--number-range', type=int, default=[0, 3000], nargs='+')
     # 影片路徑
     parser.add_argument('--video-path', type=str, default='SystemNumberSet/rgb.mp4')
     # 保存文字檔位置
@@ -26,6 +28,25 @@ def args_parse():
     parser.add_argument('--view-box', type=bool, default=False)
     args = parser.parse_args()
     return args
+
+
+def prepare_training_picture(system_number_set_path, number_range):
+    assert os.path.exists(system_number_set_path) and os.path.isdir(system_number_set_path), '提供的樣本需要是放在資料夾當中'
+    number_picture_path = [os.path.join(system_number_set_path, str(idx) + '.jpg') for idx in range(10)]
+    for picture_path in number_picture_path:
+        assert os.path.exists(picture_path), f'圖像{picture_path}不存在'
+    temp_system_number_set_path = 'SystemNumberSetCombine'
+    if not os.path.exists(temp_system_number_set_path):
+        os.mkdir(temp_system_number_set_path)
+    print('Generating number')
+    for idx in tqdm(range(number_range[0], number_range[1] + 1)):
+        number = str(idx)
+        bg = Image.new('RGB', (200, 100), (255, 255, 255))
+        for index, num in enumerate(number[::-1]):
+            num_picture = Image.open(number_picture_path[int(num)])
+            num_picture = num_picture.resize((50, 100))
+            bg.paste(num_picture, (150 - index * 50, 0))
+        bg.save(os.path.join(temp_system_number_set_path, number + '.jpg'))
 
 
 class SystemNumberDataset(Dataset):
@@ -64,7 +85,7 @@ class SystemNumberDataset(Dataset):
 
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, number_range):
         super(Net, self).__init__()
         # out shape = 64 x 32 x 32
         self.conv1 = nn.Sequential(
@@ -87,7 +108,7 @@ class Net(nn.Module):
         # out shape = 64 x 1 x 1
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         # out shape = 10
-        self.fc = nn.Linear(in_features=64, out_features=10)
+        self.fc = nn.Linear(in_features=64, out_features=number_range[1] + 1)
 
     def forward(self, x):
         out = self.conv1(x)
@@ -99,11 +120,11 @@ class Net(nn.Module):
         return out
 
 
-def prepare_recognition_model(data_path):
+def prepare_recognition_model(data_path, number_range):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     train_dataset = SystemNumberDataset(data_path)
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=train_dataset.collate_fn)
-    model = Net()
+    model = Net(number_range)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters())
     loss_func = torch.nn.CrossEntropyLoss()
@@ -182,9 +203,9 @@ def write_to_excel(weights, remains, save_path):
     data.to_excel(save_path)
 
 
-def create_remain_with_weight(video_path, save_path, boxes_place):
+def create_remain_with_weight(video_path, save_path, boxes_place, number_range):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Net()
+    model = Net(number_range)
     # model.load_state_dict(torch.load('SystemNumberWeight.pth', map_location='cpu'))
     model = model.to(device)
     model.eval()
@@ -246,6 +267,7 @@ def create_remain_with_weight(video_path, save_path, boxes_place):
 def main():
     args = args_parse()
     system_number_set_path = args.system_number_set
+    number_range = args.number_range
     video_path = args.video_path
     save_path = args.save_path
     boxes_place = args.boxes_place
@@ -256,10 +278,13 @@ def main():
     if view_box:
         view_box_place(video_path, boxes_place)
     else:
-        # prepare_recognition_model(system_number_set_path)
-        create_remain_with_weight(video_path, save_path, boxes_place)
+        prepare_training_picture(system_number_set_path, number_range)
+        prepare_recognition_model('SystemNumberSetCombine', number_range)
+        create_remain_with_weight(video_path, save_path, boxes_place, number_range)
     if os.path.exists('SystemNumberWeight.pth'):
         os.remove('SystemNumberWeight.pth')
+    if os.path.exists('SystemNumberSetCombine'):
+        os.remove('SystemNumberSetCombine')
 
 
 if __name__ == '__main__':
