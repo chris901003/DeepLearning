@@ -53,8 +53,16 @@ def prepare_training_picture(system_number_set_path, number_range):
 class SystemNumberDataset(Dataset):
     def __init__(self, data_path):
         support_image_format = ['.jpg', '.JPG', '.jpeg', '.JPEG']
-        self.images_path = [os.path.join(data_path, image_name) for image_name in os.listdir(data_path)
-                            if os.path.splitext(image_name)[1] in support_image_format]
+        self.images_info = list()
+        for number in range(0, 10):
+            number_folder = os.path.join(data_path, str(number))
+            assert os.path.exists(number_folder), f'缺少[ {number} ]的資料夾'
+            for image_name in os.listdir(number_folder):
+                if os.path.splitext(image_name)[1] not in support_image_format:
+                    continue
+                image_path = os.path.join(number_folder, image_name)
+                data = dict(image_path=image_path, label=number)
+                self.images_info.append(data)
         self.transform = transforms.Compose([
             transforms.Resize((64, 64)),
             transforms.ToTensor(),
@@ -62,16 +70,16 @@ class SystemNumberDataset(Dataset):
         ])
 
     def __getitem__(self, idx):
-        image_path = self.images_path[idx]
+        info = self.images_info[idx]
+        image_path = info['image_path']
+        label = info['label']
         image = Image.open(image_path)
         image = self.transform(image)
-        label = int(os.path.splitext(os.path.basename(image_path))[0])
-        label = torch.tensor(label)
         result = dict(image=image, label=label)
         return result
 
     def __len__(self):
-        return len(self.images_path)
+        return len(self.images_info)
 
     @staticmethod
     def collate_fn(batch):
@@ -81,7 +89,7 @@ class SystemNumberDataset(Dataset):
             images.append(info['image'])
             labels.append(info['label'])
         images = torch.stack(images)
-        labels = torch.stack(labels)
+        labels = torch.Tensor(labels).to(torch.long)
         return images, labels
 
 
