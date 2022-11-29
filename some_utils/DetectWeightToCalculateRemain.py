@@ -23,7 +23,8 @@ def args_parse():
     # 保存文字檔位置
     parser.add_argument('--save-path', type=str, default='remain.xlsx')
     # 將框框位置填入，這裡請由左至右並且格式為[[xmin, ymin, xmax, ymax]]
-    parser.add_argument('--boxes-place', type=int, default=[[10, 20, 100, 120], [120, 20, 220, 120]], nargs='+')
+    parser.add_argument('--boxes-place', type=int, default=[[310, 310, 365, 380], [360, 310, 415, 380],
+                                                            [410, 310, 465, 380]], nargs='+')
     # 如果要看框選位置就改成True，此時就只會看一下框選位置
     parser.add_argument('--view-box', type=bool, default=False)
     args = parser.parse_args()
@@ -85,7 +86,7 @@ class SystemNumberDataset(Dataset):
 
 
 class Net(nn.Module):
-    def __init__(self, number_range):
+    def __init__(self):
         super(Net, self).__init__()
         # out shape = 64 x 32 x 32
         self.conv1 = nn.Sequential(
@@ -108,7 +109,7 @@ class Net(nn.Module):
         # out shape = 64 x 1 x 1
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         # out shape = 10
-        self.fc = nn.Linear(in_features=64, out_features=number_range[1] + 1)
+        self.fc = nn.Linear(in_features=64, out_features=10)
 
     def forward(self, x):
         out = self.conv1(x)
@@ -120,18 +121,19 @@ class Net(nn.Module):
         return out
 
 
-def prepare_recognition_model(data_path, number_range):
+def prepare_recognition_model(data_path):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     train_dataset = SystemNumberDataset(data_path)
-    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=train_dataset.collate_fn)
-    model = Net(number_range)
+    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True, collate_fn=train_dataset.collate_fn)
+    model = Net()
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters())
     loss_func = torch.nn.CrossEntropyLoss()
     print('Start training system number')
-    for epoch in tqdm(range(1, 101)):
+    for epoch in range(1, 101):
         acc = 0
         tot = 0
+        pbar = tqdm(total=len(train_dataloader), desc=f'Epoch {epoch} / {100}', postfix=dict, miniters=0.3)
         for image, label in train_dataloader:
             optimizer.zero_grad()
             image = image.to(device)
@@ -143,15 +145,19 @@ def prepare_recognition_model(data_path, number_range):
             pred = out.argmax(dim=-1)
             acc += pred.eq(label).sum().item()
             tot += image.size(0)
-        if epoch == 100:
-            print(acc / tot)
+            pbar.set_postfix(**{
+                'acc': acc / tot
+            })
+            pbar.update(1)
+        pbar.close()
     torch.save(model.state_dict(), 'SystemNumberWeight.pth')
     print('Finish pretrain system number')
 
 
 def view_box_place(video_path, boxes_place):
     cap = cv2.VideoCapture(video_path)
-    _, _ = cap.read()
+    for _ in range(300):
+        _, _ = cap.read()
     ret, image = cap.read()
     assert ret, '給定影片有問題，無法進行讀取'
     image_height, image_width = image.shape[:2]
@@ -203,10 +209,10 @@ def write_to_excel(weights, remains, save_path):
     data.to_excel(save_path)
 
 
-def create_remain_with_weight(video_path, save_path, boxes_place, number_range):
+def create_remain_with_weight(video_path, save_path, boxes_place):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Net(number_range)
-    # model.load_state_dict(torch.load('SystemNumberWeight.pth', map_location='cpu'))
+    model = Net()
+    model.load_state_dict(torch.load('SystemNumberWeight.pth', map_location='cpu'))
     model = model.to(device)
     model.eval()
     cap = cv2.VideoCapture(video_path)
@@ -221,10 +227,12 @@ def create_remain_with_weight(video_path, save_path, boxes_place, number_range):
                 xmin, ymin, xmax, ymax = box_place
                 if xmin < 0 or ymin < 0 or xmax >= image_width or ymax >= image_height:
                     raise RuntimeError('標註範圍大於影片大小，請使用view模式檢查標註框')
-                cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
                 picture = image[ymin:ymax, xmin:xmax, :]
                 numbers_picture.append(picture)
             number_pictures = preprocess_picture(numbers_picture)
+            for idx, box_place in enumerate(boxes_place):
+                xmin, ymin, xmax, ymax = box_place
+                cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
             with torch.no_grad():
                 number_pictures = number_pictures.to(device)
                 predicts = model(number_pictures)
@@ -278,9 +286,9 @@ def main():
     if view_box:
         view_box_place(video_path, boxes_place)
     else:
-        prepare_training_picture(system_number_set_path, number_range)
-        prepare_recognition_model('SystemNumberSetCombine', number_range)
-        create_remain_with_weight(video_path, save_path, boxes_place, number_range)
+        # prepare_training_picture(system_number_set_path, number_range)
+        prepare_recognition_model(system_number_set_path)
+        create_remain_with_weight(video_path, save_path, boxes_place)
     if os.path.exists('SystemNumberWeight.pth'):
         os.remove('SystemNumberWeight.pth')
     if os.path.exists('SystemNumberSetCombine'):
