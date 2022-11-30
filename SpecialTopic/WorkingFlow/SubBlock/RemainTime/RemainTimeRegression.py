@@ -119,6 +119,8 @@ class RemainTimeRegression:
         self.predict_remain_time(track_id)
 
     def predict_remain_time(self, track_id):
+        if self.keep_data[track_id]['last_predict_time'] == 0:
+            self.keep_data[track_id]['last_predict_time'] = self.current_time
         if self.current_time - self.keep_data[track_id]['last_predict_time'] < self.time_gap:
             return
         assert len(self.keep_data[track_id]['remain_buffer']) != 0, \
@@ -134,14 +136,14 @@ class RemainTimeRegression:
         # 透過前面多段的剩餘量計算剩餘時間
         predict_remain_time = regression_predict_remain_time(self.model, self.keep_data[track_id]['record_remain_time'])
         # 獲取本次的剩餘時間
-        current_remain_time = predict_remain_time[current_index]
+        current_remain_time = int(predict_remain_time[current_index])
         # 如果獲取本次的剩餘時間的值有發生越界就會進入，進行處理
         if current_remain_time >= self.model.settings['remain_time_start_value']:
             self.logger['logger'].warning(f'Track ID: {track_id}, Remain Time Detection超出可預期範圍，請查看情況')
         while current_index >= 0 and \
                 predict_remain_time[current_index] >= self.model.settings['remain_time_start_value']:
             current_index -= 1
-        current_remain_time = predict_remain_time[current_index]
+        current_remain_time = int(predict_remain_time[current_index])
         assert current_remain_time < self.model.settings['remain_time_start_value'], \
             self.logger['logger'].critical(f'Track ID: {track_id}, Remain Time Detection發生嚴重錯誤，'
                                            f'所有預測結果都沒有在合法範圍內')
@@ -195,7 +197,7 @@ class RemainTimeRegression:
 
     def create_new_track_object(self):
         data = dict(remain_buffer=list(), remain_time='New Remain Time track object', last_track_frame=self.frame,
-                    last_predict_time=self.current_time, record_remain_time=list([100]))
+                    last_predict_time=0, record_remain_time=list([100]))
         return data
 
 
