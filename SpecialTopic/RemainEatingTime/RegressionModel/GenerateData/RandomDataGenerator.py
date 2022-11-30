@@ -90,9 +90,7 @@ def main():
     print('Finish Generate Data')
 
 
-def check_data():
-    data_path = 'regression_dataset.pickle'
-    setting_path = 'setting.json'
+def check_data(data_path='regression_dataset.pickle', setting_path='setting.json'):
     with open(data_path, 'rb') as f:
         datasets = pickle.load(f)
     assert isinstance(datasets, list), 'dataset中的資料需要是list型態'
