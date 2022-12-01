@@ -1,5 +1,6 @@
 import time
 import copy
+import json
 from functools import partial
 from typing import Union
 from SpecialTopic.ST.utils import get_cls_from_dict
@@ -43,7 +44,12 @@ class RemainTimeRegression:
         self.output_reduce = partial(output_reduce_func, **output_reduce_mode)
         self.setting_path = setting_path
         self.model = regression_model_init(cfg=model_cfg, setting_path=setting_path, pretrained=pretrained_path)
+        self.settings = self.parse_setting()
+        # TODO 準備將time_gap從啟動設定檔移除，改成使用setting文件當中紀錄下的time_gap來執行
+        # 因為這樣的時間單位才會是對其的，結果才不會有問題
         self.time_gap = time_gap
+        if self.settings.get('time_gap', None) is not None:
+            self.time_gap = self.settings['time_gap']
         self.keep_frame = keep_frame
         self.keep_data = dict()
         # keep_data = {
@@ -60,6 +66,10 @@ class RemainTimeRegression:
             'remain_time_detection': self.remain_time_detection
         }
         self.logger = None
+
+    def parse_setting(self):
+        with open(self.setting_path, 'r') as f:
+            return json.load(f)
 
     def __call__(self, call_api, inputs=None):
         self.current_time = time.time()
