@@ -1,0 +1,52 @@
+{
+  "0": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_0.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_0.json"
+  },
+  "1": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_1.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_1.json"
+  },
+  "2": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_2.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_2.json"
+  },
+  "3": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_3.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_3.json"
+  },
+  "4": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_4.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_4.json"
+  },
+  "5": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_5.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_5.json"
+  },
+  "6": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_6.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_6.json"
+  },
+  "7": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_7.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_7.json"
+  },
+  "8": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_8.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_8.json"
+  },
+  "9": {
+    "model_cfg": "Default",
+    "pretrained_path": "./checkpoint/remain_time/regression/regression_9.pth",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_9.json"
+  }
+}

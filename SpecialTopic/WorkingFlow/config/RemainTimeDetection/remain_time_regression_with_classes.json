@@ -1,0 +1,13 @@
+{
+  "type": "RemainTimeRegressionWithClass",
+  "regression_cfg_file": "./prepare/remain_time/regression/regression_model_cfg.json",
+  "keep_frame": 200,
+  "input_reduce_mode": {
+    "type": "range", "scope": [0.3, 0.7]
+  },
+  "output_reduce_mode": "Default",
+  "remain_project_remain_time": {
+    "0": "0", "1": "1", "2": "2", "3": "3", "4": "4", "5": "5",
+    "6": "6", "7": "7", "8": "8", "9": "9"
+  }
+}
