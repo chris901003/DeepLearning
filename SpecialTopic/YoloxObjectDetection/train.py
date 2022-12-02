@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--val-annotation-path', default='none',
                         type=str)
     # 是否使用雙精度模式，只有gpu模式下才會有效果
-    parser.add_argument('--fp16', action='store_true')
+    parser.add_argument('--fp16', action='store_false')
 
     # 與訓練過程相關
     # 初始Epoch

@@ -9,9 +9,10 @@ from SpecialTopic.YoloxObjectDetection.api import init_model, detect_image
 def args_parser():
     parser = argparse.ArgumentParser()
     # 訓練權重檔案位置
-    parser.add_argument('--pretrained-path', type=str, default='number_detection.pth')
+    parser.add_argument('--pretrained-path', type=str, default=r'C:\Checkpoint\YoloxWeightNumberDetection\first_'
+                                                               r'version_1_8.pth')
     # 偵測影片路徑
-    parser.add_argument('--video-path', type=str, default='SystemNumberSet/rgb.mp4')
+    parser.add_argument('--video-path', type=str, default=r'C:\Dataset\vedio\weight.mp4')
     # 保存資料路徑
     parser.add_argument('--save-path', type=str, default='remain.xlsx')
     args = parser.parse_args()
@@ -67,6 +68,7 @@ def detect_weight(model, video_path, save_path):
             current_weight = 0
             for detect in detect_info:
                 ymin, xmin, ymax, xmax = detect[:4]
+                xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
                 if ymin <= 0 or xmin <= 0 or ymax >= image_height or xmax >= image_width:
                     continue
                 number = detect[-1]
