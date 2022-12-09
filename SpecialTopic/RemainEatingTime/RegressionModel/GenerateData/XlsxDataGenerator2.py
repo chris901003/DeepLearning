@@ -54,7 +54,7 @@ def weight_to_remain(weight_info):
     for idx, weights in enumerate(weight_info):
         min_weight, max_weight = weights[-1], weights[0]
         total_weight = max_weight - min_weight
-        assert total_weight <= 0, f'第{idx + 1}筆資料的重量變化小於等於0，請檢查是否有問題'
+        assert total_weight >= 0, f'第{idx + 1}筆資料的重量變化小於等於0，請檢查是否有問題'
         remain = [int(round((weight - min_weight) / total_weight * 100, 0)) for weight in weights]
         remains.append(remain)
     return remains
@@ -103,6 +103,7 @@ def main():
         check_dataset(save_dataset_path, save_setting_path)
         return
     if args.visualize_dataset:
+        visualize_dataset(save_dataset_path, save_setting_path)
         return
     assert os.path.exists(xlsx_path), '給定的excel檔案不存在'
     xlsx_info = parse_excel(xlsx_path, time_gap)
@@ -157,9 +158,9 @@ def main():
         'remain_time_end_value': remain_time_end_value,
         'remain_time_padding_value': remain_time_padding_value
     }
-    with open(save_dataset_path, 'rb') as f:
+    with open(save_dataset_path, 'wb') as f:
         pickle.dump(dataset_list, f)
-    with open(save_setting_path, 'r') as f:
+    with open(save_setting_path, 'w') as f:
         json.dump(parameters, f, indent=4)
     print('Finish Generate Data')
 
