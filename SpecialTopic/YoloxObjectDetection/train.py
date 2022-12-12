@@ -18,7 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
     # 預訓練權重位置，如果沒有要使用就填 'none'
-    parser.add_argument('--models-path', type=str, default='./pretrained.pth')
+    parser.add_argument('--models-path', type=str, default='./Yolox_l.pth')
     # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
     # 一個batch大小

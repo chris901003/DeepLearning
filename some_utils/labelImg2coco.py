@@ -49,7 +49,7 @@ def main():
 
 
 def get_images_data(source_path):
-    img_path = os.path.join(source_path, 'img')
+    img_path = os.path.join(source_path, 'imgs')
     assert os.path.exists(img_path), f'圖像要保存在 {img_path} 當中，如果有存放錯誤請改正'
     images = list()
     support_img_format = ['.jpeg', '.JPEG', '.jpg', '.JPG']
@@ -80,7 +80,7 @@ def get_images_data(source_path):
 
 
 def get_annotations_data(source_data, anno_name_to_hw):
-    annotations_path = os.path.join(source_data, 'annotation')
+    annotations_path = os.path.join(source_data, 'annotations')
     assert os.path.exists(annotations_path), f'無法找到 {annotations_path} 來獲取yolo標註訊息，如果保存位置有誤請更正'
     annotations = list()
     annotations_name = os.listdir(annotations_path)

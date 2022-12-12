@@ -5,10 +5,9 @@ import os
 
 def args_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--json-path', type=str, default=r'C:\Other\FaceDataset\OneDrive_1_2022-12-2\train.json')
-    parser.add_argument('--picture-folder-path', type=str, default=r'C:\Other\FaceDataset\OneDrive_1_2022-12-2\train'
-                                                                   r'2017\train2017')
-    parser.add_argument('--save-path', type=str, default=r'C:\Other\FaceDataset\OneDrive_1_2022-12-2\all')
+    parser.add_argument('--json-path', type=str, default=r'C:\Other\FaceDataset\Face\train.json')
+    parser.add_argument('--picture-folder-path', type=str, default=r'C:\Other\FaceDataset\Face\train2017\train2017\train2017')
+    parser.add_argument('--save-path', type=str, default=r'C:\Other\FaceDataset\Face\all')
     args = parser.parse_args()
     return args
 
