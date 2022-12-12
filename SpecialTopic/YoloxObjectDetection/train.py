@@ -18,7 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser('YoloX Training')
     # 比較常需要調整的部分
     # 預訓練權重位置，如果沒有要使用就填 'none'
-    parser.add_argument('--models-path', type=str, default='./pretrained.pth')
+    parser.add_argument('--models-path', type=str, default='./Yolox_l.pth')
     # 使用的模型大小['nano', 'tiny', 's', 'l', 'm', 'x']
     parser.add_argument('--phi', type=str, default='l')
     # 一個batch大小
@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--val-annotation-path', default='none',
                         type=str)
     # 是否使用雙精度模式，只有gpu模式下才會有效果
-    parser.add_argument('--fp16', action='store_true')
+    parser.add_argument('--fp16', action='store_false')
 
     # 與訓練過程相關
     # 初始Epoch

@@ -22,9 +22,9 @@ def args_parser():
     # 也就是max-length x time-gap需大於最大影片長度，對於同個類別的time-gap與max-length需相同
     # time-gap不相同會導致時間間隔單位不相同，程式依舊可以執行但是剩餘時間不可靠
     # max-length不相同會導致剩餘時間分類數不相同，程式不可執行，因模型架構不同
-    # 以預設參數來說就會是最長影片長度支援為[5 x 120](單位: 秒)的影片
+    # 以預設參數來說就會是最長影片長度支援為[5 x 240](單位: 秒)的影片
     # 在預測的時候會是以5秒為一個單位進行預測
-    parser.add_argument('--max-length', type=int, default=120)
+    parser.add_argument('--max-length', type=int, default=240)
     # 因真實情況不會有一次就直接到底的剩餘量，所以這裡會隨機去除資料的尾端資料來模擬正在吃的過程應判斷的剩餘時間
     # Ex:
     # 輸入的剩餘量資料[100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0]
@@ -54,7 +54,7 @@ def weight_to_remain(weight_info):
     for idx, weights in enumerate(weight_info):
         min_weight, max_weight = weights[-1], weights[0]
         total_weight = max_weight - min_weight
-        assert total_weight <= 0, f'第{idx + 1}筆資料的重量變化小於等於0，請檢查是否有問題'
+        assert total_weight >= 0, f'第{idx + 1}筆資料的重量變化小於等於0，請檢查是否有問題'
         remain = [int(round((weight - min_weight) / total_weight * 100, 0)) for weight in weights]
         remains.append(remain)
     return remains
@@ -65,6 +65,13 @@ def compress_time(weight_info, time_gap):
     """
     compress_weight = list()
     for weights in weight_info:
+        index = -1
+        for idx, weight in enumerate(weights):
+            if math.isnan(weight):
+                index = idx
+                break
+        if index != -1:
+            weights = weights[:index]
         weight_record = list()
         for idx in range(0, len(weights), time_gap):
             range_weight = weights[idx: idx + time_gap]
@@ -77,7 +84,7 @@ def compress_time(weight_info, time_gap):
 def parse_excel(xlsx_path, time_gap):
     """ 讀取excel當中的資料，並且轉換成剩餘量資料
     """
-    xlsx_pandas_info = pd.read_excel(io=xlsx_path, sheet_name='Sheet1')
+    xlsx_pandas_info = pd.read_excel(io=xlsx_path, sheet_name='工作表1')
     xlsx_dict_info = xlsx_pandas_info.to_dict()
     xlsx_info = list()
     for dict_info_key, dict_info_value in xlsx_dict_info.items():
@@ -103,6 +110,7 @@ def main():
         check_dataset(save_dataset_path, save_setting_path)
         return
     if args.visualize_dataset:
+        visualize_dataset(save_dataset_path, save_setting_path)
         return
     assert os.path.exists(xlsx_path), '給定的excel檔案不存在'
     xlsx_info = parse_excel(xlsx_path, time_gap)
@@ -157,9 +165,9 @@ def main():
         'remain_time_end_value': remain_time_end_value,
         'remain_time_padding_value': remain_time_padding_value
     }
-    with open(save_dataset_path, 'rb') as f:
+    with open(save_dataset_path, 'wb') as f:
         pickle.dump(dataset_list, f)
-    with open(save_setting_path, 'r') as f:
+    with open(save_setting_path, 'w') as f:
         json.dump(parameters, f, indent=4)
     print('Finish Generate Data')
 
