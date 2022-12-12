@@ -121,7 +121,7 @@ class RemainTimeRegressionWithClass:
 
     def upper_layer_init(self, track_id):
         if track_id in self.keep_data.keys():
-            assert isinstance(self.keep_data[track_id]['remain'], str), \
+            assert isinstance(self.keep_data[track_id]['remain_time'], str), \
                 self.logger['logger'].critical(f'Track ID: {track_id}, 程序錯誤，理論上不應該出現非字串資料')
             self.keep_data[track_id]['last_remain_frame'] = self.frame
         else:

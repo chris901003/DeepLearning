@@ -8,13 +8,13 @@ def args_parser():
     parser = argparse.ArgumentParser('隨機生成訓練資料')
     # 每筆資料生成的長度，給定一個範圍，會從指定範圍中獲取一種長度
     # 這裡的長度不會包含最前面的開始以及最後面的結束部分
-    parser.add_argument('--length-range', type=int, default=[30, 120], nargs='+')
+    parser.add_argument('--length-range', type=int, default=[100, 120], nargs='+')
     # 總共需要生成多少資料
-    parser.add_argument('--number-of-data', type=int, default=100)
+    parser.add_argument('--number-of-data', type=int, default=200)
     # 進行去除後面的概率
     parser.add_argument('--cutoff-rate', type=float, default=0.5)
     # 截斷位置，因為需要部分沒有直接到結束的資料，所以這裡可以設定隨機拋棄最後面的幾個剩餘量
-    parser.add_argument('--offset-range', type=int, default=[0, 30], nargs='+')
+    parser.add_argument('--offset-range', type=int, default=[0, 80], nargs='+')
     # 保存生成資料位置
     parser.add_argument('--dataset-save-path', type=str, default='regression_dataset.pickle')
     # 將設定資料進行保存，這裡會需要保存訓練時的設定，因為會透過指定的length決起始的值以及終點值以及padding值
@@ -153,4 +153,4 @@ def check_data(data_path='regression_dataset.pickle', setting_path='setting.json
 
 if __name__ == '__main__':
     print('Generate Regression model random training data')
-    check_data()
+    main()

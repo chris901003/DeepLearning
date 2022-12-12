@@ -12,8 +12,11 @@ def args_parser():
     parser.add_argument('--pretrained-path', type=str, default=r'C:\Checkpoint\YoloxWeightNumberDetection\first_'
                                                                r'version_1_8.pth')
     # 偵測影片路徑
-    parser.add_argument('--video-path', type=str, default=[r'C:\Users\109專題\Desktop\1128_Dinner_Trim.mp4',
-                                                           r'C:\Users\109專題\Desktop\1128_Dinner_Trim2.mp4'], nargs='+')
+    parser.add_argument('--video-path', type=str, default=[r'C:\Dataset\vedio\Rice\1128_Dinner.mp4',
+                                                           r'C:\Dataset\vedio\Rice\1202_dinner_2.mp4',
+                                                           r'C:\Dataset\vedio\Rice\1204_dinner.mp4',
+                                                           r'C:\Dataset\vedio\Rice\1206_dinner_2.mov',
+                                                           r'C:\Dataset\vedio\Rice\1210_dinner.mp4'], nargs='+')
     # 保存資料路徑
     parser.add_argument('--save-path', type=str, default='remain')
     args = parser.parse_args()

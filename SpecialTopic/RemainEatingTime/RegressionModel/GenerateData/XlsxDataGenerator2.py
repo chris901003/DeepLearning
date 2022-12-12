@@ -202,7 +202,7 @@ def visualize_dataset(data_path, setting_path):
         plt.gca().invert_xaxis()
         plt.plot(remain, remain_time, 'r-')
         plt.draw()
-        plt.pause(0.1)
+        plt.pause(1)
         plt.cla()
 
 
