@@ -29,7 +29,7 @@
   },
   "step5": {
     "type": "RemainTimeDetection",
-    "config_file": "./config/RemainTimeDetection/remain_time_regression.json",
+    "config_file": "./config/RemainTimeDetection/remain_time_regression_with_classes.json",
     "call_api": ["remain_time_detection"],
     "inputs": [["image", "track_object_info"]],
     "outputs": [["image", "track_object_info"]]
@@ -43,45 +43,45 @@
   },
   "log_config": {
     "log_link": "app",
-    "level": "info",
+    "level": "critical",
     "format": ["asctime", "name", "levelname", "message"],
     "handler": [
       {
         "type": "FileHandler",
         "save_path": "./log/app/log_save.log",
-        "level": "info",
+        "level": "critical",
         "format": null
       },
       {
         "type": "StreamHandler",
-        "level": "info",
+        "level": "critical",
         "format": null
       }
     ],
     "sub_log": [
       {
         "log_link": "ReadPicture",
-        "level": "info"
+        "level": "critical"
       },
       {
         "log_link": "ObjectDetection",
-        "level": "info"
+        "level": "critical"
       },
       {
         "log_link": "ObjectClassifyToRemainClassify",
-        "level": "info"
+        "level": "critical"
       },
       {
         "log_link": "RemainDetection",
-        "level": "info"
+        "level": "critical"
       },
       {
         "log_link": "RemainTimeDetection",
-        "level": "info"
+        "level": "critical"
       },
       {
         "log_link": "ShowResults",
-        "level": "info"
+        "level": "critical"
       }
     ]
   }
