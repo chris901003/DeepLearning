@@ -58,8 +58,8 @@ class DrawResultsOnPicture:
             assert vals_name is not None, '需要指定文字的參數'
             sep = text_info.get('sep', ' ')
             color = text_info.get('color', (0, 0, 255))
-            text_size = text_info.get('text_size', 1)
-            thick = text_info.get('thick', 2)
+            text_size = text_info.get('text_size', 0.5)
+            thick = text_info.get('thick', 1)
             transform = text_info.get('transform', None)
             if transform is not None:
                 transform = self.support_text_transform.get(transform, None)
@@ -103,7 +103,7 @@ class DrawResultsOnPicture:
     @staticmethod
     def get_string_type(val):
         if isinstance(val, (int, float)):
-            return str(val)
+            return str(round(val, 2))
         if isinstance(val, str):
             return val
         if isinstance(val, np.ndarray):
