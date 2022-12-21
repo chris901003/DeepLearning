@@ -177,6 +177,12 @@ class RemainTimeRegressionWithClass:
         current_remain = self.input_reduce(track_id=track_id)
         self.keep_data[track_id]['remain_buffer'] = list()
         current_index = len(self.keep_data[track_id]['record_remain'])
+        max_len = settings['max_length'] - 2
+        # 當吃的時間已經超過可預期上限時會直接告知，已超出正常時間範圍
+        if current_index == max_len:
+            self.keep_data[track_id]['remain_time'] = 'Out of normal eating time...'
+            self.keep_data[track_id]['last_predict_time'] = self.current_time
+            return
         self.keep_data[track_id]['record_remain'].append(current_remain)
         # 進行預測
         predict_remain_time = regression_predict_remain_time(model, self.keep_data[track_id]['record_remain'])
