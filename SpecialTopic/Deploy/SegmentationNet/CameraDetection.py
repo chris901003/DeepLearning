@@ -11,11 +11,11 @@ def parse_args():
     # 相機FPS值
     parser.add_argument('--fps', type=int, default=30)
     # onnx檔案保存路徑
-    parser.add_argument('--onnx-file', type=str, default=None)
+    parser.add_argument('--onnx-file', type=str, default='SegmentationNetM_Simplify.onnx')
     # tensorrt引擎保存路徑
-    parser.add_argument('--trt-engine-path', type=str, default='SegmentationNetNano.trt')
+    parser.add_argument('--trt-engine-path', type=str, default='SegmentationNetM_Simplify.trt')
     # 保存tensorrt引擎序列化後的資料
-    parser.add_argument('--save-engine-path', type=str, default='SegmentationNetNano.trt')
+    parser.add_argument('--save-engine-path', type=str, default=None)
     # 是否要啟用fp16模式進行推理
     parser.add_argument('--fp16', action='store_false')
     args = parser.parse_args()

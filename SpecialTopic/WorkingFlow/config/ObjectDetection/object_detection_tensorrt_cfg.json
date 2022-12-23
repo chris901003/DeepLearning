@@ -1,6 +1,6 @@
 {
   "type": "YoloxObjectDetectionTensorRT",
-  "onnx_or_trt_file": "./checkpoint/object_detection/tensorrt/2022_11_7.trt",
+  "onnx_or_trt_file": "./checkpoint/object_detection/tensorrt/2022_12_20_3757.trt",
   "classes_path": "./prepare/object_detection_classes.txt",
   "confidence": 0.7,
   "nms": 0.3,

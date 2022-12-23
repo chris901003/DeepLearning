@@ -339,8 +339,7 @@ def parse_args():
     # 分割類別數
     parser.add_argument('--num-classes', type=int, default=3)
     # 訓練權重路徑
-    parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\SegformerFoodAndNot'
-                                                          r'FoodDetection\1024_eval_0.pth')
+    parser.add_argument('--pretrained', type=str, default=r'C:\DeepLearning\SpecialTopic\WorkingFlow\checkpoint\remain\segformer_0_2022_10_24.pth')
     args = parser.parse_args()
     return args
 
@@ -357,7 +356,8 @@ def main():
     images = torch.randn(1, 3, 512, 512).to(device)
     preds = model(images)
     print(preds.shape)
-    dynamic_axes = {'images_seg': {2: 'image_height', 3: 'image_width'}}
+    # dynamic_axes = {'images_seg': {2: 'image_height', 3: 'image_width'}}
+    dynamic_axes = None
     input_names = ['images_seg']
     output_names = ['outputs_seg']
     with torch.no_grad():
@@ -492,6 +492,6 @@ def image_draw(origin_image, seg_pred, palette, classes, opacity, with_class=Fal
 
 if __name__ == '__main__':
     print('Starting create Segmentation net [m] onnx')
-    # main()
-    # simplify_onnx()
-    test_tensorrt()
+    main()
+    simplify_onnx()
+    # test_tensorrt()

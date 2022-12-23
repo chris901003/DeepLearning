@@ -18,7 +18,6 @@ def args_parser():
                                                            r'C:\Dataset\vedio\Rice\1206_dinner_2.mov',
                                                            r'C:\Dataset\vedio\Rice\1210_dinner.mp4'], nargs='+')
     # 保存資料路徑
-    parser.add_argument('--save-path', type=str, default='remain')
     args = parser.parse_args()
     return args
 

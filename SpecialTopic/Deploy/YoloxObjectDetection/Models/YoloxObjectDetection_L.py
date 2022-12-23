@@ -241,6 +241,18 @@ def load_pretrained(model, pretrained_path):
     return model
 
 
+def simplify_onnx():
+    from onnxsim import simplify
+    import onnx
+    onnx_path = 'YoloxObjectDetectionL.onnx'
+    output_path = 'YoloxObjectDetectionL_Simplify.onnx'
+    onnx_model = onnx.load(onnx_path)  # load onnx model
+    model_simp, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx.save(model_simp, output_path)
+    print('finished exporting onnx')
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     # 分類類別數
@@ -275,3 +287,4 @@ def main():
 if __name__ == '__main__':
     print('Starting create Yolox object detection [l] onnx')
     main()
+    simplify_onnx()
