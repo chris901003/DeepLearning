@@ -14,9 +14,9 @@ def parse_args():
     # 分類類別文件
     parser.add_argument('--classes-file', type=str, default=r'C:\Dataset\FoodDetectionDataset\classes.txt')
     # Onnx檔案位置
-    parser.add_argument('--onnx-file', type=str, default='YoloxObjectDetectionL.onnx')
+    parser.add_argument('--onnx-file', type=str, default='YoloxObjectDetectionL_Simplify.onnx')
     # TensorRT序列化保存位置，如果有提供就可以直接使用已經序列化好的引擎，可以大幅度減少構建時間
-    parser.add_argument('--trt-engine-path', type=str, default='YoloxObjectDetectionL.trt')
+    parser.add_argument('--trt-engine-path', type=str, default='YoloxObjectDetectionL_Simplify.trt')
     # 將本次的引擎序列化後保存下來
     parser.add_argument('--save-trt-engine-path', type=str, default=None)
     # 是否使用fp16模式，使用後可以提升速度但是會減少精度
@@ -29,7 +29,8 @@ def main():
     args = parse_args()
     tensorrt_engine = create_tensorrt_engine(onnx_file_path=args.onnx_file, fp16_mode=args.fp16,
                                              trt_engine_path=args.trt_engine_path,
-                                             save_trt_engine_path=args.save_trt_engine_path)
+                                             save_trt_engine_path=args.save_trt_engine_path,
+                                             trt_logger_level='VERBOSE')
     classes_name, num_classes = get_classes(args.classes_file)
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FPS, args.fps)

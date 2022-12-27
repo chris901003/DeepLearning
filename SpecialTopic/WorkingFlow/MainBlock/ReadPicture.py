@@ -16,12 +16,14 @@ class ReadPicture:
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromKinectV2 import ReadPictureFromKinectV2
         from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromVideoWithDepth import \
             ReadPictureFromVideoWithDepth
+        from SpecialTopic.WorkingFlow.SubBlock.ReadPicture.ReadPictureFromD435 import ReadPictureFromD435
         support_module = {
             'ReadPictureFromVideo': ReadPictureFromVideo,
             'ReadPictureFromCamera': ReadPictureFromCamera,
             'ReadPictureFromPi': ReadPictureFromPi,
             'ReadPictureFromKinectV2': ReadPictureFromKinectV2,
-            'ReadPictureFromVideoWithDepth': ReadPictureFromVideoWithDepth
+            'ReadPictureFromVideoWithDepth': ReadPictureFromVideoWithDepth,
+            'ReadPictureFromD435': ReadPictureFromD435
         }
         cfg = parser_cfg(cfg_path)
         self.cfg = cfg

@@ -1,7 +1,7 @@
 {
   "step1": {
     "type": "ReadPicture",
-    "config_file": "./config/ReadPicture/get_deep_picture_from_kinectv2.json",
+    "config_file": "./config/ReadPicture/get_deep_picture_from_d435.json",
     "call_api": ["get_single_picture"],
     "inputs": [[]],
     "outputs": [["image", "image_type", "deep_image", "deep_draw"]]

@@ -518,6 +518,8 @@ class SegformerWithDeepRemainDetection:
         topk_freq = min(len(value_count), topk_freq)
         # 獲取出現前k次的index
         value_idx = np.argpartition(value_count, -topk_freq)[-topk_freq:]
+        # 將value直為0的地方過濾掉，D435有點太誠實了
+        value_idx = [idx for idx in value_idx if depth_value[idx] != 0]
         # 將選出來的index取均值
         avg = depth_value[value_idx].mean()
         return avg
