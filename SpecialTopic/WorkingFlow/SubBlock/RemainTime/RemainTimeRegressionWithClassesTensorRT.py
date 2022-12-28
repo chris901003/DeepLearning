@@ -1,3 +1,7 @@
+try:
+    import tensorrt
+except ImportError:
+    raise ImportError('無法使用TensorRT模組，需先安裝完TensorRT才可以使用該模塊')
 import time
 import os
 import copy
@@ -5,21 +9,14 @@ import json
 from functools import partial
 from typing import Union
 from SpecialTopic.ST.utils import get_cls_from_dict
-from SpecialTopic.RemainEatingTime.RegressionModel.api import init_model as regression_model_init
-from SpecialTopic.RemainEatingTime.RegressionModel.api import predict_remain_time as regression_predict_remain_time
+from SpecialTopic.Deploy.RemainEatingTimeRegression.api import create_tensorrt_engine as regression_model_init
+from SpecialTopic.Deploy.RemainEatingTimeRegression.api import tensorrt_engine_detect_remain_time as \
+    regression_trt_predict_remain_time
 
 
-class RemainTimeRegressionWithClass:
+class RemainTimeRegressionWithClassTensorRT:
     def __init__(self, regression_cfg_file, keep_frame=200, input_reduce_mode: Union[str, dict] = 'Default',
                  output_reduce_mode: Union[dict, str] = 'Default', remain_project_remain_time=None):
-        """ 根據不同類別會使用不同的回歸模型權重
-        Args:
-            regression_cfg_file: 回歸模型初始化設定資料
-            keep_frame: 一個追蹤對象可以丟失多少幀才會被移除
-            input_reduce_mode: 一段時間內的剩餘量輸入的緩衝方式
-            output_reduce_mode: 輸出剩餘時間的緩衝方式
-            remain_project_remain_time: 可以設定將哪些類別映射到哪個回歸模型，如果不設定就是依照原始值
-        """
         support_input_reduce_mode = {
             'mean': self.input_reduce_mean,
             'topk': self.input_reduce_topk,
@@ -42,6 +39,7 @@ class RemainTimeRegressionWithClass:
         self.output_reduce = partial(output_reduce_func, **output_reduce_mode)
         self.regression_cfg_file = regression_cfg_file
         self.models = self.create_regression_models()
+        # models = dict('idx': dict('trt_model': tensorRT Model, 'settings': Setting))
         self.remain_project_remain_time = remain_project_remain_time
         self.keep_frame = keep_frame
         self.keep_data = dict()
@@ -60,36 +58,36 @@ class RemainTimeRegressionWithClass:
         }
         self.logger = None
 
-    def create_regression_models(self):
-        """ 根據不同目標類別會使用不同的回歸模型，這裡會將該模型的setting資料放到模型本身當中
-        """
-        assert os.path.exists(self.regression_cfg_file), '指定的回歸模型設定檔案不存在'
-        with open(self.regression_cfg_file, 'r') as f:
-            regression_models_info = json.load(f)
-        models_dict = dict()
-        for idx, model_dict in regression_models_info.items():
-            models_dict[idx] = None
-            model_cfg = model_dict.get('model_cfg', None)
-            pretrained_path = model_dict.get('pretrained_path', None)
-            setting_path = model_dict.get('setting_path', None)
-            if model_cfg is None:
-                model_cfg = 'Default'
-            if pretrained_path is None or (not os.path.exists(pretrained_path)):
-                print(f'Remain Time model id: {idx}, 沒有訓練權重資料，將無法使用')
-                continue
-            if setting_path is None or (not os.path.exists(setting_path)):
-                print(f'Remain Time model id: {idx}, 沒有提供setting資料，無法使用')
-                continue
-            model = regression_model_init(cfg=model_cfg, setting_path=setting_path, pretrained=pretrained_path)
-            models_dict[idx] = model
-            settings = self.parse_setting(setting_path)
-            model.settings = settings
-        return models_dict
-
     @staticmethod
     def parse_setting(setting_path):
         with open(setting_path, 'r') as f:
             return json.load(f)
+
+    def create_regression_models(self):
+        assert os.path.exists(self.regression_cfg_file), '指定的回歸模型設定檔案不存在'
+        with open(self.regression_cfg_file, 'r') as f:
+            regression_model_info = json.load(f)
+        models_dict = dict()
+        for idx, model_dict in regression_model_info.items():
+            # 先把model_dict當中的資料清空
+            model_dict[idx] = None
+            onnx_file_path = model_dict.get('onnx_file_path', None)
+            trt_file_path = model_dict.get('trt_file_path', None)
+            save_trt_file_path = model_dict.get('save_trt_file_path', None)
+            setting_file_path = model_dict.get('setting_path', None)
+            if not os.path.exists(onnx_file_path) and not os.path.exists(trt_file_path):
+                # 如果沒有onnx且沒有trt檔案就會跳過該模型的建置
+                continue
+            # 如果沒有獲取到setting會報錯
+            assert os.path.exists(setting_file_path), f'{idx}未獲取setting檔案，路徑錯誤或是沒有收集齊'
+            settings = self.parse_setting(setting_file_path)
+            try:
+                trt_engine = regression_model_init(onnx_file_path=onnx_file_path, trt_engine_path=trt_file_path,
+                                                   save_trt_engine_path=save_trt_file_path)
+                models_dict[idx] = dict(trt_model=trt_engine, settings=settings)
+            except RuntimeError:
+                print(f'Create TensorRT Error at {idx}')
+        return models_dict
 
     def __call__(self, call_api, inputs=None):
         self.current_time = time.time()
@@ -165,8 +163,8 @@ class RemainTimeRegressionWithClass:
             self.keep_data[track_id]['remain_buffer'] = list()
             return
         # 獲取對應模型以及該模型的setting資料
-        model = self.models[category_id]
-        settings = model.settings
+        model_info = self.models[category_id]
+        model, settings = model_info['trt_model'], model_info['settings']
         time_gap = settings['time_gap']
         # 檢查是否有到該模型的time-gap時間
         if self.current_time - self.keep_data[track_id]['last_predict_time'] < time_gap:
@@ -185,7 +183,8 @@ class RemainTimeRegressionWithClass:
             return
         self.keep_data[track_id]['record_remain'].append(current_remain)
         # 進行預測
-        predict_remain_time = regression_predict_remain_time(model, self.keep_data[track_id]['record_remain'])
+        predict_remain_time = regression_trt_predict_remain_time(
+            tensorrt_engine=model, food_remain=self.keep_data[track_id]['record_remain'], settings=settings)
         current_remain_time = int(predict_remain_time[current_index])
         if current_remain_time >= settings['remain_time_start_value']:
             self.logger['logger'].warning(f'Track ID: {track_id}, Remain Time Detection超出可預期範圍，請查看情況')
@@ -272,12 +271,15 @@ def test():
     logger.addHandler(handler)
     logger = dict(logger=logger, sub_log=None)
     input_reduce_cfg = dict(type='range', scope=(0.4, 0.7))
-    model = RemainTimeRegressionWithClass(regression_cfg_file='/Users/huanghongyan/Documents/DeepLearning/Special'
-                                                              'Topic/WorkingFlow/prepare/remain_time/regression/regre'
-                                                              'ssion_model_cfg.json',
-                                          input_reduce_mode=input_reduce_cfg)
+    model = RemainTimeRegressionWithClassTensorRT(
+        regression_cfg_file='./prepare/remain_time/regression/regression_model_trt_cfg.json',
+        input_reduce_mode=input_reduce_cfg
+    )
     model.logger = logger
-    remains = np.random.randint(low=0, high=100, size=100)
+    remains = [100, 99, 98, 97, 96, 94, 93, 92, 92, 90, 90, 90, 89, 89, 89, 88, 88, 87, 87, 83, 82, 82, 82, 80, 79, 78,
+              76, 76, 76, 75, 75, 74, 74, 72, 72, 69, 68, 67, 66, 66, 65, 64, 64, 62, 62, 60, 60, 59, 56, 55, 55, 55,
+              54, 54, 52, 51, 50, 47, 46, 43, 43, 42, 41, 40, 40, 39, 38, 38, 36, 35, 34, 34, 34, 33, 32, 32, 31, 30,
+              29, 26, 24, 23, 23, 23, 23, 21, 16, 16, 15, 14, 13, 11, 11, 9, 9, 7, 7, 6, 5]
     remains = sorted(np.array(remains))[::-1]
     track_object_info = [{
         'position': [],
