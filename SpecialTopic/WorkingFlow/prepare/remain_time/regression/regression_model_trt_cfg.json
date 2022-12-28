@@ -1,0 +1,62 @@
+{
+  "0": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_0.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_0.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_0.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_0.json"
+  },
+  "1": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_1.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_1.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_1.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_1.json"
+  },
+  "2": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_2.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_2.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_2.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_2.json"
+  },
+  "3": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_3.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_3.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_3.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_3.json"
+  },
+  "4": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_4.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_4.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_4.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_4.json"
+  },
+  "5": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_5.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_5.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_5.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_5.json"
+  },
+  "6": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_6.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_6.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_6.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_6.json"
+  },
+  "7": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_7.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_7.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_7.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_7.json"
+  },
+  "8": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_8.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_8.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_8.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_8.json"
+  },
+  "9": {
+    "onnx_file_path": "./prepare/remain_time/regression/onnx/regression_9.onnx",
+    "trt_file_path": "./prepare/remain_time/regression/trt/regression_9.trt",
+    "save_trt_file_path": "./prepare/remain_time/regression/trt/regression_9.trt",
+    "setting_path": "./prepare/remain_time/regression/setting/setting_9.json"
+  }
+}

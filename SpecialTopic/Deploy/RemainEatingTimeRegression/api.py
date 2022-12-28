@@ -134,6 +134,7 @@ def tensorrt_engine_detect_remain_time(tensorrt_engine, food_remain, settings: U
     if isinstance(settings, str):
         settings = parser_setting(settings)
     food_remain = transform_food_remain_to_model_input(food_remain, settings)
+    food_remain = food_remain.astype(np.long)
     tensorrt_inputs = {input_name: np.ascontiguousarray(food_remain)}
     tensorrt_preds = tensorrt_engine.inference(input_datas=tensorrt_inputs, output_shapes=[output_shapes])[0]
     tensorrt_preds = np.transpose(tensorrt_preds, (0, 2, 1))
