@@ -24,7 +24,7 @@ class RemainEatingTimeRegressionNet(nn.Module):
         outs = list()
         for time_step in range(r_out.size(1)):
             outs.append(self.cls(r_out[:, time_step, :]))
-        return torch.stack(outs, dim=1), h_state, c_state
+        return torch.stack(outs, dim=1)
 
 
 def parse_args():
@@ -83,11 +83,10 @@ def get_mock_data(settings):
     return remain
 
 
-def simplify_onnx():
+def simplify_onnx(onnx_path='RemainEatingTimeRegression.onnx',
+                  output_path='RemainEatingTimeRegression_Simplify.onnx'):
     from onnxsim import simplify
     import onnx
-    onnx_path = 'RemainEatingTimeRegression.onnx'
-    output_path = 'RemainEatingTimeRegression_Simplify.onnx'
     onnx_model = onnx.load(onnx_path)
     model_simp, check = simplify(onnx_model)
     assert check, 'Simplified ONNX model could not be validated'
