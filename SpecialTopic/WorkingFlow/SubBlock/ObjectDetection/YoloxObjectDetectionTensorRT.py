@@ -12,7 +12,7 @@ from SpecialTopic.ST.utils import get_classes
 
 class YoloxObjectDetectionTensorRT:
     def __init__(self, onnx_or_trt_file, classes_path, confidence, nms, filter_edge, cfg, fp16=True,
-                 input_name='images', output_shapes='Default',
+                 inference_image_size=(640, 640), input_name='images', output_shapes='Default',
                  average_time_check=30, track_percentage=0.5, tracking_keep_period=120, last_track_send=5,
                  average_time_output=1, intersection_area_threshold=0.2, new_track_box=60,
                  new_track_box_max_interval=3, device='auto'):
@@ -20,6 +20,7 @@ class YoloxObjectDetectionTensorRT:
         Args:
             onnx_or_trt_file: 提供onnx檔案或是TenorRT序列化引擎資料
             fp16: TensorRT推理過程是否使用fp16
+            inference_image_size: 進行推理時的圖像大小
             classes_path: 類別資訊
             confidence: 置信度閾值
             nms: 非極大值抑制處理閾值
@@ -45,6 +46,9 @@ class YoloxObjectDetectionTensorRT:
             assert '傳入資料需要是onnx檔案或是trt檔案'
         if output_shapes == 'Default':
             self.output_shapes = [(1, 14, 80, 80), (1, 14, 40, 40), (1, 14, 20, 20)]
+        if inference_image_size == (320, 320) or inference_image_size == [320, 320]:
+            self.output_shapes = [(1, 14, 40, 40), (1, 14, 20, 20), (1, 14, 10, 10)]
+        self.inference_image_size = inference_image_size
         self.input_name = input_name
         self.classes_path = classes_path
         self.confidence = confidence
@@ -123,6 +127,7 @@ class YoloxObjectDetectionTensorRT:
         image = self.change_to_ndarray(image, image_type)
         self.image_height, self.image_width = image.shape[:2]
         detect_results = tensorrt_engine_detect_image(self.object_detection_model, image=image,
+                                                      input_shape=self.inference_image_size,
                                                       num_classes=self.num_classes, confidence=self.confidence,
                                                       nms_iou=self.nms, input_name=self.input_name,
                                                       output_shapes=self.output_shapes)

@@ -7,8 +7,8 @@ from SpecialTopic.ST.utils import get_classes
 
 class YoloxObjectDetection:
     def __init__(self, phi, pretrained, classes_path, confidence, nms, filter_edge, cfg,
-                 average_time_check=30, track_percentage=0.5, tracking_keep_period=120, last_track_send=5,
-                 average_time_output=1, intersection_area_threshold=0.2, new_track_box=60,
+                 inference_image_size=(640, 640), average_time_check=30, track_percentage=0.5, tracking_keep_period=120,
+                 last_track_send=5, average_time_output=1, intersection_area_threshold=0.2, new_track_box=60,
                  new_track_box_max_interval=3, device='auto'):
         """
         Args:
@@ -19,6 +19,7 @@ class YoloxObjectDetection:
             nms: 非極大值抑制處理閾值
             filter_edge: 是否要將邊緣匡去除
             cfg: 設定模型的config資料，如果沒有特別就填寫 'auto'
+            inference_image_size: 推理時的圖像大小
             average_time_check: 設定一段時間，這部分會與track_percentage配合，決定是否要將追蹤對象資料往下傳到下個階段
             track_percentage: 指定期間內有追蹤到多少比例的幀數就會被傳送出去，指定時間就會是average_time_check
             tracking_keep_period: 最多可以讓正在追蹤的對象追丟多少幀
@@ -35,6 +36,7 @@ class YoloxObjectDetection:
         self.nms = nms
         self.filter_edge = filter_edge
         self.cfg = cfg
+        self.inference_image_size = inference_image_size
         self.average_time_check = average_time_check
         self.track_percentage = track_percentage
         self.tracking_keep_period = tracking_keep_period
@@ -109,8 +111,8 @@ class YoloxObjectDetection:
         image = self.change_to_ndarray(image, image_type)
         self.image_height, self.image_width = image.shape[:2]
         detect_results = detect_image(model=self.object_detection_model, device=self.device, image_info=image,
-                                      input_shape=[640, 640], num_classes=self.num_classes, confidence=self.confidence,
-                                      nms_iou=self.nms)
+                                      input_shape=self.inference_image_size, num_classes=self.num_classes,
+                                      confidence=self.confidence, nms_iou=self.nms)
         labels, scores, boxes = detect_results
         for label, score, box in zip(labels, scores, boxes):
             ymin, xmin, ymax, xmax = box

@@ -259,6 +259,8 @@ def parse_args():
     parser.add_argument('--num-classes', type=int, default=9)
     # 訓練權重資料位置，這裡一定要加載進去
     parser.add_argument('--pretrained', type=str, default=r'C:\Checkpoint\YoloxFoodDetection\900_yolox_850.25.pth')
+    # 在推理時的圖像大小，目前只支援正方形大小
+    parser.add_argument('--inference-image-size', type=int, default=640)
     args = parser.parse_args()
     return args
 
@@ -269,12 +271,13 @@ def main():
     如果生成設備上有gpu就會產生出可以支持gpu版本的onnx檔案
     """
     args = parse_args()
+    inference_image_size = args.inference_image_size
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = YoloxObjectDetection(num_classes=args.num_classes)
     model = load_pretrained(model, args.pretrained)
     model.eval()
     model = model.to(device)
-    images = torch.randn(1, 3, 640, 640).to(device)
+    images = torch.randn(1, 3, inference_image_size, inference_image_size).to(device)
     # preds = model(images)
     input_names = ['images']
     output_names = ['outputs']

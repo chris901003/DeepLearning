@@ -14,6 +14,8 @@ def parse_args():
     parser.add_argument('--pretrained', type=str, default='none')
     # 模型大小
     parser.add_argument('--phi', type=str, default='l')
+    # 進行推理時的圖像大小
+    parser.add_argument('--inference-image-size', type=int, default=[640, 640], nargs='+')
     # 類別txt文件位置
     parser.add_argument('--classes-path', type=str, default='./classes.txt')
     # 置信度閾值
@@ -37,7 +39,7 @@ def main():
         ret, img = cap.read()
         if ret:
             img_height, img_width = img.shape[:2]
-            results = detect_image(model, device, img, [640, 640], num_classes,
+            results = detect_image(model, device, img, args.inference_image_size, num_classes,
                                    confidence=args.confidence, nms_iou=args.nms_iou)
             labels, scores, bboxes = results
             for label, score, bbox in zip(labels, scores, bboxes):
