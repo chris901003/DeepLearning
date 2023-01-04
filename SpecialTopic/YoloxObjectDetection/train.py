@@ -24,9 +24,10 @@ def parse_args():
     # 一個batch大小
     parser.add_argument('--batch-size', type=int, default=2)
     # 類別文件
-    parser.add_argument('--classes-path', default='./classes.txt', type=str)
+    parser.add_argument('--classes-path', default=r'C:\Dataset\FoodDetectionDataset\SideDish\classes.txt', type=str)
     # 訓練標註文件
-    parser.add_argument('--train-annotation-path', default='./2012_train.txt', type=str)
+    parser.add_argument('--train-annotation-path', default=r'C:\Dataset\FoodDetectionDataset\SideDish\2012_train.txt',
+                        type=str)
     # 驗證標註文件
     parser.add_argument('--val-annotation-path', default='none',
                         type=str)
@@ -45,7 +46,7 @@ def parse_args():
     # 最大學習率
     parser.add_argument('--Init-lr', type=float, default=1e-2)
     # 使用的優化器 ['sgd', 'adam']
-    parser.add_argument('--optimizer_type', type=str, default='sgd')
+    parser.add_argument('--optimizer_type', type=str, default='adam')
     # 優化器相關超參數
     parser.add_argument('--momentum', type=float, default=0.937)
     parser.add_argument('--weight-decay', type=float, default=5e-4)
@@ -68,7 +69,8 @@ def parse_args():
     # 多少個Epoch會進行mAP計算
     parser.add_argument('--eval-period', type=int, default=1)
     # mAP計算需使用的coco文件
-    parser.add_argument('--coco-json-file', type=str, default='./val2017.json')
+    parser.add_argument('--coco-json-file', type=str,
+                        default=r'C:\Dataset\FoodDetectionDataset\SideDish\self_annotation.json')
     # DataLoader使用的cpu數量
     parser.add_argument('--num-workers', type=int, default=1)
 

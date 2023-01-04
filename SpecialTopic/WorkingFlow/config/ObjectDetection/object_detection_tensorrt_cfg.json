@@ -6,6 +6,7 @@
   "nms": 0.3,
   "filter_edge": false,
   "cfg": "auto",
+  "inference_image_size": [640, 640],
   "average_time_check": 30,
   "track_percentage": 0.5,
   "tracking_keep_period": 120,
