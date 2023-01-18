@@ -146,7 +146,9 @@ class YoloxWithSegmentationToTrack:
                                             input_shape=self.inference_image_size, num_classes=self.yolox_num_classes,
                                             confidence=self.confidence, nms_iou=self.nms)
         labels, scores, boxes = detect_results
-        for label, score, box in zip(labels, scores, boxes):
+        self.mark_tracking_miss_to_true()
+        not_track_index = list()
+        for idx, (label, score, box) in enumerate(zip(labels, scores, boxes)):
             ymin, xmin, ymax, xmax = box
             if self.filter_edge:
                 if xmin < 0 or ymin < 0 or xmax >= self.image_width or ymax >= self.image_height:
@@ -158,6 +160,7 @@ class YoloxWithSegmentationToTrack:
             match_track_index = self.matching_tracking_box(box, self.yolox_classes_name[label])
             clip_box = (xmin, ymin, xmax, ymax)
             food_box_iou = self.get_food_box_iou(image, clip_box, self.yolox_classes_name[label])
+            self.logger['logger'].debug(f'xmin: {xmin}, ymin: {ymin}, iou: {food_box_iou}')
             if match_track_index != -1:
                 self.logger['logger'].info(f'Track ID: [ {match_track_index} ] match')
                 self.track_box[match_track_index]['position'] = np.append(
@@ -169,41 +172,56 @@ class YoloxWithSegmentationToTrack:
                 self.track_box[match_track_index]['last_miss'] = False
                 self.track_box[match_track_index]['last_iou'] = food_box_iou
             else:
-                match_waiting_track_index = self.match_waiting_track(box, self.yolox_classes_name[label])
-                if match_waiting_track_index != -1:
-                    self.logger['logger'].debug(f'Waiting track index: [ {match_waiting_track_index} ]')
-                    self.waiting_track_box[match_waiting_track_index]['position'] = np.append(
-                        self.waiting_track_box[match_waiting_track_index]['position'], current_position, axis=0)
-                    self.waiting_track_box[match_waiting_track_index]['scores'] = np.append(
-                        self.waiting_track_box[match_waiting_track_index]['scores'], score)
-                    self.waiting_track_box[match_waiting_track_index]['frame_index'] = np.append(
-                        self.waiting_track_box[match_waiting_track_index]['frame_index'], self.current_frame_index)
-                    self.waiting_track_box[match_waiting_track_index]['last_miss'] = False
-                    self.waiting_track_box[match_waiting_track_index]['last_iou'] = food_box_iou
+                not_track_index.append(idx)
+        for idx, (label, score, box) in enumerate(zip(labels, scores, boxes)):
+            if idx not in not_track_index:
+                continue
+            ymin, xmin, ymax, xmax = box
+            if self.filter_edge:
+                if xmin < 0 or ymin < 0 or xmax >= self.image_width or ymax >= self.image_height:
+                    continue
+            else:
+                xmin, ymin = max(0, xmin), max(0, ymin)
+                xmax, ymax = min(self.image_width, xmax), min(self.image_height, ymax)
+            current_position = np.array([[xmin, ymin, xmax, ymax]])
+            clip_box = (xmin, ymin, xmax, ymax)
+            food_box_iou = self.get_food_box_iou(image, clip_box, self.yolox_classes_name[label])
+            self.logger['logger'].debug(f'xmin: {xmin}, ymin: {ymin}, iou: {food_box_iou}')
+            match_waiting_track_index = self.match_waiting_track(box, self.yolox_classes_name[label])
+            if match_waiting_track_index != -1:
+                self.logger['logger'].debug(f'Waiting track index: [ {match_waiting_track_index} ]')
+                self.waiting_track_box[match_waiting_track_index]['position'] = np.append(
+                    self.waiting_track_box[match_waiting_track_index]['position'], current_position, axis=0)
+                self.waiting_track_box[match_waiting_track_index]['scores'] = np.append(
+                    self.waiting_track_box[match_waiting_track_index]['scores'], score)
+                self.waiting_track_box[match_waiting_track_index]['frame_index'] = np.append(
+                    self.waiting_track_box[match_waiting_track_index]['frame_index'], self.current_frame_index)
+                self.waiting_track_box[match_waiting_track_index]['last_miss'] = False
+                self.waiting_track_box[match_waiting_track_index]['last_iou'] = food_box_iou
+            else:
+                # 這裡會透過iou將沒有匹配上的盡量匹配到正在追蹤的對象上
+                iou_match_track_index = self.iou_match_track(food_box_iou, self.yolox_classes_name[label])
+                if iou_match_track_index != -1:
+                    self.logger['logger'].info(f'Track ID: [ {iou_match_track_index} ] match')
+                    self.track_box[iou_match_track_index]['position'] = np.append(
+                        self.track_box[iou_match_track_index]['position'], current_position, axis=0)
+                    self.track_box[iou_match_track_index]['scores'] = np.append(
+                        self.track_box[iou_match_track_index]['scores'], score)
+                    self.track_box[iou_match_track_index]['frame_index'] = np.append(
+                        self.track_box[iou_match_track_index]['frame_index'], self.current_frame_index)
+                    self.track_box[iou_match_track_index]['last_miss'] = False
+                    self.track_box[iou_match_track_index]['last_iou'] = food_box_iou
                 else:
-                    # 這裡會透過iou將沒有匹配上的盡量匹配到正在追蹤的對象上
-                    iou_match_track_index = self.iou_match_track(food_box_iou, self.yolox_classes_name[label])
-                    if iou_match_track_index != -1:
-                        self.logger['logger'].info(f'Track ID: [ {iou_match_track_index} ] match')
-                        self.track_box[iou_match_track_index]['position'] = np.append(
-                            self.track_box[iou_match_track_index]['position'], current_position, axis=0)
-                        self.track_box[iou_match_track_index]['scores'] = np.append(
-                            self.track_box[iou_match_track_index]['scores'], score)
-                        self.track_box[iou_match_track_index]['frame_index'] = np.append(
-                            self.track_box[iou_match_track_index]['frame_index'], self.current_frame_index)
-                        self.track_box[iou_match_track_index]['last_miss'] = False
-                        self.track_box[iou_match_track_index]['last_iou'] = food_box_iou
-                    else:
-                        self.logger['logger'].debug(
-                            f'Add new waiting track target at position [ {current_position.tolist()} ]')
-                        # 沒有匹配到正在等待追蹤的目標，自立一個新的等待追蹤目標
-                        waiting_track_info = {
-                            'position': current_position, 'scores': np.array([score]),
-                            'label': self.yolox_classes_name[label],
-                            'frame_index': np.array([self.current_frame_index])
-                        }
-                        # 添加到等待追蹤的列表當中
-                        self.waiting_track_box.append(waiting_track_info)
+                    self.logger['logger'].debug(
+                        f'Add new waiting track target at position [ {current_position.tolist()} ]')
+                    # 沒有匹配到正在等待追蹤的目標，自立一個新的等待追蹤目標
+                    waiting_track_info = {
+                        'position': current_position, 'scores': np.array([score]),
+                        'label': self.yolox_classes_name[label],
+                        'frame_index': np.array([self.current_frame_index])
+                    }
+                    # 添加到等待追蹤的列表當中
+                    self.waiting_track_box.append(waiting_track_info)
         # 移除原先正在追蹤但是現在跟丟的目標
         self.remove_tracking_box()
         # 移除等待加入追蹤的標註框
@@ -231,6 +249,12 @@ class YoloxWithSegmentationToTrack:
             return image
         else:
             raise ValueError(f'目前沒有實作{image_type}的轉換方式')
+
+    def mark_tracking_miss_to_true(self):
+        """ 先將當前所有正在追蹤對象設定成未追蹤到
+        """
+        for track_index, track_box_info in self.track_box.items():
+            track_box_info['last_miss'] = True
 
     def get_food_box_iou(self, image, box, label):
         """
@@ -307,7 +331,7 @@ class YoloxWithSegmentationToTrack:
             label = track_box_info['label']
             if current_label != label:
                 continue
-            iou = track_index['last_iou']
+            iou = track_box_info['last_iou']
             if abs(iou - current_iou) < min_diff_iou:
                 match_id = track_index
                 min_diff_iou = abs(iou - current_iou)
@@ -444,6 +468,7 @@ def test():
     # last_track_send = 5, average_time_output = 1, intersection_area_threshold = 0.2, new_track_box = 60,
     # new_track_box_max_interval = 3, device = 'auto', yolox_label_to_segformer_json = 'transform.json'
     import logging
+    import time
     yolox_pretrained = r'C:\DeepLearning\SpecialTopic\WorkingFlow\checkpoint\object_detection\yolox_l_fake_rice.pth'
     yolox_class = r'C:\DeepLearning\SpecialTopic\WorkingFlow\prepare\object_detection_classes.txt'
     segformer_module_file = r'C:\DeepLearning\SpecialTopic\WorkingFlow\prepare\remain_segformer_module_cfg.json'
@@ -463,9 +488,11 @@ def test():
     logger = dict(logger=logger, sub_log=None)
     module.logger = logger
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FPS, 0.5)
     while True:
         ret, image = cap.read()
         if ret:
+            time.sleep(1)
             image_height, image_width = image.shape[:2]
             _, results, detect_results = module(call_api='detect_single_picture',
                                                 input=dict(image=image, image_type='ndarray', force_get_detect=True))
