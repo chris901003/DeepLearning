@@ -1,0 +1,66 @@
+{
+  "step1": {
+    "type": "ReadPicture",
+    "config_file": "./config/ReadPicture/get_deep_picture_from_d435.json",
+    "call_api": ["get_single_picture"],
+    "inputs": [[]],
+    "outputs": [["image", "image_type", "deep_image", "deep_draw"]]
+  },
+  "step2": {
+    "type": "ObjectDetection",
+    "config_file": "./config/ObjectDetection/object_detection_cfg.json",
+    "call_api": ["detect_single_picture"],
+    "inputs": [["image", "image_type", "deep_image", "deep_draw"]],
+    "outputs": [["image", "track_object_info"]]
+  },
+  "step3": {
+    "type": "ObjectClassifyToRemainClassify",
+    "config_file": "./config/ObjectClassifyToRemainClassify/object_classify_to_remain_classify_cfg.json",
+    "call_api": ["get_remain_id"],
+    "inputs": [["image", "track_object_info", "using_dict_name"]],
+    "outputs": [["image", "track_object_info"]]
+  },
+  "step4": {
+    "type": "RemainDetection",
+    "config_file": "./config/RemainDetection/remain_segformer_detection_with_deep_information.json",
+    "call_api": ["remain_detection"],
+    "inputs": [["image", "track_object_info"]],
+    "outputs": [["image", "track_object_info"]]
+  },
+  "log_config": {
+    "log_link": "app",
+    "level": "critical",
+    "format": ["asctime", "name", "levelname", "message"],
+    "handler": [
+      {
+        "type": "FileHandler",
+        "save_path": "./log/app/log_save.log",
+        "level": "critical",
+        "format": null
+      },
+      {
+        "type": "StreamHandler",
+        "level": "critical",
+        "format": null
+      }
+    ],
+    "sub_log": [
+      {
+        "log_link": "ReadPicture",
+        "level": "critical"
+      },
+      {
+        "log_link": "ObjectDetection",
+        "level": "critical"
+      },
+      {
+        "log_link": "ObjectClassifyToRemainClassify",
+        "level": "critical"
+      },
+      {
+        "log_link": "RemainDetection",
+        "level": "critical"
+      }
+    ]
+  }
+}
