@@ -32,6 +32,8 @@ def main():
         assert tracking_object is not None, f'給定流程有問題'
         rgb_image = image_info.get('rgb_image')
         deep_color_image = image_info.get('deep_draw')
+        if np.min(rgb_image) == 0 and np.max(rgb_image) == 0:
+            break
         if len(tracking_object) != 0:
             assert len(tracking_object) == 1, '追蹤對象超出一個，請將環境清理乾淨'
             tracking_object = tracking_object[0]
@@ -41,12 +43,18 @@ def main():
                 remain = round(remain, 5)
                 remain_record_list.append(remain)
             assert remain is not None, '資料當中不包含剩餘量資料，請確認是否傳出資料錯誤'
+            track_id = tracking_object.get('track_id', None)
+            assert track_id is not None, '須提供當前追蹤ID'
             position = tracking_object.get('position', None)
             assert position is not None, '為獲取目標位置'
-            xmin, ymin, xmax, ymax = position.astype(np.int)
+            xmin, ymin, xmax, ymax = position.astype(np.int32)
             xmin, ymin, xmax, ymax = max(0, xmin), max(0, ymin), min(image_width, xmax), min(image_height, ymax)
             cv2.rectangle(rgb_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
             cv2.rectangle(deep_color_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
+            cv2.putText(rgb_image, f"ID : {track_id}",
+                        (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            cv2.putText(deep_color_image, f"ID : {track_id}",
+                        (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(rgb_image, f"Remain : {remain}",
                         (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(deep_color_image, f"Remain : {remain}",

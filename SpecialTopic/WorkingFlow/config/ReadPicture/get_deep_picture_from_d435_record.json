@@ -1,0 +1,6 @@
+{
+  "type": "ReadPictureFromD435Record",
+  "rgbd_record_config_path": "C:\\DeepLearning\\SpecialTopic\\WorkingFlow\\prepare\\read_picture\\rgbd_record_config.json",
+  "deep_color_range": [800, 900],
+  "fps": 30
+}
