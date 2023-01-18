@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import json
+import os
 from matplotlib import pyplot as plt
 
 
@@ -77,8 +78,25 @@ class ReadPictureFromD435Record:
 
     @staticmethod
     def parse_json_file(json_file_path):
+        """ 讀取影片路徑資料
+        """
         with open(json_file_path, 'r') as f:
-            return json.load(f)
+            video_info = json.load(f)
+        rgb_video_path_list = list()
+        deep_info_path_list = list()
+        rgb_video_folder_path = video_info.get('rgb_path')
+        deep_info_folder_path = video_info.get('deep_path')
+        for file_name in os.listdir(rgb_video_folder_path):
+            if '_rgb.avi' in file_name and os.path.splitext(file_name)[1] == '.avi':
+                rgb_video_path = os.path.join(rgb_video_folder_path, file_name)
+                rgb_video_path_list.append(rgb_video_path)
+        for file_name in os.listdir(deep_info_folder_path):
+            if '_depth.npy' in file_name and os.path.splitext(file_name)[1] == '.npy':
+                depth_info_path = os.path.join(deep_info_folder_path, file_name)
+                deep_info_path_list.append(depth_info_path)
+        assert len(rgb_video_path_list) == len(deep_info_path_list), '檔案中的彩色影片與深度資訊數量不對襯'
+        result = dict(rgb_path=rgb_video_path_list, deep_path=deep_info_path_list)
+        return result
 
     @staticmethod
     def get_mock_image():

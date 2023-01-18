@@ -1,10 +1,4 @@
 {
-  "rgb_path": [
-    "C:\\Dataset\\rgbd_video\\test1_rgb.avi",
-    "C:\\Dataset\\rgbd_video\\test2_rgb.avi"
-  ],
-  "deep_path": [
-    "C:\\Dataset\\rgbd_video\\test1_depth.npy",
-    "C:\\Dataset\\rgbd_video\\test2_depth.npy"
-  ]
+  "rgb_path": "C:\\Dataset\\rgbd_video",
+  "deep_path": "C:\\Dataset\\rgbd_video"
 }
