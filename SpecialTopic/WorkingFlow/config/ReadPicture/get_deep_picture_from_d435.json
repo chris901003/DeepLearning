@@ -2,7 +2,7 @@
   "type": "ReadPictureFromD435",
   "deep_color_palette": "jet_r",
   "deep_color_palette_range": 255,
-  "deep_color_range": [1000, 1100],
+  "deep_color_range": [800, 900],
   "rgb_height": 480,
   "rgb_width": 640,
   "deep_height": 480,
