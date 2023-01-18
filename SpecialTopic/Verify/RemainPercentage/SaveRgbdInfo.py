@@ -1,13 +1,14 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import time
 import argparse
 import os
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file-name', '-f', type=str, default='test1')
+    parser.add_argument('--file-name', '-f', type=str, default='test')
     parser.add_argument('--height', type=int, default=480)
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--fps', type=int, default=30)
@@ -25,16 +26,19 @@ def main():
     config = rs.config()
     config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, fps)
     config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, fps)
-    # 對齊深度與彩色圖實力化對象
+    # 對齊深度與彩色圖實例化對象
     align_to_color = rs.align(rs.stream.color)
 
-    color_path = os.path.join('C:/Dataset/rgbd_video/', file_name + '_rgb.avi')
-    depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name + '_depth')
+    current_phase = 0
+
+    color_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_rgb.avi')
+    depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_depth')
     color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps, (image_width, image_height), 1)
 
     pipeline.start(config)
     is_depth = 0
     depth_image = np.zeros((image_height, image_width, 1), dtype='uint16')
+    pTime = time.time()
 
     try:
         while True:
@@ -56,6 +60,21 @@ def main():
             color_image = np.asanyarray(color_frame.get_data())
             color_writer.write(color_image)
 
+            if depth_image.shape[2] == 900:
+                np.save(depth_path, depth_image)
+                color_writer.release()
+                depth_image = np.zeros((image_height, image_width, 1), dtype='uint16')
+                is_depth = 0
+                current_phase += 1
+                color_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_rgb.avi')
+                depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_depth')
+                color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps,
+                                               (image_width, image_height), 1)
+
+            cTime = time.time()
+            fps = 1 / (cTime - pTime)
+            pTime = cTime
+            cv2.putText(color_image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
             cv2.imshow('Stream', color_image)
             if cv2.waitKey(1) == ord("q"):
                 break
