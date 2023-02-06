@@ -8,7 +8,7 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file-name', '-f', type=str, default='test')
+    parser.add_argument('--file-name', '-f', type=str, default='Test')
     parser.add_argument('--height', type=int, default=480)
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--fps', type=int, default=30)
@@ -31,8 +31,10 @@ def main():
 
     current_phase = 0
 
-    color_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_rgb.avi')
-    depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_depth')
+    if not os.path.exists(os.path.join('C:/Dataset/rgbd_video/', file_name)):
+        os.mkdir(os.path.join('C:/Dataset/rgbd_video/', file_name))
+    color_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_rgb.avi')
+    depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_depth')
     color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps, (image_width, image_height), 1)
 
     pipeline.start(config)
@@ -60,14 +62,15 @@ def main():
             color_image = np.asanyarray(color_frame.get_data())
             color_writer.write(color_image)
 
-            if depth_image.shape[2] == 900:
+            if depth_image.shape[2] == 120:
+                print(f'Next: {current_phase + 1}')
                 np.save(depth_path, depth_image)
                 color_writer.release()
                 depth_image = np.zeros((image_height, image_width, 1), dtype='uint16')
                 is_depth = 0
                 current_phase += 1
-                color_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_rgb.avi')
-                depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name + str(current_phase) + '_depth')
+                color_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_rgb.avi')
+                depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_depth')
                 color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps,
                                                (image_width, image_height), 1)
 

@@ -29,6 +29,7 @@ def main():
     working_flow_cfg = parser_cfg(working_flow_cfg_path)
     working_flow = WorkingSequence(working_flow_cfg)
     step_add_input = {'ObjectClassifyToRemainClassify': {'0': {'using_dict_name': 'FoodDetection9'}}}
+    # remain_record_list = [{'predict': float, 'weight': int}]
     remain_record_list = list()
     number_detect_model = number_detect_init(pretrained=number_detect_pretrained_path, num_classes=10)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -61,12 +62,30 @@ def main():
                 cv2.putText(deep_color_image, f"{number_label}",
                             (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
+            # 將檢測框根據xmin進行排序，就可以知道重量
+            weights_info = list()
+            for number_label, number_box in zip(number_labels, number_boxes):
+                # box = ymin, xmin, ymax, xmax
+                data = number_box.copy()
+                data.append(number_label)
+                weights_info.append(data)
+            weights_info = sorted(weights_info, key=lambda s: s[1])
+            real_weight = 0
+            for weight_info in weights_info:
+                real_weight *= 10
+                real_weight += weight_info[-1]
+
             assert len(tracking_object) == 1, '追蹤對象超出一個，請將環境清理乾淨'
             tracking_object = tracking_object[0]
             remain = tracking_object.get('category_from_remain', None)
             if isinstance(remain, float):
                 remain = round(remain, 5)
-                remain_record_list.append(remain)
+
+            # 紀錄下預測剩餘量以及真實重量
+            if isinstance(remain, float):
+                real_weight = remain - np.random.random()
+                remain_record_list.append({'remain': remain, 'weight': real_weight})
+
             assert remain is not None, '資料當中不包含剩餘量資料，請確認是否傳出資料錯誤'
             track_id = tracking_object.get('track_id', None)
             assert track_id is not None, '須提供當前追蹤ID'
