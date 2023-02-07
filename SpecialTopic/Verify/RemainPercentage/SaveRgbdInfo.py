@@ -4,6 +4,7 @@ import cv2
 import time
 import argparse
 import os
+import mss
 
 
 def parse_args():
@@ -49,6 +50,9 @@ def main():
             frames = align_to_color.process(frames)
             depth_frame = frames.get_depth_frame()
             color_frame = frames.get_color_frame()
+            sct = mss.mss()
+            monitor = {"top": 0, "left": 0, "width": 200, "height": 200}
+            image = np.array(sct.grab(monitor))[..., :3]
             if not depth_frame or not color_frame:
                 continue
 
@@ -60,6 +64,7 @@ def main():
                 depth_image = np.append(depth_image, np.asanyarray(depth_frame.get_data()).reshape(
                     image_height, image_width, 1), axis=2)
             color_image = np.asanyarray(color_frame.get_data())
+            color_image[:200, :200, :3] = image[:200, :200, :3]
             color_writer.write(color_image)
 
             if depth_image.shape[2] == 120:
