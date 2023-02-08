@@ -9,20 +9,34 @@ import mss
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file-name', '-f', type=str, default='Test')
+    # 保存路徑
+    parser.add_argument('--folder-name', '-f', type=str, default='./RgbdSave/Test')
+    # 深度攝影機獲取圖像高寬
     parser.add_argument('--height', type=int, default=480)
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--fps', type=int, default=30)
+
+    # 設定螢幕擷取範圍資訊，這裡需要提供[左上角以及高寬資訊]
+    parser.add_argument('--screen-xmin', '-x', type=int, default=0)
+    parser.add_argument('--screen-ymin', '-y', type=int, default=0)
+    parser.add_argument('--screen-height', type=int, default=200)
+    parser.add_argument('--screen-width', type=int, default=200)
     args = parser.parse_args()
     return args
 
 
 def main():
+    # 獲取args資料
     args = parse_args()
-    file_name = args.file_name
+    folder_name = args.folder_name
     image_height = args.height
     image_width = args.width
     fps = args.fps
+    screen_xmin = args.screen_xmin
+    screen_ymin = args.screen_ymin
+    screen_height = args.screen_height
+    screen_width = args.screen_width
+
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, fps)
@@ -32,15 +46,13 @@ def main():
 
     current_phase = 0
 
-    if not os.path.exists(os.path.join('C:/Dataset/rgbd_video/', file_name)):
-        os.mkdir(os.path.join('C:/Dataset/rgbd_video/', file_name))
-    color_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_rgb.avi')
-    depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_depth')
+    if not os.path.exists(folder_name):
+        os.mkdir(folder_name)
+    color_path = os.path.join(folder_name, 'RgbView.avi')
     color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps, (image_width, image_height), 1)
+    depth_path = os.path.join(folder_name, f'Depth_{current_phase}')
 
     pipeline.start(config)
-    is_depth = 0
-    depth_image = np.zeros((image_height, image_width, 1), dtype='uint16')
     pTime = time.time()
 
     try:
@@ -51,33 +63,22 @@ def main():
             depth_frame = frames.get_depth_frame()
             color_frame = frames.get_color_frame()
             sct = mss.mss()
-            monitor = {"top": 0, "left": 0, "width": 200, "height": 200}
-            image = np.array(sct.grab(monitor))[..., :3]
+            monitor = {"top": screen_ymin, "left": screen_xmin,
+                       "width": screen_width, "height": screen_height}
+            screen_image = np.array(sct.grab(monitor))[..., :3]
             if not depth_frame or not color_frame:
                 continue
 
-            # convert images to numpy arrays
-            if is_depth == 0:
-                depth_image[:, :, 0] = np.asanyarray(depth_frame.get_data())
-                is_depth = 1
-            else:
-                depth_image = np.append(depth_image, np.asanyarray(depth_frame.get_data()).reshape(
-                    image_height, image_width, 1), axis=2)
-            color_image = np.asanyarray(color_frame.get_data())
-            color_image[:200, :200, :3] = image[:200, :200, :3]
-            color_writer.write(color_image)
+            # 深度資訊保存方式
+            depth_image = np.asanyarray(depth_frame.get_data())
+            np.save(depth_path, depth_image)
+            current_phase += 1
+            depth_path = os.path.join(folder_name, f'Depth_{current_phase}')
 
-            if depth_image.shape[2] == 120:
-                print(f'Next: {current_phase + 1}')
-                np.save(depth_path, depth_image)
-                color_writer.release()
-                depth_image = np.zeros((image_height, image_width, 1), dtype='uint16')
-                is_depth = 0
-                current_phase += 1
-                color_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_rgb.avi')
-                depth_path = os.path.join('C:/Dataset/rgbd_video/', file_name, str(current_phase) + '_depth')
-                color_writer = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'XVID'), fps,
-                                               (image_width, image_height), 1)
+            color_image = np.asanyarray(color_frame.get_data())
+            color_image[args.screen_ymin: args.screen_height, args.screen_xmin: args.screen_width, :3] = \
+                screen_image[args.screen_ymin: args.screen_height, args.screen_xmin: args.screen_width, :3]
+            color_writer.write(color_image)
 
             cTime = time.time()
             fps = 1 / (cTime - pTime)
@@ -87,7 +88,6 @@ def main():
             if cv2.waitKey(1) == ord("q"):
                 break
     finally:
-        np.save(depth_path, depth_image)
         color_writer.release()
         pipeline.stop()
 

@@ -74,11 +74,13 @@ def change_weight_to_remain(record_info):
         assert weight is not None
         min_weight = min(min_weight, weight)
         max_weight = max(max_weight, weight)
+    # 如果要使用此方法得出最大重量需要在影片最前面時就是初始重量
+    max_weight = record_info[0]['weight']
     weight_diff = max_weight - min_weight
     for info in record_info:
         remain = info.get('remain', None)
         weight = info.get('weight', None)
-        real_remain = (weight - min_weight) / weight_diff
+        real_remain = (weight - min_weight) / weight_diff * 100
         results.append(dict(predict_remain=remain, real_remain=real_remain))
     return results
 
@@ -89,22 +91,22 @@ def cal_l1_diff(record_info, part_time):
     results = list()
     results_sec = list()
     count = 0
-    tmp_l2_dif = list()
+    tmp_l1_dif = list()
     for info in record_info:
         predict_remain = info.get('predict_remain', None)
         real_remain = info.get('real_remain', None)
         assert predict_remain is not None and real_remain is not None, '變換過程有錯誤'
         diff = abs(predict_remain - real_remain)
-        tmp_l2_dif.append(diff)
+        tmp_l1_dif.append(diff)
         results_sec.append(diff)
         count += 1
         if count == part_time:
-            avg_diff = sum(tmp_l2_dif) / len(tmp_l2_dif)
+            avg_diff = sum(tmp_l1_dif) / len(tmp_l1_dif)
             results.append(avg_diff)
-            tmp_l2_dif = list()
+            tmp_l1_dif = list()
             count = 0
     if count != 0:
-        avg_diff = math.sqrt(sum(tmp_l2_dif)) / len(tmp_l2_dif)
+        avg_diff = sum(tmp_l1_dif) / len(tmp_l1_dif)
         results.append(avg_diff)
     return results, results_sec
 
@@ -115,22 +117,22 @@ def cal_l2_diff(record_info, part_time):
     results = list()
     results_sec = list()
     count = 0
-    tmp_l1_dif = list()
+    tmp_l2_dif = list()
     for info in record_info:
         predict_remain = info.get('predict_remain', None)
         real_remain = info.get('real_remain', None)
         assert predict_remain is not None and real_remain is not None, '變換過程有錯誤'
-        diff = (predict_remain - real_remain) + (predict_remain - real_remain)
-        tmp_l1_dif.append(diff)
+        diff = (predict_remain - real_remain) * (predict_remain - real_remain)
+        tmp_l2_dif.append(diff)
         results_sec.append(diff)
         count += 1
         if count == part_time:
-            avg_diff = math.sqrt(sum(tmp_l1_dif)) / len(tmp_l1_dif)
+            avg_diff = math.sqrt(sum(tmp_l2_dif)) / len(tmp_l2_dif)
             results.append(avg_diff)
-            tmp_l1_dif = list()
+            tmp_l2_dif = list()
             count = 0
     if count != 0:
-        avg_diff = sum(tmp_l1_dif) / len(tmp_l1_dif)
+        avg_diff = math.sqrt(sum(tmp_l2_dif)) / len(tmp_l2_dif)
         results.append(avg_diff)
     return results, results_sec
 
@@ -176,7 +178,7 @@ def main():
     record_info = change_weight_to_remain(record_info)
     total_time = len(record_info)
     part_time = math.ceil(total_time / num_part)
-    time_line = [part_time * i for i in range(num_part)]
+    time_line = [part_time * i for i in range(num_part + 1)]
     time_line[-1] = min(time_line[-1], total_time)
     time_line = parse_time_line(time_line)
     l1_diff_part, l1_diff_sec = cal_l1_diff(record_info, part_time)
@@ -206,18 +208,18 @@ def main():
         json.dump(save_info, f, indent=4)
 
     # 畫圖表
-    fig = plt.figure(figsize=(6, 7))
+    _ = plt.figure(figsize=(11, 7))
     plt.subplot(511)
     plt.title('剩餘量', fontproperties=font1)
-    plt.plot(predict_remain_list, 'bo--', label='預估')
-    plt.plot(real_remain_list, 'ro-', label='真實')
+    plt.plot(predict_remain_list, 'b--', label='預估')
+    plt.plot(real_remain_list, 'r-', label='真實')
     plt.legend(loc='best', prop=font1)
     plt.subplot(512)
     plt.title('L1', fontproperties=font1)
-    plt.plot(l1_diff_sec, 'bo-')
+    plt.plot(l1_diff_sec, 'b-')
     plt.subplot(513)
     plt.title('L2', fontproperties=font1)
-    plt.plot(l2_diff_sec, 'bo-')
+    plt.plot(l2_diff_sec, 'b-')
     plt.subplot(514)
     plt.title('L1 分段', fontproperties=font1)
     plt.bar(x=range(len(l1_diff_part)), height=l1_diff_part, tick_label=time_line, color='g')

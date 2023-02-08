@@ -83,7 +83,6 @@ def main():
 
             # 紀錄下預測剩餘量以及真實重量
             if isinstance(remain, float):
-                real_weight = remain - np.random.random()
                 remain_record_list.append({'remain': remain, 'weight': real_weight})
 
             assert remain is not None, '資料當中不包含剩餘量資料，請確認是否傳出資料錯誤'
@@ -96,13 +95,13 @@ def main():
             cv2.rectangle(rgb_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
             cv2.rectangle(deep_color_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 3)
             cv2.putText(rgb_image, f"ID : {track_id}",
-                        (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        (30, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(deep_color_image, f"ID : {track_id}",
-                        (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        (30, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(rgb_image, f"Remain : {remain}",
-                        (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        (30, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(deep_color_image, f"Remain : {remain}",
-                        (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        (30, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
         cv2.imshow('RGB Video', rgb_image)
         cv2.imshow('Deep Color Video', deep_color_image)
         if cv2.waitKey(1) == ord('q'):
