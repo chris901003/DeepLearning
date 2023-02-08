@@ -3,6 +3,7 @@ import cv2
 import json
 import os
 from matplotlib import pyplot as plt
+import functools
 
 
 class ReadPictureFromD435Record:
@@ -19,10 +20,9 @@ class ReadPictureFromD435Record:
         self.fps = fps
         self.deep_color_palette = plt.cm.get_cmap('jet_r')(range(255))
         self.deep_color_range = deep_color_range
-        self.num_videos = len(self.rgb_record_path)
+        self.num_videos = len(self.deep_record_path)
         self.current_frame_index = 0
-        self.current_video_index = 0
-        self.current_video = cv2.VideoCapture(self.rgb_record_path[0])
+        self.current_video = cv2.VideoCapture(self.rgb_record_path)
         self.current_deep = np.load(self.deep_record_path[0])
         self.isEnd = False
         self.support_api = {
@@ -44,7 +44,7 @@ class ReadPictureFromD435Record:
         rgb_ret, rgb_img = self.current_video.read()
         if not rgb_ret:
             raise RuntimeError('讀取影像資料錯誤')
-        deep_info = self.current_deep[:, :, self.current_frame_index]
+        deep_info = self.current_deep
         deep_color_info = self.color_deep_info(deep_info=deep_info)
         self.update_new_frame()
         return rgb_img, 'ndarray', deep_info, deep_color_info
@@ -67,14 +67,10 @@ class ReadPictureFromD435Record:
         """ 更新下張圖的位置，如果當前片段已經讀取完畢就會自動載入下一段
         """
         self.current_frame_index += 1
-        if self.current_frame_index == self.current_deep.shape[2]:
-            self.current_frame_index = 0
-            self.current_video_index += 1
-            if self.current_video_index == self.num_videos:
-                self.isEnd = True
-            else:
-                self.current_video = cv2.VideoCapture(self.rgb_record_path[self.current_video_index])
-                self.current_deep = np.load(self.deep_record_path[self.current_video_index])
+        if self.current_frame_index == self.num_videos:
+            self.isEnd = True
+        else:
+            self.current_deep = np.load(self.deep_record_path[self.current_frame_index])
 
     @staticmethod
     def parse_json_file(json_file_path):
@@ -82,20 +78,18 @@ class ReadPictureFromD435Record:
         """
         with open(json_file_path, 'r') as f:
             video_info = json.load(f)
-        rgb_video_path_list = list()
-        deep_info_path_list = list()
+
         rgb_video_folder_path = video_info.get('rgb_path')
         deep_info_folder_path = video_info.get('deep_path')
-        for file_name in os.listdir(rgb_video_folder_path):
-            if '_rgb.avi' in file_name and os.path.splitext(file_name)[1] == '.avi':
-                rgb_video_path = os.path.join(rgb_video_folder_path, file_name)
-                rgb_video_path_list.append(rgb_video_path)
+        rgb_video_path = os.path.join(rgb_video_folder_path, 'RgbView.avi')
+        assert os.path.exists(rgb_video_path), f'指定的RGB影片路徑{rgb_video_path}不存在'
+        deep_info_path_list = list()
         for file_name in os.listdir(deep_info_folder_path):
-            if '_depth.npy' in file_name and os.path.splitext(file_name)[1] == '.npy':
+            if 'Depth_' in file_name and os.path.splitext(file_name)[1] == '.npy':
                 depth_info_path = os.path.join(deep_info_folder_path, file_name)
                 deep_info_path_list.append(depth_info_path)
-        assert len(rgb_video_path_list) == len(deep_info_path_list), '檔案中的彩色影片與深度資訊數量不對襯'
-        result = dict(rgb_path=rgb_video_path_list, deep_path=deep_info_path_list)
+        deep_info_path_list.sort(key=functools.cmp_to_key(file_name_comp))
+        result = dict(rgb_path=rgb_video_path, deep_path=deep_info_path_list)
         return result
 
     @staticmethod
@@ -104,6 +98,19 @@ class ReadPictureFromD435Record:
         mock_deep_image = np.zeros((480, 640), dtype=np.uint16)
         mock_deep_color_image = np.zeros((480, 640, 3), dtype=np.uint8)
         return mock_rgb_image, 'ndarray', mock_deep_image, mock_deep_color_image
+
+
+def file_name_comp(lhs, rhs):
+    lhs_basename = os.path.basename(lhs)
+    rhs_basename = os.path.basename(rhs)
+    lhs_basename = os.path.splitext(lhs_basename)[0]
+    rhs_basename = os.path.splitext(rhs_basename)[0]
+    lhs_idx = int(lhs_basename.split('_')[1])
+    rhs_idx = int(rhs_basename.split('_')[1])
+    if lhs_idx < rhs_idx:
+        return -1
+    else:
+        return 1
 
 
 def test():
