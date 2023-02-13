@@ -6,7 +6,7 @@ import json
 from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties as font
 
-font1 = font(fname="./NotoSansTC-Bold.otf")
+font1 = font(fname='./NotoSansTC-Bold.otf')
 
 
 def parse_args():
@@ -17,9 +17,10 @@ def parse_args():
     parser.add_argument('--fps', type=int, default=30)
     # 保存預測剩餘量以及真實重量的檔案位置
     parser.add_argument('--save-info-path', '-f', type=str, default='./ResultSave/record.npy')
-    # 最終驗證結果數據存放位置
-    parser.add_argument('--result-save-path', '-s', type=str, default='./VerifyResult')
-    parser.add_argument('--save-name', type=str, default='result')
+    # 最終驗證結果數據存放的根目錄位置
+    parser.add_argument('--result-save-root-folder', '-s', type=str, default='./VerifyResult')
+    # 根目錄下的資料夾名稱
+    parser.add_argument('--save-folder-name', type=str, default='Test')
     args = parser.parse_args()
     return args
 
@@ -108,7 +109,8 @@ def cal_l1_diff(record_info, part_time):
     if count != 0:
         avg_diff = sum(tmp_l1_dif) / len(tmp_l1_dif)
         results.append(avg_diff)
-    return results, results_sec
+    total_avg = sum(results_sec) / len(results_sec)
+    return results, results_sec, total_avg
 
 
 def cal_l2_diff(record_info, part_time):
@@ -134,7 +136,8 @@ def cal_l2_diff(record_info, part_time):
     if count != 0:
         avg_diff = math.sqrt(sum(tmp_l2_dif)) / len(tmp_l2_dif)
         results.append(avg_diff)
-    return results, results_sec
+    total_avg = math.sqrt(sum(results_sec)) / len(results_sec)
+    return results, results_sec, total_avg
 
 
 def parse_time_line(time_line):
@@ -161,14 +164,17 @@ def main():
     num_part = args.num_part
     fps = args.fps
     save_info_path = args.save_info_path
-    result_save_path = args.result_save_path
-    save_name = args.save_name
+    result_save_root_folder = args.result_save_root_folder
+    save_folder_name = args.save_folder_name
+    save_folder_name = os.path.join(result_save_root_folder, save_folder_name)
     assert num_part > 0, '須至少大於一段'
     assert fps > 0, 'FPS值至少大於0'
     if not os.path.exists(save_info_path):
         raise RuntimeError('無法取得指定路徑的檔案')
-    if not os.path.exists(result_save_path):
-        os.mkdir(result_save_path)
+    if not os.path.exists(result_save_root_folder):
+        os.mkdir(result_save_root_folder)
+    if not os.path.exists(save_folder_name):
+        os.mkdir(save_folder_name)
     record_info = parse_npy(save_info_path)
     record_info = record_info.tolist()
     assert isinstance(record_info, list), '保存資料格式錯誤，外層需要是list格式'
@@ -181,8 +187,8 @@ def main():
     time_line = [part_time * i for i in range(num_part + 1)]
     time_line[-1] = min(time_line[-1], total_time)
     time_line = parse_time_line(time_line)
-    l1_diff_part, l1_diff_sec = cal_l1_diff(record_info, part_time)
-    l2_diff_part, l2_diff_sec = cal_l2_diff(record_info, part_time)
+    l1_diff_part, l1_diff_sec, l1_tot_avg = cal_l1_diff(record_info, part_time)
+    l2_diff_part, l2_diff_sec, l2_tot_avg = cal_l2_diff(record_info, part_time)
 
     # 將剩餘量資料提取出來
     predict_remain_list = list()
@@ -195,39 +201,45 @@ def main():
         real_remain_list.append(real_remain)
 
     # 將結果保存到Json檔案中
-    json_save_path = os.path.join(result_save_path, save_name + '.json')
+    json_save_path = os.path.join(save_folder_name, 'raw_info.json')
     save_info = dict(
         predict_remain=predict_remain_list,
         real_remain=real_remain_list,
         l1_sec=l1_diff_sec,
-        l1_part=l1_diff_part,
         l2_sec=l2_diff_sec,
-        l2_part=l2_diff_part
+        l1_part=l1_diff_part,
+        l2_part=l2_diff_part,
+        l1_tot_avg=l1_tot_avg,
+        l2_tot_avg=l2_tot_avg
     )
     with open(json_save_path, 'w') as f:
         json.dump(save_info, f, indent=4)
 
     # 畫圖表
     _ = plt.figure(figsize=(11, 7))
-    plt.subplot(511)
+    plt.subplot(611)
     plt.title('剩餘量', fontproperties=font1)
     plt.plot(predict_remain_list, 'b--', label='預估')
     plt.plot(real_remain_list, 'r-', label='真實')
     plt.legend(loc='best', prop=font1)
-    plt.subplot(512)
+    plt.subplot(612)
     plt.title('L1', fontproperties=font1)
     plt.plot(l1_diff_sec, 'b-')
-    plt.subplot(513)
+    plt.subplot(613)
     plt.title('L2', fontproperties=font1)
     plt.plot(l2_diff_sec, 'b-')
-    plt.subplot(514)
+    plt.subplot(614)
     plt.title('L1 分段', fontproperties=font1)
     plt.bar(x=range(len(l1_diff_part)), height=l1_diff_part, tick_label=time_line, color='g')
-    plt.subplot(515)
+    plt.subplot(615)
     plt.title('L2 分段', fontproperties=font1)
     plt.bar(x=range(len(l2_diff_part)), height=l2_diff_part, tick_label=time_line, color='r')
+    plt.subplot(616)
+    plt.title('總平均', fontproperties=font1)
+    plt.text(0, 0.5, f'L1 Avg: {l1_tot_avg}', fontsize=15, color='blue')
+    plt.text(0, 0, f'L2 Avg: {l2_tot_avg}', fontsize=15, color='blue')
     plt.tight_layout()
-    chart_save_path = os.path.join(result_save_path, save_name + '.jpg')
+    chart_save_path = os.path.join(save_folder_name, 'chart.jpg')
     plt.savefig(chart_save_path)
     plt.show()
 

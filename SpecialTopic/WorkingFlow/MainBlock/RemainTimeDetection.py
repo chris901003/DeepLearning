@@ -20,13 +20,16 @@ class RemainTimeDetection:
             import RemainTimeRegressionWithClass
         from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeRegressionWithClassesTensorRT \
             import RemainTimeRegressionWithClassTensorRT
+        from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeRegressionWithClassesForVerify \
+            import RemainTimeRegressionWithClassForVerify
         support_module = {
             'RemainTimeTransformerDetection': RemainTimeTransformerDetection,
             'RemainTimeTransformerDetectionTensorRT': RemainTimeTransformerDetectionTensorRT,
             'RemainTimeCalculate': RemainTimeCalculate,
             'RemainTimeRegression': RemainTimeRegression,
             'RemainTimeRegressionWithClass': RemainTimeRegressionWithClass,
-            'RemainTimeRegressionWithClassTensorRT': RemainTimeRegressionWithClassTensorRT
+            'RemainTimeRegressionWithClassTensorRT': RemainTimeRegressionWithClassTensorRT,
+            'RemainTimeRegressionWithClassForVerify': RemainTimeRegressionWithClassForVerify
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)
