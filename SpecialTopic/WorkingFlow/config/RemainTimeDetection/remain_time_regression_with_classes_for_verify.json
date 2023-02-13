@@ -1,0 +1,18 @@
+{
+  "type": "RemainTimeRegressionWithClassForVerify",
+  "regression_cfg_file": "./prepare/remain_time/regression/regression_model_cfg.json",
+  "input_reduce_mode": {
+    "type": "range", "scope": [0.3, 0.7]
+  },
+  "output_reduce_mode": "Default",
+  "remain_project_remain_time": {
+    "0": "0", "1": "1", "2": "2", "3": "3", "4": "4", "5": "5",
+    "6": "6", "7": "7", "8": "8", "9": "9"
+  },
+  "time_detect_pretrained": "C:\\Checkpoint\\YoloxWeightNumberDetection\\stopwatch.pth",
+  "time_detect_classes": 11,
+  "screen_xmin": 0,
+  "screen_ymin": 0,
+  "screen_height": 200,
+  "screen_width": 200
+}
