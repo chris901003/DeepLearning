@@ -159,13 +159,22 @@ def parse_time_line(time_line):
     return results
 
 
-def main():
-    args = parse_args()
-    num_part = args.num_part
-    fps = args.fps
-    save_info_path = args.save_info_path
-    result_save_root_folder = args.result_save_root_folder
-    save_folder_name = args.save_folder_name
+def main(args=None):
+    if args is None:
+        args = parse_args()
+        num_part = args.num_part
+        fps = args.fps
+        save_info_path = args.save_info_path
+        result_save_root_folder = args.result_save_root_folder
+        save_folder_name = args.save_folder_name
+    else:
+        num_part = args.get('numPart', None)
+        fps = args.get('fps', None)
+        save_info_path = args.get('saveInfoPath', None)
+        result_save_root_folder = args.get('resultSaveRootFolder', None)
+        save_folder_name = args.get('saveFolderName', None)
+        assert num_part is not None and fps is not None and result_save_root_folder is not None and \
+               save_folder_name is not None, '缺少資料'
     save_folder_name = os.path.join(result_save_root_folder, save_folder_name)
     assert num_part > 0, '須至少大於一段'
     assert fps > 0, 'FPS值至少大於0'
