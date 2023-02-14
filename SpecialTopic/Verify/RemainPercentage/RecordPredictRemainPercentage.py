@@ -21,13 +21,23 @@ def parse_args():
     return args
 
 
-def main():
-    args = parse_args()
-    working_flow_cfg_path = args.WorkingFlowCfgPath
-    result_save_path = args.ResultSavePath
-    number_detect_pretrained_path = args.DetectNumberPretrainPath
-    working_flow_cfg = parser_cfg(working_flow_cfg_path)
-    working_flow = WorkingSequence(working_flow_cfg)
+def main(args=None):
+    if args is None:
+        args = parse_args()
+    if isinstance(args, dict):
+        working_flow_cfg_path = args.get('WorkingFlowCfgPath', None)
+        result_save_path = args.get('ResultSavePath', None)
+        number_detect_pretrained_path = args.get('DetectNumberPretrainPath', None)
+        assert working_flow_cfg_path is not None and result_save_path is not None and \
+               number_detect_pretrained_path is not None, '資料有缺少'
+        working_flow = args.get('workingFlow', None)
+        assert working_flow is not None, '須提供working_flow實例化對象'
+    else:
+        working_flow_cfg_path = args.WorkingFlowCfgPath
+        result_save_path = args.ResultSavePath
+        number_detect_pretrained_path = args.DetectNumberPretrainPath
+        working_flow_cfg = parser_cfg(working_flow_cfg_path)
+        working_flow = WorkingSequence(working_flow_cfg)
     step_add_input = {'ObjectClassifyToRemainClassify': {'0': {'using_dict_name': 'FoodDetection9'}}}
     # remain_record_list = [{'predict': float, 'weight': int}]
     remain_record_list = list()
