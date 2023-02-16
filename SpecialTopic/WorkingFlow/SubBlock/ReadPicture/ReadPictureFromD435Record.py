@@ -81,7 +81,10 @@ class ReadPictureFromD435Record:
 
         rgb_video_folder_path = video_info.get('rgb_path')
         deep_info_folder_path = video_info.get('deep_path')
-        rgb_video_path = os.path.join(rgb_video_folder_path, 'RgbView.avi')
+        if os.path.isdir(rgb_video_folder_path):
+            rgb_video_path = os.path.join(rgb_video_folder_path, 'RgbView.avi')
+        else:
+            rgb_video_path = rgb_video_folder_path
         assert os.path.exists(rgb_video_path), f'指定的RGB影片路徑{rgb_video_path}不存在'
         deep_info_path_list = list()
         for file_name in os.listdir(deep_info_folder_path):
