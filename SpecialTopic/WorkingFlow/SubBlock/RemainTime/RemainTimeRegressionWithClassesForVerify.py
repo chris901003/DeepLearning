@@ -173,8 +173,8 @@ class RemainTimeRegressionWithClassForVerify:
         rgb_image = image.get('rgb_image', None)
         assert rgb_image is not None, '無法取的彩色圖像資料'
         # 只使用有效的畫面
-        # 目前這裡會因為與標註時的大小落差過大導致失誤，所以目前先將整個畫面都拿去判斷
-        # rgb_image = rgb_image[self.screen_ymin:self.screen_height, self.screen_xmin:self.screen_width, :3]
+        rgb_image = rgb_image[self.screen_ymin:self.screen_ymin + self.screen_height,
+                    self.screen_xmin:self.screen_xmin + self.screen_width, :3]
         stopwatch_result = time_image_detect(self.stopwatch_detection_model, self.device, rgb_image,
                                              input_shape=(640, 640),
                                              num_classes=self.time_detect_classes, confidence=0.8)

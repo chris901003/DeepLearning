@@ -11,6 +11,8 @@ from SpecialTopic.ST.utils import get_logger
 import numpy as np
 from torch.backends import cudnn
 from utils_fit import fit_one_epoch
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 # On develop02 writing
 
 
