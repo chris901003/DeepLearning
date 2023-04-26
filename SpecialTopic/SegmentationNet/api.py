@@ -54,7 +54,7 @@ def init_module(model_type, phi, pretrained='none', num_classes=150, device='aut
         support_platte = {
             'ADE20KDataset': ADE20KDataset,
             'FoodAndNotFood': FoodAndNotFood,
-            'DonburiRiceAndNotFood':DonburiRiceAndNotFood,
+            'DonburiRiceAndNotFood': DonburiRiceAndNotFood,
             'Seg9AndNotFood': Seg9AndNotFood,
             'FoodWithSpoon': FoodWithSpoon
         }

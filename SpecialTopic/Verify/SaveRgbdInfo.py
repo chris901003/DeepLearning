@@ -13,7 +13,7 @@ def parse_args():
     # 根目錄位置
     parser.add_argument('--root-folder-path', type=str, default='./VideoSave')
     # 資料夾名稱
-    parser.add_argument('--folder-name', type=str, default='Test')
+    parser.add_argument('--folder-name', type=str, default='Donburi22')
     # 影片寬度(通常不用調整)
     parser.add_argument('--width', type=int, default=640)
     # 影片高度(通常不用調整)
@@ -26,16 +26,16 @@ def parse_args():
     parser.add_argument('--depth-max-height', default=None)
 
     # 碼表在螢幕上的哪個位置
-    parser.add_argument('--stopwatch-xmin', type=int, default=953)
-    parser.add_argument('--stopwatch-ymin', type=int, default=192)
-    parser.add_argument('--stopwatch-xmax', type=int, default=1161)
-    parser.add_argument('--stopwatch-ymax', type=int, default=243)
+    parser.add_argument('--stopwatch-xmin', type=int, default=122)
+    parser.add_argument('--stopwatch-ymin', type=int, default=172)
+    parser.add_argument('--stopwatch-xmax', type=int, default=396)
+    parser.add_argument('--stopwatch-ymax', type=int, default=250)
 
     # 重量在螢幕上的位置
-    parser.add_argument('--weight-xmin', type=int, default=1381)
-    parser.add_argument('--weight-ymin', type=int, default=253)
-    parser.add_argument('--weight-xmax', type=int, default=1751)
-    parser.add_argument('--weight-ymax', type=int, default=443)
+    parser.add_argument('--weight-xmin', type=int, default=1467)
+    parser.add_argument('--weight-ymin', type=int, default=270)
+    parser.add_argument('--weight-xmax', type=int, default=1801)
+    parser.add_argument('--weight-ymax', type=int, default=444)
 
     args = parser.parse_args()
     return args
@@ -149,6 +149,7 @@ def main():
     finally:
         color_writer.release()
         stopwatch_writer.release()
+        weight_writer.release()
         pipeline.stop()
 
 
@@ -186,3 +187,4 @@ def get_mouse_place():
 
 if __name__ == '__main__':
     main()
+    # get_mouse_place()

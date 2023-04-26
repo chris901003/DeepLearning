@@ -1,8 +1,8 @@
 {
   "0": {
     "model_cfg": "Default",
-    "pretrained_path": "./checkpoint/remain_time/regression/regression_0.pth",
-    "setting_path": "./prepare/remain_time/regression/setting/setting_0.json"
+    "pretrained_path": "C:\\DeepLearning\\SpecialTopic\\RemainEatingTime\\RegressionModel\\regression_model.pth",
+    "setting_path": "C:\\DeepLearning\\SpecialTopic\\RemainEatingTime\\RegressionModel\\setting.json"
   },
   "1": {
     "model_cfg": "Default",

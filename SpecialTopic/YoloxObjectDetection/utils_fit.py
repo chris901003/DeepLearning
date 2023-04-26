@@ -5,7 +5,7 @@ import numpy as np
 import json
 import pycocotools.coco as coco
 from pycocotools.cocoeval import COCOeval
-from utils import get_lr, decode_outputs, non_max_suppression
+from SpecialTopic.YoloxObjectDetection.utils import get_lr, decode_outputs, non_max_suppression
 
 
 def fit_one_epoch(model_train, model, yolo_loss, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch,
