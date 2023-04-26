@@ -9,15 +9,12 @@ from SpecialTopic.YoloxObjectDetection.api import init_model, detect_image
 def args_parser():
     parser = argparse.ArgumentParser()
     # 訓練權重檔案位置
-    parser.add_argument('--pretrained-path', type=str, default=r'C:\Checkpoint\YoloxWeightNumberDetection\first_'
-                                                               r'version_1_8.pth')
+    parser.add_argument('--pretrained-path', type=str, default=r'C:\Checkpoint\YoloxWeightNumberDetection\weight_number.pth')
     # 偵測影片路徑
-    parser.add_argument('--video-path', type=str, default=[r'C:\Dataset\vedio\Rice\1217_rice.mp4',
-                                                           r'C:\Dataset\vedio\Rice\1220_donburi.mp4',
-                                                           r'C:\Dataset\vedio\Rice\1220_rice.mp4',
-                                                           r'C:\Dataset\vedio\Rice\1220_rice_2.mp4',
-                                                           r'C:\Dataset\vedio\Rice\1221_donburi_2.mp4',
-                                                           r'C:\Dataset\vedio\Rice\1221-donburi.mp4'], nargs='+')
+    parser.add_argument('--video-path', type=str, default=[r'C:\Dataset\vedio\Rice\Weight15.mp4',
+                                                           r'C:\Dataset\vedio\Rice\Weight16.mp4',
+                                                           r'C:\Dataset\vedio\Rice\Weight17.mp4',
+                                                           r'C:\Dataset\vedio\Rice\Weight18.mp4'], nargs='+')
     # 保存資料路徑
     parser.add_argument('--save-path', type=str, default='remain')
     args = parser.parse_args()

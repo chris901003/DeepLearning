@@ -26,25 +26,25 @@ def parse_args():
                         default=r'C:\DeepLearning\SpecialTopic\Verify\EatingTime\working_flow_cfg.json')
     # 影片保存路徑
     parser.add_argument('--video-save-path', type=str,
-                        default=r'C:\DeepLearning\SpecialTopic\Verify\VideoSave\Test')
+                        default=r'C:\DeepLearning\SpecialTopic\Verify\VideoSave\Donburi13_cut')
     # 結果保存根目錄位置(基本上這裡不用更改)
     parser.add_argument('--result-save-root', type=str, default=r'C:\DeepLearning\SpecialTopic\Verify\Result')
     # 結果保存在根目錄下的資料夾名稱
-    parser.add_argument('--result-save-folder-name', type=str, default='Test')
+    parser.add_argument('--result-save-folder-name', type=str, default='v2_Donburi13_cut')
 
     # 剩餘量驗證參數
     # 第一部分參數(基本上不用改)
     parser.add_argument('--detect-number-pretrain-path', type=str,
                         default=r'C:\Checkpoint\YoloxWeightNumberDetection\weight_number.pth')
     # 第二部分參數
-    parser.add_argument('--remain-num-part', type=int, default=4)
+    parser.add_argument('--remain-num-part', type=int, default=10)
 
     # 剩餘時間參數
     # 第一部分參數(基本上不用改)
     parser.add_argument('--detect-time-pretrain-path', type=str,
-                        default=r'C:\Checkpoint\YoloxWeightNumberDetection\stopwatch.pth')
+                        default=r'C:\Checkpoint\YoloxWeightNumberDetection\first_version_1_8.pth')
     # 第二部分參數
-    parser.add_argument('--time-num-part', type=int, default=4)
+    parser.add_argument('--time-num-part', type=int, default=10)
     args = parser.parse_args()
     return args
 
@@ -315,7 +315,7 @@ def main():
     # 剩餘量圖表
     _ = plt.figure(figsize=(11, 7))
     plt.subplot(611)
-    plt.title('剩餘時間', fontproperties=font1)
+    plt.title('剩餘量', fontproperties=font1)
     plt.plot(predict_remain_list, 'b--', label='預估')
     plt.plot(real_remain_list, 'r-', label='真實')
     plt.legend(loc='best', prop=font1)
@@ -457,7 +457,7 @@ def transfer_weight_to_real_remain(remain_record_list):
     for idx, info in enumerate(remain_record_list):
         weight = info.get('weight', None)
         assert weight is not None
-        real_remain = (weight - min_weight) / weight_range
+        real_remain = (weight - min_weight) / weight_range * 100
         remain_record_list[idx]['real_remain'] = real_remain
     return remain_record_list
 

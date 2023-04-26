@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from SpecialTopic.RemainEatingTime.RegressionModel.utils_fit import train_one_epoch, val_one_epoch
 from SpecialTopic.ST.build import build_detector
 from SpecialTopic.RemainEatingTime.RegressionModel.dataset import RegressionDataset
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 def args_parse():
@@ -26,9 +27,9 @@ def args_parse():
     parser.add_argument('--lstm-num-layers', type=int, default=2)
 
     # 訓練資料集的路徑
-    parser.add_argument('--training-dataset-path', type=str, default='train_regression_dataset.pickle')
+    parser.add_argument('--training-dataset-path', type=str, default='regression_dataset.pickle')
     # 驗證資料集的路徑
-    parser.add_argument('--val-dataset-path', type=str, default='val_regression_dataset.pickle')
+    parser.add_argument('--val-dataset-path', type=str, default='regression_dataset.pickle')
     # 超參數相關設定資料位置
     parser.add_argument('--setting-path', type=str, default='setting.json')
     # 模型權重保存路徑
@@ -74,7 +75,8 @@ def main():
     val_dataset = RegressionDataset(val_dataset_path)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1,
                                 collate_fn=val_dataset.collate_fn, pin_memory=True)
-    loss_function = nn.CrossEntropyLoss()
+    # loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     for epoch in range(1, Epoch + 1):
         train_one_epoch(model, epoch, Epoch, device, train_dataloader, loss_function, optimizer)

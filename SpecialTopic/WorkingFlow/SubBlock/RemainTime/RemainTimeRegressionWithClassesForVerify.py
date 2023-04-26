@@ -116,7 +116,7 @@ class RemainTimeRegressionWithClassForVerify:
     def remain_time_detection(self, image, track_object_info):
         if len(track_object_info) == 0:
             return image, track_object_info
-        assert len(track_object_info) == 1, f'在RemainTimeRegression中有多個追蹤對象，請將桌面保持只有一個食物'
+        # assert len(track_object_info) == 1, f'在RemainTimeRegression中有多個追蹤對象，請將桌面保持只有一個食物'
         # 將單一個追蹤對象取出
         track_object = track_object_info[0]
         track_id = track_object.get('track_id', None)
