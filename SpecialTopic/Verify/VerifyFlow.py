@@ -26,11 +26,11 @@ def parse_args():
                         default=r'C:\DeepLearning\SpecialTopic\Verify\EatingTime\working_flow_cfg.json')
     # 影片保存路徑
     parser.add_argument('--video-save-path', type=str,
-                        default=r'C:\DeepLearning\SpecialTopic\Verify\VideoSave\Donburi13_cut')
+                        default=r'C:\DeepLearning\SpecialTopic\Verify\VideoSave\Donburi15_cut')
     # 結果保存根目錄位置(基本上這裡不用更改)
     parser.add_argument('--result-save-root', type=str, default=r'C:\DeepLearning\SpecialTopic\Verify\Result')
     # 結果保存在根目錄下的資料夾名稱
-    parser.add_argument('--result-save-folder-name', type=str, default='v2_Donburi13_cut')
+    parser.add_argument('--result-save-folder-name', type=str, default='v2_Donburi15_cut_test')
 
     # 剩餘量驗證參數
     # 第一部分參數(基本上不用改)
@@ -217,6 +217,13 @@ def main():
             cv2.putText(weight_image, f"Weight : {real_weight}",
                         (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.putText(rgb_image, f"FPS : {int(fps)}", (30, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+            remain_color = tracking_object.get('remain_color_picture', None)
+            if remain_color is not None:
+                remain_color_height, remain_color_width = remain_color.shape[:2]
+                rgb_image[ymin: ymin + remain_color_height, xmin: xmin + remain_color_width, :] = \
+                    remain_color * 0.3 +\
+                    rgb_image[ymin: ymin + remain_color_height, xmin: xmin + remain_color_width, :] * 0.7
 
         # 最後顯示出來
         cv2.imshow('RGB Video', rgb_image)

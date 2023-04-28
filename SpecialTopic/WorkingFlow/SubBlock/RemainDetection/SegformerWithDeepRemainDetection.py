@@ -156,9 +156,6 @@ class SegformerWithDeepRemainDetection:
         """
         with_seg_draw = self.with_seg_draw
         with_depth_draw = self.with_depth_draw
-        import cv2
-        deep_draw = image['deep_draw']
-        cv2.imshow('deep', deep_draw)
         assert 'rgb_image' in image.keys(), self.logger['logger'].critical('缺少rgb_image資料')
         assert 'deep_image' in image.keys(), self.logger['logger'].critical('缺少深度deep_image資料')
         if with_depth_draw:
