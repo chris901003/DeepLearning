@@ -142,6 +142,11 @@ def main():
     number_detect_model = number_detect_model.to(device)
     number_detect_model.eval()
 
+    # 將驗證中出現的畫面保存下來
+    save_verify_video_path = os.path.join(result_save_folder_path, "VerifyVideo.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    verify_writer = cv2.VideoWriter(save_verify_video_path, fourcc, fps, (width, height), 1)
+
     # 開始對影片進行解析
     while True:
         weight_ret, weight_image = weight_cap.read()
@@ -231,8 +236,12 @@ def main():
         cv2.namedWindow("Weight", 0)
         cv2.resizeWindow("Weight", weight_width, weight_height)
         cv2.imshow('Weight', weight_image)
+        verify_writer.write(rgb_image)
         if cv2.waitKey(1) == ord('q'):
             break
+
+    # 釋放保存驗證影片
+    verify_writer.release()
 
     # 保存原始資料
     remain_record_save_path = os.path.join(result_save_folder_path, 'remain_record')
