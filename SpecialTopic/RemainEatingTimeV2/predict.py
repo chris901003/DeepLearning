@@ -9,12 +9,18 @@ from train import RegressionModel
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
-def model_predict(model, device, remain, time_range):
+def model_predict(model, device, remain, time_range, with_elapsed_time, with_avg_diff):
     results = list()
     data_len = len(remain)
     for idx in range(0, data_len - time_range):
         data = remain[idx: idx + time_range]
         data = [max(0, min(100, rem)) for rem in data]
+        if with_avg_diff:
+            avg = int(sum(data) / len(data))
+            data_diff = [int(remain - avg) + 100 for remain in data]
+            data.extend(data_diff)
+        if with_elapsed_time:
+            data.append(idx + time_range)
         data = torch.Tensor(data).long().to(device).unsqueeze(dim=0)
         with torch.no_grad():
             predict = model(data).squeeze(dim=0)
@@ -58,10 +64,15 @@ def args_parse():
     parser.add_argument('--lstm-hidden-size', type=int, default=64)
     parser.add_argument('--lstm-num-layers', type=int, default=2)
     parser.add_argument('--time-range', type=int, default=2 * 60)
-    parser.add_argument('--weight-path', type=str, default='./2023-4-26.pth')
+    parser.add_argument('--weight-path', type=str, default='./regression_model.pth')
     # parser.add_argument('--time-range', type=int, default=4 * 60)
     # parser.add_argument('--weight-path', type=str, default='./regression_model.pth')
     parser.add_argument('--val-data-path', type=str, default='./raw_info.json')
+
+    # 添加已經過時間
+    parser.add_argument('--with-elapsed-time', type=bool, default=True)
+    # 添加每個值對整段的平均差異
+    parser.add_argument('--with-avg-diff', type=bool, default=True)
     args = parser.parse_args()
     return args
 
@@ -70,11 +81,15 @@ def main():
     args = args_parse()
     time_range = args.time_range
     val_data_path = args.val_data_path
+    with_elapsed_time = args.with_elapsed_time
+    with_avg_diff = args.with_avg_diff
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = RegressionModel(
         input_size=args.lstm_input_size,
         hidden_size=args.lstm_hidden_size,
-        num_layers=args.lstm_num_layers
+        num_layers=args.lstm_num_layers,
+        with_elapsed_time=with_elapsed_time,
+        with_avg_diff=with_avg_diff
     )
     model = model.to(device)
     model.load_state_dict(torch.load(args.weight_path))
@@ -85,9 +100,11 @@ def main():
     predict_remain = val_data["predict_remain"]
     real_remain = val_data["real_remain"]
     real_remain_time = val_data["real_remain_time"]
-    predict_remain_to_remain_time = model_predict(model, device, predict_remain, time_range)
+    predict_remain_to_remain_time = model_predict(model, device, predict_remain, time_range,
+                                                  with_elapsed_time, with_avg_diff)
     predict_remain_loss = model_loss(predict_remain_to_remain_time, real_remain_time, time_range)
-    real_remain_to_remain_time = model_predict(model, device, real_remain, time_range)
+    real_remain_to_remain_time = model_predict(model, device, real_remain, time_range,
+                                               with_elapsed_time, with_avg_diff)
     real_remain_loss = model_loss(real_remain_to_remain_time, real_remain_time, time_range)
     print(f"Predict Remain Avg Diff: {predict_remain_loss['avg']}")
     print(f"Real Remain Avg Diff: {real_remain_loss['avg']}")
