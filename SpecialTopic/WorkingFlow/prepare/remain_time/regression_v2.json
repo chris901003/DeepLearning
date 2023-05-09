@@ -1,0 +1,101 @@
+{
+  "0": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "C:\\DeepLearning\\SpecialTopic\\RemainEatingTimeV2\\regression_model_without.pth",
+    "time_range": 120
+  },
+  "1": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "2": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "3": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "4": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "5": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "6": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "7": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  },
+  "8": {
+    "model_cfg": {
+      "input_size": 32,
+      "hidden_size": 64,
+      "num_layers": 2,
+      "with_elapsed_time": true,
+      "with_avg_diff": true
+    },
+    "pretrained_path": "",
+    "time_range": 120
+  }
+}
