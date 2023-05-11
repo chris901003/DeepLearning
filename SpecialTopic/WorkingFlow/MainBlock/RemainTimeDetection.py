@@ -22,6 +22,7 @@ class RemainTimeDetection:
             import RemainTimeRegressionWithClassTensorRT
         from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeRegressionWithClassesForVerify \
             import RemainTimeRegressionWithClassForVerify
+        from SpecialTopic.WorkingFlow.SubBlock.RemainTime.RemainTimeRegressionV2 import RemainTimeRegressionV2
         support_module = {
             'RemainTimeTransformerDetection': RemainTimeTransformerDetection,
             'RemainTimeTransformerDetectionTensorRT': RemainTimeTransformerDetectionTensorRT,
@@ -29,7 +30,8 @@ class RemainTimeDetection:
             'RemainTimeRegression': RemainTimeRegression,
             'RemainTimeRegressionWithClass': RemainTimeRegressionWithClass,
             'RemainTimeRegressionWithClassTensorRT': RemainTimeRegressionWithClassTensorRT,
-            'RemainTimeRegressionWithClassForVerify': RemainTimeRegressionWithClassForVerify
+            'RemainTimeRegressionWithClassForVerify': RemainTimeRegressionWithClassForVerify,
+            'RemainTimeRegressionV2': RemainTimeRegressionV2
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)
