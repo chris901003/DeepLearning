@@ -2,17 +2,22 @@ import time
 import os
 import torch
 import json
+import copy
 from typing import Union
 from functools import partial
 from SpecialTopic.ST.utils import get_cls_from_dict
 from SpecialTopic.RemainEatingTimeV2.train import RegressionModel
 
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+
 class RemainTimeRegressionV2:
     def __init__(self, regression_cfg_file, keep_frame=200, input_reduce_mode: Union[str, dict] = "Default",
                  output_reduce_mode: Union[dict, str] = "Default", remain_project_remain_time=None):
         support_input_reduce_mode = {
-            "mean": self.input_reduce_mean
+            "mean": self.input_reduce_mean,
+            'range': self.input_reduce_range
         }
         support_output_reduce_mode = {
             "momentum": self.output_reduce_momentum
@@ -25,9 +30,10 @@ class RemainTimeRegressionV2:
             output_reduce_mode = dict(type="momentum", alpha=0.2)
         else:
             assert isinstance(output_reduce_mode, dict), "傳入的資料需要是dict格式"
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         input_reduce_func = get_cls_from_dict(support_input_reduce_mode, input_reduce_mode)
         self.input_reduce = partial(input_reduce_func, **input_reduce_mode)
-        output_reduce_func = get_cls_from_dict(support_output_reduce_mode, **output_reduce_mode)
+        output_reduce_func = get_cls_from_dict(support_output_reduce_mode, output_reduce_mode)
         self.output_reduce = partial(output_reduce_func, **output_reduce_mode)
         self.regression_cfg_file = regression_cfg_file
         self.models = self.create_regression_models()
@@ -41,7 +47,6 @@ class RemainTimeRegressionV2:
             "remain_time_detection": self.remain_time_detection
         }
         self.logger = None
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     def create_regression_models(self):
         assert os.path.exists(self.regression_cfg_file)
@@ -56,10 +61,14 @@ class RemainTimeRegressionV2:
             assert pretrained_path is not None
             time_range = model_dict.get("time_range", None)
             assert time_range is not None
+            if not os.path.exists(pretrained_path):
+                continue
+            print(f"成功加載{idx}剩餘時間權重")
             model = RegressionModel(**model_cfg)
+            model.load_state_dict(torch.load(pretrained_path, map_location="cpu"))
             model = model.to(self.device)
             model.eval()
-            model_dict[idx] = model
+            models_dict[idx] = model
             model.time_range = time_range
         return models_dict
 
@@ -117,7 +126,6 @@ class RemainTimeRegressionV2:
             self.keep_data[track_id]["start_predict_time"] = self.current_time
         self.keep_data[track_id]["sec_remain_buffer"].append(food_remain)
         self.keep_data[track_id]["last_track_frame"] = self.frame
-        self.keep_data[track_id]["last_mix_time"] = self.current_time
         self.predict_remain_time(track_id, remain_category_id)
 
     def predict_remain_time(self, track_id, remain_category_id):
@@ -133,8 +141,9 @@ class RemainTimeRegressionV2:
         time_range = model.time_range
         with_elapsed_time = model.with_elapsed_time
         with_avg_diff = model.with_avg_diff
-        if self.current_time - self.keep_data[track_id]["last_mix_time"] < 1:
+        if (self.current_time - self.keep_data[track_id]["last_mix_time"]) < 1:
             return
+        self.keep_data[track_id]["last_mix_time"] = self.current_time
         current_remain = self.input_reduce(track_id=track_id)
         self.keep_data[track_id]["sec_remain_buffer"] = list()
         if len(self.keep_data[track_id]["remain_buffer"]) == time_range:
@@ -142,13 +151,17 @@ class RemainTimeRegressionV2:
         self.keep_data[track_id]["remain_buffer"].append(current_remain)
         if len(self.keep_data[track_id]["remain_buffer"]) != time_range:
             return
-        pass_time = self.current_time - self.keep_data[track_id]["start_predict_time"]
+        pass_time = self.current_time - self.keep_data[track_id]["start_predict_time"] + 1
         remain_data = self.preprocess_remain_data(self.keep_data[track_id]["remain_buffer"], pass_time,
                                                   with_avg_diff, with_elapsed_time)
         remain_data = remain_data.to(self.device)
         with torch.no_grad():
             predict = model(remain_data).squeeze(dim=0)
         remain_time = predict.item()
+        # if self.keep_data[track_id]["last_predict"] is not None:
+        #     remain_time = self.output_reduce(old_value=self.keep_data[track_id]["last_predict"],
+        #                                      new_value=remain_time)
+        self.keep_data[track_id]["last_predict"] = remain_time
         self.keep_data[track_id]["remain_time"] = remain_time
 
     @staticmethod
@@ -175,6 +188,20 @@ class RemainTimeRegressionV2:
         avg = tot / record_len
         return avg
 
+    def input_reduce_range(self, scope, track_id):
+        assert scope[0] <= scope[1] and len(scope) == 2, '給定範圍錯誤'
+        remain_buffer = copy.deepcopy(self.keep_data[track_id]['sec_remain_buffer'])
+        remain_buffer = sorted(remain_buffer)
+        remain_len = len(remain_buffer)
+        left_idx, right_idx = int(remain_len * scope[0]), int(remain_len * scope[1])
+        if left_idx == right_idx:
+            right_idx += 1
+        left_idx = min(max(0, left_idx), remain_len - 1)
+        right_idx = min(max(1, right_idx), remain_len)
+        remain_buffer = remain_buffer[left_idx:right_idx]
+        avg = sum(remain_buffer) / len(remain_buffer)
+        return avg
+
     @staticmethod
     def output_reduce_momentum(alpha, old_value, new_value):
         new_value = old_value * alpha + new_value * (1 - alpha)
@@ -182,12 +209,57 @@ class RemainTimeRegressionV2:
 
     def create_new_track_object(self):
         data = dict(sec_remain_buffer=list(), remain_buffer=list(), remain_time="New Remain Time track object",
-                    last_track_frame=self.frame, start_predict_time=0, last_mix_time=0, record_remain=list([100]))
+                    last_track_frame=self.frame, start_predict_time=0, last_mix_time=0, last_predict=None)
         return data
 
 
 def test():
-    pass
+    raw_data_path = r"C:\DeepLearning\SpecialTopic\Verify\Result\v1_Donburi37\raw_info.json"
+    with open(raw_data_path, "r") as f:
+        raw_info = json.load(f)
+    predict_remain = raw_info["predict_remain"]
+    input_reduce_cfg = dict(type='range', scope=(0.4, 0.7))
+    model = RemainTimeRegressionV2(
+        regression_cfg_file=r"C:\DeepLearning\SpecialTopic\WorkingFlow\prepare\remain_time\regression_v2.json",
+        input_reduce_mode=input_reduce_cfg)
+    track_object_info = [{
+        "position": [],
+        "category_from_object_detection": 0,
+        "object_score": 100,
+        "track_id": 0,
+        "using_last": False,
+        "remain_category_id": "0",
+        "category_from_remain": "Init standard remain ratio ..."
+    }]
+    image = []
+    inputs = {"image": image, "track_object_info": track_object_info}
+    image, track_object_info = model(call_api="remain_time_detection", inputs=inputs)
+    _ = track_object_info[0]["remain_time"]
+    record = list()
+    for remain in predict_remain:
+        track_object_info[0]["category_from_remain"] = remain
+        image, track_object_info = model(call_api="remain_time_detection", inputs=inputs)
+        remain_time = track_object_info[0]["remain_time"]
+        if isinstance(remain_time, float):
+            record.append(remain_time)
+    data_len = len(record)
+    real_remain_time = [data_len - idx for idx in range(0, data_len)]
+    plot_figure(record, 0, real_remain_time, 2 * 60)
+    print(record)
+
+
+def plot_figure(predict_remain_predict, predict_avg, real_remain_time, time_range):
+    from matplotlib import pyplot as plt
+    _ = plt.figure(figsize=(11, 7))
+    plt.subplot(211)
+    plt.title("Predict Remain -> Remain Time")
+    plt.plot(predict_remain_predict, 'b--', label='Predict')
+    plt.plot(real_remain_time, 'r-', label='Real')
+    plt.subplot(212)
+    plt.title("Avg")
+    plt.text(0, 0.5, f"Predict Remain Avg: {predict_avg}", fontsize=15, color='blue')
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
