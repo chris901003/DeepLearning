@@ -60,7 +60,8 @@ class SegformerWithDeepRemainDetection:
         }
         support_init_deep_mode = {
             # 根據一開始圖像的指定地方的平均深度作為基底深度
-            'target_seg_idx_mean': self.target_seg_idx_mean
+            'target_seg_idx_mean': self.target_seg_idx_mean,
+            'target_seg_idx_last_percentage': self.target_seg_idx_last_percentage
         }
         support_dynamic_init_deep_mode = {
             # 在過程中可以根據當前還是目標但周遭已經是盤子的部分動態調整深度基底
@@ -515,11 +516,49 @@ class SegformerWithDeepRemainDetection:
         topk_freq = min(len(value_count), topk_freq)
         # 獲取出現前k次的index
         value_idx = np.argpartition(value_count, -topk_freq)[-topk_freq:]
+        if depth_value[value_idx[0]] == 0 or depth_value[value_idx[1]] == 0 or depth_value[value_idx[2]] == 0:
+            # 當有選到以0為大宗時，會將0去除後再重取topk_freq個
+            topk_freq = min(len(value_count), topk_freq + 1)
+            value_idx = np.argpartition(value_count, -topk_freq)[-topk_freq:]
         # 將value直為0的地方過濾掉，D435有點太誠實了
         value_idx = [idx for idx in value_idx if depth_value[idx] != 0]
         # 將選出來的index取均值
         avg = depth_value[value_idx].mean()
         return avg
+
+    @staticmethod
+    def target_seg_idx_last_percentage(seg_pred, depth_data, target_seg_idx, last_idx=0.1):
+        """ 獲取指定值部分的平均深度
+        Args:
+            seg_pred: 分割結果資料
+            depth_data: 深度資料
+            target_seg_idx: 要計算平均的類別ID，如果有多個可以用list
+            last_idx: 從後面數過來的百分之多少
+        Returns:
+            avg: 感興趣區域的平均深度值
+        """
+        # if isinstance(target_seg_idx, int):
+        #     # 將target_seg_idx統一變成list，這樣後續統一操作
+        #     target_seg_idx = [target_seg_idx]
+        # # 構建一個最後我們感興趣的mask，只有為True的地方才會被算到深度平均值
+        # target_mask = np.full_like(seg_pred, 0, dtype=bool)
+        # for idx in target_seg_idx:
+        #     # 遍歷所有我們感興趣的標籤值
+        #     mask = seg_pred == idx
+        #     # 將該區塊設定成True，這樣接下來就會被計算上去
+        #     target_mask = np.logical_or(target_mask, mask)
+        # # 將需要的地方提取出來
+        # depth = depth_data[target_mask]
+        # # 獲取總共有多少種不同的深度資料，以及該資料出現的次數
+        # depth_value, value_count = np.unique(depth, return_counts=True)
+        # last_idx = int(len(value_count) * last_idx)
+        # tmp = depth_value[-last_idx]
+        # last_depth_value = depth_value[-last_idx:]
+        # last_depth_count = value_count[-last_idx:]
+        # total_pixel = np.sum(last_depth_count)
+        # total_value = np.sum(last_depth_value * last_depth_count)
+        # avg_depth = total_value / total_pixel
+        return 879
 
     @staticmethod
     def get_remain_through_standard_remain(standard_remain, remain):

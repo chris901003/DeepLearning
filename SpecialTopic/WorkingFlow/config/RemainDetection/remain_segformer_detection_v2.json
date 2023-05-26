@@ -1,0 +1,15 @@
+{
+  "type": "SegformerWithDeepV2",
+  "remain_module_file": "./prepare/remain_segformer_module_cfg.json",
+  "classes_path": "./prepare/remain_segformer_detection_classes.txt",
+  "with_color_platte": "FoodAndNotFood",
+  "initial_depth_info": "./prepare/remain_detection/initial_depth.npy",
+  "save_last_period": 150,
+  "reduce_mode": {
+    "type": "momentum", "alpha": 0.5
+  },
+  "check_init_ratio_frame": 30,
+  "standard_remain_error": [0.8, 1.2],
+  "with_seg_draw": true,
+  "with_depth_draw": true
+}

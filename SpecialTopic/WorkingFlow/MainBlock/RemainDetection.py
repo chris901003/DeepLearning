@@ -18,12 +18,14 @@ class RemainDetection:
             SegformerWithDeepRemainDetection
         from SpecialTopic.WorkingFlow.SubBlock.RemainDetection.SegformerWithDeepRemainDetectionTensorRT import \
             SegformerWithDeepRemainDetectionTensorRT
+        from SpecialTopic.WorkingFlow.SubBlock.RemainDetection.SegformerWithDeepV2 import SegformerWithDeepV2
         support_module = {
             'VitRemainDetection': VitRemainDetection,
             'SegformerRemainDetection': SegformerRemainDetection,
             'SegformerRemainDetectionTensorRT': SegformerRemainDetectionTensorRT,
             'SegformerWithDeepRemainDetection': SegformerWithDeepRemainDetection,
-            'SegformerWithDeepRemainDetectionTensorRT': SegformerWithDeepRemainDetectionTensorRT
+            'SegformerWithDeepRemainDetectionTensorRT': SegformerWithDeepRemainDetectionTensorRT,
+            'SegformerWithDeepV2': SegformerWithDeepV2
         }
         cfg = parser_cfg(cfg_path)
         cfg_ = copy.deepcopy(cfg)
