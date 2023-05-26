@@ -55,7 +55,7 @@ def main():
                 break
     finally:
         pipeline.stop()
-    np.save(save_path, save_depth_info)
+    np.save(save_path, save_depth_info / cnt)
 
 
 def deep_color_image(deep_info, min_value=None, max_value=None):
