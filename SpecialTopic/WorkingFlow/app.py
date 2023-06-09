@@ -31,27 +31,31 @@ def main():
             os.mkdir(save_video_path)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         video_name = os.path.join(save_video_path, 'test.mp4')
-        video_write = cv2.VideoWriter(video_name, fourcc, 30, (1920, 1080))
+        video_write = cv2.VideoWriter(video_name, fourcc, 30, (640, 480))
     show_window_size = args.show_window_size
     working_flow = WorkingSequence(working_flow_cfg)
     step_add_input = {'ObjectClassifyToRemainClassify': {'0': {'using_dict_name': 'FoodDetection9'}}}
     pTime = 0
-    while True:
-        result = working_flow(step_add_input=step_add_input)
-        result_image = result['image']
-        cTime = time.time()
-        fps = 1 / (cTime - pTime)
-        pTime = cTime
-        cv2.putText(result_image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-        if isinstance(show_window_size, (tuple, list)):
-            assert len(show_window_size) == 2, '需提供高寬大小'
-            cv2.namedWindow("result", 0)
-            cv2.resizeWindow("result", show_window_size[1], show_window_size[0])
-        cv2.imshow('result', result_image)
+    try:
+        while True:
+            result = working_flow(step_add_input=step_add_input)
+            result_image = result['image']
+            cTime = time.time()
+            fps = 1 / (cTime - pTime)
+            pTime = cTime
+            cv2.putText(result_image, f"FPS : {int(fps)}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+            if isinstance(show_window_size, (tuple, list)):
+                assert len(show_window_size) == 2, '需提供高寬大小'
+                cv2.namedWindow("result", 0)
+                cv2.resizeWindow("result", show_window_size[1], show_window_size[0])
+            cv2.imshow('result', result_image)
+            if video_write is not None:
+                video_write.write(result_image)
+            if cv2.waitKey(1) == ord('q'):
+                break
+    finally:
         if video_write is not None:
-            video_write.write(result_image)
-        if cv2.waitKey(1) == ord('q'):
-            break
+            video_write.release()
 
 
 if __name__ == '__main__':
